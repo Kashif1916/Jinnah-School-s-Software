@@ -1,4 +1,4 @@
-# School Finance Management System (SFMS)
+# Jinnah School's Finance Management System (SFMS)
 
 A complete, production-ready School Finance Management System built with PHP, MySQL, HTML, and CSS. Designed to run on XAMPP localhost with clean folder structure and modular code.
 
