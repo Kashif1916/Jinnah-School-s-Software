@@ -47,10 +47,11 @@ if ($defaulters) {
             padding-bottom: 5mm;
             margin-bottom: 10mm;
         }
-        .header h1 {
-            margin: 0;
-            color: #1f5f46;
-            font-size: 22px;
+        .report-logo {
+            display: block;
+            width: 95px;
+            height: auto;
+            margin: 0 auto 4mm;
         }
         .header p {
             margin: 2mm 0;
@@ -118,7 +119,7 @@ if ($defaulters) {
 <body>
     <div class="report-container">
         <div class="header">
-            <h1><?php echo SYSTEM_NAME; ?></h1>
+            <?php echo render_system_logo('report-logo'); ?>
             <p>Defaulter Students Report</p>
             <p>Generated on <?php echo date('d-m-Y H:i'); ?></p>
         </div>

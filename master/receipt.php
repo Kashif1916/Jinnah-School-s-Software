@@ -60,10 +60,11 @@ ob_start();
             padding-bottom: 10mm;
             margin-bottom: 10mm;
         }
-        .header h1 {
-            margin: 0;
-            color: #1f5f46;
-            font-size: 24px;
+        .receipt-logo {
+            display: block;
+            width: 100px;
+            height: auto;
+            margin: 0 auto 4mm;
         }
         .header p {
             margin: 2mm 0;
@@ -238,7 +239,8 @@ ob_start();
         </div>
         
         <div class="footer">
-            <p>This is an official receipt issued by <?php echo SYSTEM_NAME; ?>. Please retain this receipt for your records.</p>
+            <?php echo render_system_logo('receipt-logo'); ?>
+            <p>This is an official receipt issued by <?php echo SITE_NAME; ?>. Please retain this receipt for your records.</p>
             <p>Receipt generated on <?php echo date('d-m-Y H:i:s'); ?></p>
         </div>
     </div>

@@ -220,4 +220,12 @@ function show_message($type, $message) {
     echo '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
 }
 
+/**
+ * Render system logo
+ */
+function render_system_logo($class = '') {
+    $class_attr = !empty($class) ? ' class="' . htmlspecialchars($class, ENT_QUOTES, 'UTF-8') . '"' : '';
+    return '<img src="' . BASE_URL . 'images/logo.jfif" alt="' . htmlspecialchars(SITE_NAME, ENT_QUOTES, 'UTF-8') . '"' . $class_attr . '>';
+}
+
 ?>
