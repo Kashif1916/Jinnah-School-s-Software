@@ -74,21 +74,30 @@ ob_start();
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 10mm;
+            padding: 0;
             background: white;
+            width: 80mm; /* Standard Thermal Width */
         }
         .receipt-container {
             max-width: 210mm;
             margin: 0 auto;
+            width: 76mm; /* Slight margin for printer */
+            margin: 0;
             background: white;
             padding: 20mm;
             border: 1px solid #333;
+            padding: 2mm;
             box-sizing: border-box;
+            border: none;
         }
         .header {
             text-align: center;
             border-bottom: 2px solid #1f5f46;
             padding-bottom: 10mm;
             margin-bottom: 10mm;
+            border-bottom: 1px dashed #333;
+            padding-bottom: 5mm;
+            margin-bottom: 5mm;
         }
         .receipt-logo {
             display: block;
@@ -98,8 +107,10 @@ ob_start();
         }
         .header p {
             margin: 2mm 0;
+            margin: 1mm 0;
             color: #666;
             font-size: 11px;
+            font-size: 10px;
         }
         .receipt-number {
             float: right;
@@ -107,12 +118,16 @@ ob_start();
         }
         .receipt-number p {
             margin: 2mm 0;
+            margin: 1mm 0;
+            font-size: 11px;
+            text-align: center;
         }
         .clearfix {
             clear: both;
         }
         .section {
             margin-bottom: 8mm;
+            margin-bottom: 5mm;
         }
         .section-title {
             font-weight: bold;
@@ -120,6 +135,9 @@ ob_start();
             border-bottom: 1px solid #ddd;
             padding-bottom: 2mm;
             margin-bottom: 3mm;
+            border-bottom: 1px dashed #ddd;
+            padding-bottom: 1mm;
+            margin-bottom: 2mm;
             font-size: 12px;
         }
         .student-info {
@@ -129,13 +147,17 @@ ob_start();
             margin-bottom: 8mm;
         }
         .info-item {
+            margin-bottom: 5mm;
             font-size: 11px;
+            line-height: 1.4;
         }
         .info-label {
             font-weight: bold;
             color: #333;
             display: block;
             margin-bottom: 1mm;
+            width: 80px;
+            display: inline-block;
         }
         .info-value {
             color: #667;
@@ -149,17 +171,28 @@ ob_start();
             border-collapse: collapse;
             margin-bottom: 5mm;
             font-size: 11px;
+            margin-bottom: 3mm;
+            font-size: 10px;
         }
         table th {
             background: #f5f5f5;
             border: 1px solid #ddd;
             padding: 3mm;
+            border-bottom: 1px solid #333;
+            padding: 2mm 0;
             text-align: left;
             font-weight: bold;
         }
         table td {
             border: 1px solid #ddd;
             padding: 3mm;
+            padding: 2mm 0;
+            vertical-align: top;
+            border-bottom: 1px dashed #eee;
+        }
+        .amount-col {
+            text-align: right;
+            white-space: nowrap;
         }
         .signature-section {
             margin-top: 15mm;
@@ -167,19 +200,27 @@ ob_start();
             grid-template-columns: 1fr 1fr;
             gap: 20mm;
             font-size: 11px;
+            margin-top: 10mm;
+            font-size: 10px;
         }
         .signature-line {
             border-top: 1px solid #333;
+            border-top: 1px dashed #333;
             text-align: center;
             padding-top: 3mm;
+            padding-top: 2mm;
+            margin-top: 10mm;
         }
         .footer {
             text-align: center;
             font-size: 10px;
+            font-size: 9px;
             color: #999;
             border-top: 1px solid #ddd;
+            border-top: 1px dashed #ddd;
             padding-top: 5mm;
             margin-top: 10mm;
+            margin-top: 5mm;
         }
         .paid-stamp {
             position: absolute;
@@ -188,12 +229,28 @@ ob_start();
             font-size: 60px;
             color: rgba(31, 95, 70, 0.18);
             transform: rotate(-20deg);
+            text-align: center;
+            font-size: 24px;
+            color: #1f5f46;
+            border: 2px solid #1f5f46;
+            display: inline-block;
+            padding: 1mm 5mm;
+            margin: 5mm auto;
             font-weight: bold;
+            opacity: 0.5;
         }
         .amount-display {
             font-size: 14px;
             font-weight: bold;
             color: #1f5f46;
+        }
+        @media print {
+            @page {
+                margin: 0;
+            }
+            body {
+                width: 80mm;
+            }
         }
     </style>
 </head>
@@ -205,9 +262,14 @@ ob_start();
             <h1><?php echo SITE_NAME; ?></h1>
             <p>School Management Fee Receipt</p>
         </div>
+
+        <div style="text-align: center;">
+            <div class="paid-stamp">PAID</div>
+        </div>
         
         <div class="receipt-number">
             <p><strong>Receipt #:</strong> <?php echo str_pad($payments_to_display[0]['id'], 6, '0', STR_PAD_LEFT); ?> (Batch)</p>
+            <p><strong>Receipt #:</strong> <?php echo str_pad($payments_to_display[0]['id'], 6, '0', STR_PAD_LEFT); ?></p>
             <p><strong>Date:</strong> <?php echo date('d-m-Y H:i'); ?></p>
         </div>
         
@@ -215,6 +277,7 @@ ob_start();
         
         <div class="section">
             <div class="section-title">Student Information</div>
+            <div class="section-title">Common Info</div>
             <div class="student-info">
                 <div class="info-item">
                     <span class="info-label">Student Name:</span>
@@ -232,37 +295,52 @@ ob_start();
                     <span class="info-label">Contact Number:</span>
                     <span class="info-value"><?php echo $student_info['contact_number']; ?></span>
                 </div>
+                <div><span class="info-label">Father:</span> <?php echo $student_info['father_name']; ?></div>
+                <div><span class="info-label">Contact:</span> <?php echo $student_info['contact_number']; ?></div>
             </div>
         </div>
         
         <div class="section payment-details">
             <div class="section-title">Payment Details</div>
+            <div class="section-title">Items</div>
             <table>
                 <thead>
                     <tr>
                         <th>Student Name</th>
+                        <th>Class</th>
                         <th>Payment ID</th>
                         <th>Fee Month</th>
                         <th>Amount Paid</th>
                         <th>Payment Date & Time</th>
                         <th>Received By</th>
+                        <th>Description</th>
+                        <th class="amount-col">Amount</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($payments_to_display as $payment): ?>
                         <tr>
                             <td><?php echo $payment['name']; ?></td>
+                            <td><?php echo $payment['class'] . '-' . $payment['section']; ?></td>
                             <td><?php echo $payment['id']; ?></td>
                             <td><?php echo $payment['paid_for_month']; ?></td>
                             <td class="amount-display"><?php echo format_currency($payment['amount']); ?></td>
                             <td><?php echo format_datetime($payment['payment_date']); ?></td>
                             <td><?php echo $payment['received_by']; ?></td>
+                            <td>
+                                <strong><?php echo $payment['name']; ?></strong><br>
+                                <?php echo $payment['class'] . '-' . $payment['section']; ?> | <?php echo $payment['paid_for_month']; ?>
+                            </td>
+                            <td class="amount-col"><?php echo number_format($payment['amount'], 2); ?></td>
                         </tr>
                     <?php endforeach; ?>
                     <tr style="font-weight: bold; background-color: #f0f0f0;">
-                        <td colspan="3" style="text-align: right;">TOTAL AMOUNT:</td>
+                        <td colspan="4" style="text-align: right;">TOTAL AMOUNT:</td>
                         <td class="amount-display"><?php echo format_currency($total_amount_paid); ?></td>
                         <td colspan="2"></td>
+                    <tr style="font-weight: bold;">
+                        <td style="text-align: right; padding-top: 4mm;">TOTAL:</td>
+                        <td class="amount-col" style="padding-top: 4mm;"><?php echo format_currency($total_amount_paid); ?></td>
                     </tr>
                 </tbody>
             </table>
@@ -297,6 +375,7 @@ ob_start();
         <div class="signature-section">
             <div class="signature-line">
                 <span>Authorized By</span>
+                <span>Receiver Signature</span>
             </div>
             <div class="signature-line">
                 <span>Received By</span>
@@ -307,59 +386,12 @@ ob_start();
             <?php echo render_system_logo('receipt-logo'); ?>
             <p>This is an official receipt issued by <?php echo SITE_NAME; ?>. Please retain this receipt for your records.</p>
             <p>Receipt generated on <?php echo date('d-m-Y H:i:s'); ?></p>
-        </div>
-    </div>
-</body>
-</html>
-<?php
-$content = ob_get_clean();
-
-// Send as HTML - users can print as PDF using browser
-header('Content-Type: text/html; charset=utf-8');
-echo $content;
-?>
-                </div>
-            </div>
+            <p>Thank you for your payment!</p>
+            <p><?php echo date('d-m-Y H:i:s'); ?></p>
         </div>
         
-        <div class="section payment-details">
-            <div class="section-title">Payment Details</div>
-            <table>
-                <tbody>
-                    <tr>
-                        <td><strong>Fee Month:</strong></td>
-                        <td><?php echo $receipt['month']; ?></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Amount:</strong></td>
-                        <td class="amount-display"><?php echo format_currency($receipt['amount']); ?></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Payment Status:</strong></td>
-                        <td><?php echo strtoupper($receipt['status']); ?></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Payment Date & Time:</strong></td>
-                        <td><?php echo format_datetime($receipt['payment_date']); ?></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <div class="signature-section">
-            <div class="signature-line">
-                <span>Authorized By</span>
-            </div>
-            <div class="signature-line">
-                <span>Received By</span>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <?php echo render_system_logo('receipt-logo'); ?>
-            <p>This is an official receipt issued by <?php echo SITE_NAME; ?>. Please retain this receipt for your records.</p>
-            <p>Receipt generated on <?php echo date('d-m-Y H:i:s'); ?></p>
-        </div>
+        <!-- Extra space for thermal cutter -->
+        <div style="height: 10mm;"></div>
     </div>
 </body>
 </html>

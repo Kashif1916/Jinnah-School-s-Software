@@ -119,7 +119,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             if (!empty($generated_payment_ids)) {
                 $_SESSION['fee_cart'] = []; // Clear cart after success
-                header('Location: receipt.php?payment_ids=' . implode(',', $generated_payment_ids));
+                $_SESSION['print_receipt_url'] = 'receipt.php?payment_ids=' . implode(',', $generated_payment_ids);
+                header('Location: fee_management.php'); // Redirect to clear the search/student screen
                 exit();
             }
         } else {
@@ -431,6 +432,13 @@ if (isset($_GET['id'])) {
     <script src="../assets/js/script.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Check if there is a receipt to be opened in a new tab
+            <?php if (isset($_SESSION['print_receipt_url'])): ?>
+                const receiptUrl = '<?php echo $_SESSION['print_receipt_url']; ?>';
+                window.open(receiptUrl, '_blank');
+                <?php unset($_SESSION['print_receipt_url']); // Clear it after opening ?>
+            <?php endif; ?>
+
             const checkboxes = document.querySelectorAll('.fee-checkbox');
             const addBatchBtn = document.getElementById('addBatchBtn');
 
