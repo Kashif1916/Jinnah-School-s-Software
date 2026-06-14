@@ -6,6 +6,7 @@
 
 require_once 'config/config.php';
 require_once 'config/db.php';
+require_once 'includes/helpers.php';
 
 // Check if database needs to be set up
 if (isset($redirect_to_setup) && $redirect_to_setup) {
@@ -116,11 +117,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             margin-bottom: 30px;
         }
         
-        .login-header h1 {
-            color: #1f5f46;
-            font-weight: 700;
-            font-size: 28px;
-            margin-bottom: 10px;
+        .login-logo {
+            display: block;
+            width: 90px;
+            height: auto;
+            margin: 0 auto 12px;
         }
         
         .login-header p {
@@ -209,8 +210,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="login-container">
         <div class="login-box">
             <div class="login-header">
-                <h1>SFMS</h1>
-                <p>School Finance Management System</p>
+                <?php echo render_system_logo('login-logo'); ?>
+                <p>Jinnah School Finance Management System</p>
             </div>
             
             <?php if (!empty($error)): ?>
