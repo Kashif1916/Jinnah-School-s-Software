@@ -1,0 +1,223 @@
+<?php
+/**
+ * Helper Functions
+ * School Finance Management System
+ */
+
+/**
+ * Sanitize input
+ */
+function sanitize_input($data) {
+    global $conn;
+    $data = trim($data);
+    $data = stripslashes($data);
+    $data = htmlspecialchars($data);
+    return $conn->real_escape_string($data);
+}
+
+/**
+ * Format currency
+ */
+function format_currency($amount) {
+    return 'Rs. ' . number_format($amount, 2);
+}
+
+/**
+ * Generate month string
+ */
+function get_month_string($month_num) {
+    $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return $months[$month_num - 1] . '-' . date('Y');
+}
+
+/**
+ * Get current month year
+ */
+function get_current_month() {
+    return date('M-Y');
+}
+
+/**
+ * Format date
+ */
+function format_date($datetime) {
+    if (empty($datetime)) return '-';
+    return date('d-m-Y', strtotime($datetime));
+}
+
+/**
+ * Format datetime
+ */
+function format_datetime($datetime) {
+    if (empty($datetime)) return '-';
+    return date('d-m-Y H:i', strtotime($datetime));
+}
+
+/**
+ * Get student by ID
+ */
+function get_student($student_id) {
+    global $conn;
+    $query = "SELECT * FROM students WHERE id = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('i', $student_id);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
+
+/**
+ * Get fee record
+ */
+function get_fee_record($student_id, $month) {
+    global $conn;
+    $query = "SELECT * FROM fee_records WHERE student_id = ? AND month = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('is', $student_id, $month);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
+
+/**
+ * Create fee records for new student for 12 months
+ */
+function create_annual_fees($student_id, $monthly_fee) {
+    global $conn;
+    
+    $months = array_map(function($m) {
+        return $m . '-' . date('Y');
+    }, ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
+    
+    foreach ($months as $month) {
+        $query = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param('isd', $student_id, $month, $monthly_fee);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
+
+/**
+ * Get total unpaid fees for student
+ */
+function get_total_unpaid_fees($student_id) {
+    global $conn;
+    $query = "SELECT SUM(amount) as total FROM fee_records WHERE student_id = ? AND status = 'unpaid'";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('i', $student_id);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    return $result['total'] ?? 0;
+}
+
+/**
+ * Get total paid fees for student
+ */
+function get_total_paid_fees($student_id) {
+    global $conn;
+    $query = "SELECT SUM(amount) as total FROM fee_records WHERE student_id = ? AND status = 'paid'";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('i', $student_id);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    return $result['total'] ?? 0;
+}
+
+/**
+ * Get defaulters list
+ */
+function get_defaulters($class = '', $section = '', $month = '') {
+    global $conn;
+    
+    $query = "SELECT DISTINCT s.id, s.name, s.father_name, s.class, s.section, s.monthly_fee, s.contact_number 
+              FROM students s 
+              INNER JOIN fee_records f ON s.id = f.student_id 
+              WHERE s.status = 'active' AND f.status = 'unpaid'";
+    
+    if (!empty($class)) {
+        $query .= " AND s.class = '" . escape_string($class) . "'";
+    }
+    
+    if (!empty($section)) {
+        $query .= " AND s.section = '" . escape_string($section) . "'";
+    }
+    
+    if (!empty($month)) {
+        $query .= " AND f.month = '" . escape_string($month) . "'";
+    }
+    
+    $query .= " ORDER BY s.class, s.section, s.name";
+    
+    return $conn->query($query);
+}
+
+/**
+ * Get daily collection
+ */
+function get_daily_collection($date) {
+    global $conn;
+    $query = "SELECT SUM(amount) as total FROM payments WHERE DATE(payment_date) = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('s', $date);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    return $result['total'] ?? 0;
+}
+
+/**
+ * Get monthly collection
+ */
+function get_monthly_collection($month_year) {
+    global $conn;
+    $query = "SELECT SUM(amount) as total FROM payments WHERE DATE_FORMAT(payment_date, '%b-%Y') = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('s', $month_year);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    return $result['total'] ?? 0;
+}
+
+/**
+ * Record payment
+ */
+function record_payment($student_id, $amount, $month, $received_by) {
+    global $conn;
+    
+    // Start transaction
+    $conn->begin_transaction();
+    
+    try {
+        // Record payment
+        $payment_date = date('Y-m-d H:i:s');
+        $query = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by) 
+                 VALUES (?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param('idsss', $student_id, $amount, $month, $payment_date, $received_by);
+        $stmt->execute();
+        $payment_id = $conn->insert_id;
+        $stmt->close();
+        
+        // Update fee record status
+        $query = "UPDATE fee_records SET status = 'paid', payment_date = ? WHERE student_id = ? AND month = ?";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param('sis', $payment_date, $student_id, $month);
+        $stmt->execute();
+        $stmt->close();
+        
+        $conn->commit();
+        return $payment_id;
+    } catch (Exception $e) {
+        $conn->rollback();
+        return false;
+    }
+}
+
+/**
+ * Show message
+ */
+function show_message($type, $message) {
+    echo '<div class="alert alert-' . $type . ' alert-dismissible fade show" role="alert">';
+    echo $message;
+    echo '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+}
+
+?>
