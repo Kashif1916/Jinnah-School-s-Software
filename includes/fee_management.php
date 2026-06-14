@@ -1,6 +1,6 @@
 <?php
 /**
- * Fee Payment - Finance Module
+ * Fee Management
  * School Finance Management System
  */
 
@@ -9,7 +9,7 @@ require_once '../config/db.php';
 require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
-require_finance();
+require_master();
 
 $CLASSES = $CLASSES ?? ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 $SECTIONS = $SECTIONS ?? ['A', 'B', 'C', 'D', 'E'];
@@ -62,52 +62,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Mark fee as paid
         $fee_record_id = intval($_POST['fee_record_id'] ?? 0);
         $student_id = intval($_POST['student_id'] ?? 0);
-        $paid_amounts = $_POST['paid_amount'] ?? []; // Array of paid amounts
-        $selected_fee_records = $_POST['selected_fee_records'] ?? []; // Array of fee_record_ids
-
-        $generated_payment_ids = [];
-
-        if (!empty($selected_fee_records) && is_array($selected_fee_records)) {
-            foreach ($selected_fee_records as $record_id) {
-                $record_id = intval($record_id);
-                $paid_amount = floatval($paid_amounts[$record_id] ?? 0);
-
-                // Get fee record details for validation
-                $query = "SELECT amount, month, student_id FROM fee_records WHERE id = ?";
-                $stmt = $conn->prepare($query);
-                $stmt->bind_param('i', $record_id);
-                $stmt->execute();
-                $fee_record = $stmt->get_result()->fetch_assoc();
-                $stmt->close();
-
-                if ($fee_record && $fee_record['student_id'] == $student_id) { // Ensure record belongs to current student
-                    if ($paid_amount > 0 && $paid_amount <= $fee_record['amount']) {
-                        $payment_id = record_payment($student_id, $paid_amount, $fee_record['month'], get_username());
-                        if ($payment_id) {
-                            $generated_payment_ids[] = $payment_id;
-                        } else {
-                            $error .= 'Error recording payment for ' . $fee_record['month'] . '! ';
-                        }
-                    } else {
-                        $error .= 'Invalid payment amount for ' . $fee_record['month'] . '! ';
-                    }
-                } else {
-                    $error .= 'Fee record not found or mismatched student for ID: ' . $record_id . '! ';
-                }
+        
+        // Get fee record
+        $query = "SELECT * FROM fee_records WHERE id = ?";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param('i', $fee_record_id);
+        $stmt->execute();
+        $fee_record = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        
+        if ($fee_record) {
+            $payment_id = record_payment($student_id, $fee_record['amount'], $fee_record['month'], get_username());
+            
+            if ($payment_id) {
+                $success = 'Fee marked as paid successfully! Payment ID: ' . $payment_id;
+                // Reload student fees
+                $student = get_student($student_id);
+            } else {
+                $error = 'Error recording payment!';
             }
         } else {
             $error = 'Fee record not found!';
-        }
-
-        if (!empty($generated_payment_ids)) {
-            $success = 'Payments recorded successfully! Payment IDs: ' . implode(', ', $generated_payment_ids);
-            // Reload student fees
-            $student = get_student($student_id);
-            // Redirect to receipt page with multiple payment IDs
-            header('Location: ../master/receipt.php?payment_ids=' . implode(',', $generated_payment_ids));
-            exit();
-        } elseif (empty($error)) {
-            $error = 'No valid payments were processed.';
         }
     }
 }
@@ -132,7 +107,7 @@ if (isset($_GET['id'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fee Payment - <?php echo SITE_NAME; ?></title>
+    <title>Fee Management - <?php echo SITE_NAME; ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
@@ -145,8 +120,8 @@ if (isset($_GET['id'])) {
             <div class="topbar">
                 <div class="topbar-left">
                     <div class="panel-brand">
-                        <h2>Record Fee Payment</h2>
-                        <span>Finance / Clerk Panel</span>
+                        <h2>Fee Management</h2>
+                        <span>Principal Panel</span>
                     </div>
                 </div>
                 <div class="topbar-right">
@@ -166,11 +141,26 @@ if (isset($_GET['id'])) {
                         <a href="dashboard.php" class="module-nav-btn">
                             <i class="fas fa-chart-bar"></i> Dashboard
                         </a>
-                        <a href="fee_payment.php" class="module-nav-btn active">
-                            <i class="fas fa-money-bill-wave"></i> Fee Payment
+                        <a href="add_student.php" class="module-nav-btn">
+                            <i class="fas fa-user-plus"></i> Add Student
+                        </a>
+                        <a href="edit_student.php" class="module-nav-btn">
+                            <i class="fas fa-user-edit"></i> Edit Student
+                        </a>
+                        <a href="fee_management.php" class="module-nav-btn active">
+                            <i class="fas fa-money-bill-wave"></i> Fee Management
                         </a>
                         <a href="defaulter_list.php" class="module-nav-btn">
                             <i class="fas fa-list"></i> Defaulters
+                        </a>
+                        <a href="payment_analytics.php" class="module-nav-btn">
+                            <i class="fas fa-chart-line"></i> Analytics
+                        </a>
+                        <a href="promotion.php" class="module-nav-btn">
+                            <i class="fas fa-arrow-up"></i> Promotion
+                        </a>
+                        <a href="drop_student.php" class="module-nav-btn">
+                            <i class="fas fa-trash"></i> Drop Student
                         </a>
                     </div>
                 </div>
@@ -193,7 +183,7 @@ if (isset($_GET['id'])) {
                     <!-- Search Section -->
                     <?php if ($student === null): ?>
                         <div class="search-section">
-                            <h4>Search Student to Record Payment</h4>
+                            <h4>Search Student to Manage Fees</h4>
                             <form method="POST" class="search-form">
                                 <input type="hidden" name="action" value="search">
                                 <div class="search-grid">
@@ -229,7 +219,7 @@ if (isset($_GET['id'])) {
                                         </button>
                                     </div>
                                 </div>
-                            </form>
+                            </form>>
                             
                             <?php if (count($search_results) > 0): ?>
                                 <div class="search-results">
@@ -317,35 +307,31 @@ if (isset($_GET['id'])) {
                                             </td>
                                             <td><?php echo format_datetime($fee['payment_date']); ?></td>
                                             <td>
-                                                <?php if ($fee['status'] == 'unpaid'): ?>                                                    
-                                                    <div class="d-flex gap-2 align-items-center">
-                                                        <input type="checkbox" name="selected_fee_records[]" value="<?php echo $fee['id']; ?>" class="form-check-input fee-checkbox">
-                                                        <input type="number" name="paid_amount[<?php echo $fee['id']; ?>]" class="form-control form-control-sm paid-amount-input" 
-                                                               value="<?php echo $fee['amount']; ?>" step="0.01" min="0.01" max="<?php echo $fee['amount']; ?>" style="width: 100px;" disabled>
-                                                    </div>
+                                                <?php if ($fee['status'] == 'unpaid'): ?>
+                                                    <form method="POST" style="display:inline;">
+                                                        <input type="hidden" name="action" value="mark_paid">
+                                                        <input type="hidden" name="fee_record_id" value="<?php echo $fee['id']; ?>">
+                                                        <input type="hidden" name="student_id" value="<?php echo $student['id']; ?>">
+                                                        <button type="submit" class="btn-action" onclick="return confirm('Mark as paid?')">
+                                                            <i class="fas fa-check"></i> Mark Paid
+                                                        </button>
+                                                    </form>
+                                                    <a href="receipt.php?fee_id=<?php echo $fee['id']; ?>" class="btn-action">
+                                                        <i class="fas fa-file-pdf"></i> Receipt
+                                                    </a>
+                                                <?php else: ?>
+                                                    <a href="receipt.php?fee_id=<?php echo $fee['id']; ?>" class="btn-action">
+                                                        <i class="fas fa-file-pdf"></i> Receipt
+                                                    </a>
                                                 <?php endif; ?>
-                                                <a href="../master/receipt.php?fee_id=<?php echo $fee['id']; ?>" class="btn-action" target="_blank">
-                                                    <i class="fas fa-file-pdf"></i> Receipt
-                                                </a>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
-                            <?php if (!empty($student_fees)): ?>
-                                <div class="form-actions mt-3">
-                                    <button type="submit" name="action" value="mark_paid" class="btn-primary" id="processPaymentsBtn" disabled onclick="return confirm('Process selected payments?')">
-                                        <i class="fas fa-money-bill-wave"></i> Process Selected Payments
-                                    </button>
-                                    <a href="fee_payment.php" class="btn-secondary">
-                                        <i class="fas fa-arrow-left"></i> Back to Search
-                                    </a>
-                                </div>
-                            <?php endif; ?>
-                        </form>
                             
                             <div class="form-actions">
-                                <a href="fee_payment.php" class="btn-secondary">
+                                <a href="fee_management.php" class="btn-secondary">
                                     <i class="fas fa-arrow-left"></i> Back to Search
                                 </a>
                             </div>
@@ -370,6 +356,7 @@ if (isset($_GET['id'])) {
                     checkbox.addEventListener('change', function() {
                         const input = this.closest('tr').querySelector('.paid-amount-input');
                         input.disabled = !this.checked;
+                        // Enable/disable the main process button based on any checkbox being checked
                         processPaymentsBtn.disabled = !Array.from(checkboxes).some(cb => cb.checked);
                     });
                 });

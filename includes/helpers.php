@@ -188,8 +188,25 @@ function record_payment($student_id, $amount, $month, $received_by) {
     $conn->begin_transaction();
     
     try {
-        // Record payment
+        // Get current balance for the specific fee record
+        // Assuming $month is in 'Mon-YYYY' format and $student_id is integer
+        $query = "SELECT id, amount, month FROM fee_records WHERE student_id = ? AND month = ?";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param('is', $student_id, $month);
+        $stmt->execute();
+        $current_record = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (!$current_record) {
+            throw new Exception("Fee record not found for student_id: $student_id, month: $month");
+        }
+
+        $fee_record_id = $current_record['id'];
+        $current_balance = floatval($current_record['amount']);
+        $new_balance = $current_balance - $amount;
         $payment_date = date('Y-m-d H:i:s');
+
+        // Record payment
         $query = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by) 
                  VALUES (?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($query);
@@ -198,10 +215,16 @@ function record_payment($student_id, $amount, $month, $received_by) {
         $payment_id = $conn->insert_id;
         $stmt->close();
         
-        // Update fee record status
-        $query = "UPDATE fee_records SET status = 'paid', payment_date = ? WHERE student_id = ? AND month = ?";
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param('sis', $payment_date, $student_id, $month);
+        // Update fee record: if balance is 0 or less, mark as paid. Otherwise update remaining amount.
+        if ($new_balance <= 0) {
+            $query = "UPDATE fee_records SET status = 'paid', payment_date = ?, amount = 0 WHERE id = ?";
+            $stmt = $conn->prepare($query);
+            $stmt->bind_param('si', $payment_date, $fee_record_id);
+        } else {
+            $query = "UPDATE fee_records SET amount = ?, payment_date = ? WHERE id = ?";
+            $stmt = $conn->prepare($query);
+            $stmt->bind_param('dsi', $new_balance, $payment_date, $fee_record_id);
+        }
         $stmt->execute();
         $stmt->close();
         
