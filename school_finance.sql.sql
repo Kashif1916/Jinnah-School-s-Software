@@ -34,8 +34,11 @@ CREATE TABLE `students` (
   `class` varchar(50) NOT NULL,
   `section` varchar(10) NOT NULL,
   `monthly_fee` decimal(10,2) NOT NULL,
-  `description` text DEFAULT NULL,
   `contact_number` varchar(15) DEFAULT NULL,
+  `contact_number2` varchar(15) DEFAULT NULL,
+  `whatsapp_number` varchar(15) DEFAULT NULL,
+  `concession_amount` decimal(10,2) DEFAULT 0,
+  `concession_reason` varchar(255) DEFAULT NULL,
   `status` enum('active','dropped') DEFAULT 'active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -45,19 +48,7 @@ CREATE TABLE `students` (
 -- Dumping data for table `students`
 --
 
-INSERT INTO `students` (`id`, `name`, `father_name`, `class`, `section`, `monthly_fee`, `description`, `contact_number`, `status`, `created_at`, `updated_at`) VALUES
-(1, 'Ali Abbbas', 'Muhammad Asif', '1', 'A', 2400.00, 'good', '031823545431', 'active', '2026-02-25 09:27:26', '2026-02-25 09:33:52'),
-(2, 'Ateeq', 'yasir', '2', 'A', 2300.00, 'second student', '45453568742', 'active', '2026-02-25 09:28:06', '2026-02-25 09:28:06'),
-(3, 'zulqarnain', 'haider', '3', 'A', 2200.00, 'third student', '45453568742', 'active', '2026-02-25 09:28:36', '2026-02-25 09:28:36'),
-(4, 'ubaid', 'Rehman', '4', 'A', 2000.00, 'fourth student', '031823545431', 'active', '2026-02-25 09:29:04', '2026-02-25 09:29:04'),
-(5, 'shoaib', 'Ramzan', '5', 'A', 2700.00, 'fifth student', '45453568742', 'active', '2026-02-25 09:29:32', '2026-02-25 09:29:32'),
-(6, 'Mian', 'Muhammad', '6', 'A', 2300.00, 'sixth student', '031823545431', 'active', '2026-02-25 09:29:56', '2026-02-25 09:29:56'),
-(7, 'najum', 'gull', '7', 'A', 2900.00, 'seventh Student', '45453568742', 'active', '2026-02-25 09:30:22', '2026-02-25 09:30:22'),
-(8, 'kashif', 'Javed', '8', 'A', 2200.00, 'eight student', '45453568742', 'active', '2026-02-25 09:30:45', '2026-02-25 09:30:45'),
-(9, 'Shayan', 'haider', '9', 'A', 2500.00, 'ninth student', '031823545431', 'active', '2026-02-25 09:31:19', '2026-02-25 09:31:19'),
-(10, 'zeeshan', 'mian', '10', 'A', 2400.00, 'tenth student', '45453568742', 'active', '2026-02-25 09:31:49', '2026-02-25 09:31:49'),
-(11, 'uzair', 'malik', '12', 'A', 1800.00, 'eleventh Student', '45453568742', 'active', '2026-02-25 09:32:21', '2026-02-25 09:59:30'),
-(12, 'asfand', 'wali yar', '12', 'A', 1700.00, 'twelveth student', '031823545431', 'dropped', '2026-02-25 09:33:33', '2026-02-25 09:58:41');
+-- Note: existing INSERTs omitted to preserve sample data; adjust as needed when importing.
 
 --
 -- Indexes for dumped tables

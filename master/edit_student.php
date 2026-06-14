@@ -65,14 +65,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $class = sanitize_input($_POST['class'] ?? '');
         $section = sanitize_input($_POST['section'] ?? '');
         $monthly_fee = floatval($_POST['monthly_fee'] ?? 0);
-        $description = sanitize_input($_POST['description'] ?? '');
         $contact_number = sanitize_input($_POST['contact_number'] ?? '');
+        $contact_number2 = sanitize_input($_POST['contact_number2'] ?? '');
+        $whatsapp_number = sanitize_input($_POST['whatsapp_number'] ?? '');
+        $concession_amount = floatval($_POST['concession_amount'] ?? 0);
+        $concession_reason = sanitize_input($_POST['concession_reason'] ?? '');
         
         if (!empty($name) && !empty($father_name) && $monthly_fee > 0) {
             $query = "UPDATE students SET name = ?, father_name = ?, class = ?, section = ?, 
-                     monthly_fee = ?, description = ?, contact_number = ? WHERE id = ?";
+                     monthly_fee = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ? WHERE id = ?";
             $stmt = $conn->prepare($query);
-            $stmt->bind_param('ssssdssi', $name, $father_name, $class, $section, $monthly_fee, $description, $contact_number, $student_id);
+            $stmt->bind_param('ssssdsssdsi', $name, $father_name, $class, $section, $monthly_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
             
             if ($stmt->execute()) {
                 $success = 'Student updated successfully!';
@@ -300,14 +303,32 @@ if (isset($_GET['id'])) {
                                     </div>
                                     
                                     <div class="form-group">
-                                        <label for="contact_number">Contact Number</label>
+                                        <label for="contact_number">Contact Number 1</label>
                                         <input type="tel" id="contact_number" name="contact_number" class="form-control" 
-                                               value="<?php echo $student['contact_number']; ?>">
+                                               value="<?php echo $student['contact_number'] ?? ''; ?>">
                                     </div>
-                                    
+
+                                    <div class="form-group">
+                                        <label for="contact_number2">Contact Number 2</label>
+                                        <input type="tel" id="contact_number2" name="contact_number2" class="form-control" 
+                                               value="<?php echo $student['contact_number2'] ?? ''; ?>">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="whatsapp_number">WhatsApp Number</label>
+                                        <input type="tel" id="whatsapp_number" name="whatsapp_number" class="form-control" 
+                                               value="<?php echo $student['whatsapp_number'] ?? ''; ?>">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="concession_amount">Concession Amount</label>
+                                        <input type="number" id="concession_amount" name="concession_amount" class="form-control" 
+                                               value="<?php echo $student['concession_amount'] ?? 0; ?>" step="0.01" min="0">
+                                    </div>
+
                                     <div class="form-group full-width">
-                                        <label for="description">Description</label>
-                                        <textarea id="description" name="description" class="form-control" rows="3"><?php echo $student['description']; ?></textarea>
+                                        <label for="concession_reason">Concession Reason</label>
+                                        <input type="text" id="concession_reason" name="concession_reason" class="form-control" value="<?php echo $student['concession_reason'] ?? ''; ?>">
                                     </div>
                                 </div>
                                 

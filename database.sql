@@ -22,8 +22,11 @@ CREATE TABLE IF NOT EXISTS `students` (
   `class` VARCHAR(50) NOT NULL,
   `section` VARCHAR(10) NOT NULL,
   `monthly_fee` DECIMAL(10, 2) NOT NULL,
-  `description` TEXT,
   `contact_number` VARCHAR(15),
+  `contact_number2` VARCHAR(15),
+  `whatsapp_number` VARCHAR(15),
+  `concession_amount` DECIMAL(10,2) DEFAULT 0,
+  `concession_reason` VARCHAR(255),
   `status` ENUM('active', 'dropped') DEFAULT 'active',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

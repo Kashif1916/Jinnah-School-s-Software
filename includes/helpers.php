@@ -80,7 +80,7 @@ function get_fee_record($student_id, $month) {
 /**
  * Create fee records for new student for 12 months
  */
-function create_annual_fees($student_id, $monthly_fee) {
+function create_annual_fees($student_id, $monthly_fee, $concession_amount = 0) {
     global $conn;
     
     $months = array_map(function($m) {
@@ -88,9 +88,11 @@ function create_annual_fees($student_id, $monthly_fee) {
     }, ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
     
     foreach ($months as $month) {
+        $amount = floatval($monthly_fee) - floatval($concession_amount);
+        if ($amount < 0) $amount = 0;
         $query = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')";
         $stmt = $conn->prepare($query);
-        $stmt->bind_param('isd', $student_id, $month, $monthly_fee);
+        $stmt->bind_param('isd', $student_id, $month, $amount);
         $stmt->execute();
         $stmt->close();
     }

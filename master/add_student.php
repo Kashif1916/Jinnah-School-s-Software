@@ -23,24 +23,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $class = sanitize_input($_POST['class'] ?? '');
     $section = sanitize_input($_POST['section'] ?? '');
     $monthly_fee = floatval($_POST['monthly_fee'] ?? 0);
-    $description = sanitize_input($_POST['description'] ?? '');
+    //$description = sanitize_input($_POST['description'] ?? '');
     $contact_number = sanitize_input($_POST['contact_number'] ?? '');
+    $contact_number2 = sanitize_input($_POST['contact_number2'] ?? '');
+    $whatsapp_number = sanitize_input($_POST['whatsapp_number'] ?? '');
+    $concession_amount = floatval($_POST['concession_amount'] ?? 0);
+    $concession_reason = sanitize_input($_POST['concession_reason'] ?? '');
     
     // Validation
     if (empty($name) || empty($father_name) || empty($class) || empty($section) || $monthly_fee <= 0) {
         $error = 'All required fields must be filled correctly!';
     } else {
         // Insert student
-        $query = "INSERT INTO students (name, father_name, class, section, monthly_fee, description, contact_number, status) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'active')";
+        $query = "INSERT INTO students (name, father_name, class, section, monthly_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')";
         $stmt = $conn->prepare($query);
-        $stmt->bind_param('ssssdss', $name, $father_name, $class, $section, $monthly_fee, $description, $contact_number);
+        $stmt->bind_param('ssssdsssds', $name, $father_name, $class, $section, $monthly_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason);
         
         if ($stmt->execute()) {
             $student_id = $conn->insert_id;
             
-            // Create annual fee records
-            create_annual_fees($student_id, $monthly_fee);
+            // Create annual fee records (apply concession if any)
+            create_annual_fees($student_id, $monthly_fee, $concession_amount);
             
             $success = 'Student added successfully! Annual fees created.';
         } else {
@@ -170,15 +174,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             </div>
                             
                             <div class="form-group">
-                                <label for="contact_number">Contact Number</label>
+                                <label for="contact_number">Contact Number 1</label>
                                 <input type="tel" id="contact_number" name="contact_number" class="form-control" 
-                                       placeholder="Enter contact number">
+                                       placeholder="Enter primary contact number">
                             </div>
-                            
+
+                            <div class="form-group">
+                                <label for="contact_number2">Contact Number 2</label>
+                                <input type="tel" id="contact_number2" name="contact_number2" class="form-control" 
+                                       placeholder="Enter alternate contact number">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="whatsapp_number">WhatsApp Number</label>
+                                <input type="tel" id="whatsapp_number" name="whatsapp_number" class="form-control" 
+                                       placeholder="Enter WhatsApp number">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="concession_amount">Concession Amount</label>
+                                <input type="number" id="concession_amount" name="concession_amount" class="form-control" 
+                                       placeholder="Enter concession amount" step="0.01" min="0" value="0">
+                            </div>
+
                             <div class="form-group full-width">
-                                <label for="description">Description</label>
-                                <textarea id="description" name="description" class="form-control" 
-                                         rows="3" placeholder="Enter any additional description"></textarea>
+                                <label for="concession_reason">Concession Reason</label>
+                                <input type="text" id="concession_reason" name="concession_reason" class="form-control" 
+                                       placeholder="Enter reason for concession">
                             </div>
                         </div>
                         
@@ -203,10 +225,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             const name = document.getElementById('name').value.trim();
             const fatherName = document.getElementById('father_name').value.trim();
             const monthlyFee = parseFloat(document.getElementById('monthly_fee').value);
+            const concession = parseFloat(document.getElementById('concession_amount').value || 0);
             
             if (!name || !fatherName || monthlyFee <= 0) {
                 e.preventDefault();
                 alert('Please fill all required fields correctly!');
+                return;
+            }
+
+            if (concession < 0 || concession > monthlyFee) {
+                e.preventDefault();
+                alert('Concession amount must be between 0 and the monthly fee.');
             }
         });
     </script>
