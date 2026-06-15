@@ -69,20 +69,7 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                                 Quick access to payments, defaulters, and daily collections. Use the buttons below to continue your work.
                             </p>
 
-                            <div class="welcome-card__highlights">
-                                <div>
-                                    <span>Collected Today</span>
-                                    <strong><?php echo format_currency($today_collection); ?></strong>
-                                </div>
-                                <div>
-                                    <span>Total Payments</span>
-                                    <strong><?php echo $total_payments; ?></strong>
-                                </div>
-                                <div>
-                                    <span>Defaulters</span>
-                                    <strong><?php echo $total_defaulters; ?></strong>
-                                </div>
-                            </div>
+                            
 
                             <div class="welcome-card__actions">
                                 <a href="fee_payment.php" class="welcome-card__button welcome-card__button--solid">
@@ -98,26 +85,7 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                     </aside>
                 </div>
 
-                <div class="dashboard-nav-panel">
-                    <div class="dashboard-nav-header">
-                        <h4>Finance Modules</h4>
-                        <p>Use these buttons to move quickly between finance tools.</p>
-                    </div>
-                    <div class="dashboard-nav-grid dashboard-nav-grid--compact">
-                        <a href="dashboard.php" class="dashboard-nav-btn active">
-                            <i class="fas fa-chart-bar"></i>
-                            <span>Dashboard</span>
-                        </a>
-                        <a href="fee_payment.php" class="dashboard-nav-btn">
-                            <i class="fas fa-money-bill-wave"></i>
-                            <span>Fee Payment</span>
-                        </a>
-                        <a href="defaulter_list.php" class="dashboard-nav-btn">
-                            <i class="fas fa-list"></i>
-                            <span>Defaulters</span>
-                        </a>
-                    </div>
-                </div>
+                
 
                 <!-- Statistics Cards -->
                 <div class="stats-grid">
@@ -171,46 +139,7 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                     </div>
                 </div>
                 
-                <!-- Recent Payments -->
-                <div class="recent-section">
-                    <h4>Recent Payments</h4>
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Student Name</th>
-                                <th>Class</th>
-                                <th>Amount</th>
-                                <th>For Month</th>
-                                <th>Payment Date</th>
-                                <th>Received By</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php
-                            $query = "SELECT p.*, s.name, s.class 
-                                     FROM payments p 
-                                     JOIN students s ON p.student_id = s.id 
-                                     ORDER BY p.payment_date DESC LIMIT 10";
-                            $result = $conn->query($query);
-                            
-                            if ($result->num_rows > 0) {
-                                while ($row = $result->fetch_assoc()) {
-                                    echo '<tr>';
-                                    echo '<td>' . $row['name'] . '</td>';
-                                    echo '<td>' . $row['class'] . '</td>';
-                                    echo '<td>' . format_currency($row['amount']) . '</td>';
-                                    echo '<td>' . $row['paid_for_month'] . '</td>';
-                                    echo '<td>' . format_datetime($row['payment_date']) . '</td>';
-                                    echo '<td>' . $row['received_by'] . '</td>';
-                                    echo '</tr>';
-                                }
-                            } else {
-                                echo '<tr><td colspan="6" class="text-center">No payments yet</td></tr>';
-                            }
-                            ?>
-                        </tbody>
-                    </table>
-                </div>
+                
             </div>
         </main>
     </div>
