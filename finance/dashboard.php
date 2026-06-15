@@ -74,6 +74,9 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                         <div class="hero-row">
                             
                             <span class="hero-tag"><i class="fas fa-shield-alt"></i> Finance access only</span>
+                            <a href="backup.php" class="hero-tag" style="text-decoration:none; color:inherit;">
+                                <i class="fas fa-database"></i> Backup Data
+                            </a>
                         </div>
                     </aside>
                 </div>
