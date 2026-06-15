@@ -61,7 +61,7 @@ $today_collection = get_daily_collection(date('Y-m-d'));
                     <section class="stage-panel stage-panel--hero">
                         <span class="dashboard-kicker"><i class="fas fa-school"></i> Principal Dashboard</span>
                         <h3>Control the school finance system from one place.</h3>
-                        <p>Track students, manage fees, review defaulters, and keep promotion work moving with quick access to every major module.</p>
+                        <p>Track students, manage fees, review pending payments, and keep promotion work moving with quick access to every major module.</p>
                         <div class="hero-row">
                             <span class="hero-tag"><i class="fas fa-shield-alt"></i> Principal access only</span>
                             <a href="backup.php" class="hero-tag" style="text-decoration:none; color:inherit;">

@@ -51,10 +51,10 @@ if ($defaulters) {
         <main class="main-content">
             <div class="topbar">
 
-                <div class="topbar-left">
+                <div class="topbar-left d-flex align-items-center gap-3">
+                    <?php echo render_system_logo('topbar-logo'); ?>
                     <div class="panel-brand">
-                        <h2>Defaulter List</h2>
-
+                        <h2>Pending List</h2>
                         <span>Principal Panel</span>
                     </div>
                 </div>
@@ -170,9 +170,10 @@ if ($defaulters) {
 
                     <div class="table-section">
                         <div class="table-header">
-                            <h4>Defaulters (<?php echo count($defaulter_list); ?>)</h4>
+                            <h4>Pending Fees (<?php echo count($defaulter_list); ?>)</h4>
 
-                            <a href="defaulter_report.php<?php echo (($class_filter || $section_filter || $month_filter) ? '?class=' . urlencode($class_filter) . '&section=' . urlencode($section_filter) . '&month=' . urlencode($month_filter) : ''); ?>" class="btn-primary">
+                            <a href="defaulter_report.php<?php echo (($class_filter || $section_filter || $month_filter) ? '?class=' . urlencode($class_filter) . '&section=' . urlencode($section_filter) . '&month=' . urlencode($month_filter) : ''); ?>" 
+                               class="btn-primary" target="_blank">
                                 <i class="fas fa-file-pdf"></i> Export PDF
                             </a>
 
@@ -232,56 +233,3 @@ if ($defaulters) {
     <script src="../assets/js/script.js"></script>
 </body>
 </html>
-<?php
-/**
- * Defaulter List
- * School Finance Management System
- */
-
-require_once '../config/config.php';
-require_once '../config/db.php';
-$CLASSES = $CLASSES ?? ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
-$SECTIONS = $SECTIONS ?? ['A', 'B', 'C', 'D', 'E'];
-
-require_once '../includes/session.php';
-require_once '../includes/helpers.php';
-$class_filter = '';
-$section_filter = '';
-$month_filter = '';
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $class_filter = sanitize_input($_POST['class'] ?? '');
-    $section_filter = sanitize_input($_POST['section'] ?? '');
-    $month_filter = sanitize_input($_POST['month'] ?? '');
-}
-
-// Get defaulters
-$defaulters = get_defaulters($class_filter, $section_filter, $month_filter);
-$defaulter_list = [];
-if ($defaulters) {
-    $defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
-}
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pending List - <?php echo SITE_NAME; ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="../assets/css/style.css" rel="stylesheet">
-</head>
-<body>
-    <div class="wrapper feature-shell">
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Top Bar -->
-            <div class="topbar">
-                <div class="topbar-left d-flex align-items-center gap-3">
-                    <?php echo render_system_logo('topbar-logo'); ?>
-                    <div class="panel-brand">
-                        <h2>Pending List</h2>
-                        <span>Principal Panel</span>
-                    </div>
-                </div>
