@@ -9,7 +9,11 @@ require_once '../config/db.php';
 require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
-require_master();
+// Allow both Master and Finance roles to access this report
+if (!is_master() && !is_finance()) {
+    header('Location: ' . BASE_URL . 'index.php');
+    exit();
+}
 
 $class_filter = isset($_GET['class']) ? sanitize_input($_GET['class']) : '';
 $section_filter = isset($_GET['section']) ? sanitize_input($_GET['section']) : '';

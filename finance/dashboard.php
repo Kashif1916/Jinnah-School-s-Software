@@ -66,7 +66,7 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                         </div>
 
                         <p class="welcome-card__text" style="color: rgba(255,255,255,0.9);">
-                            Quick access to payments, defaulters, and daily collections. Use the buttons below to continue your work.
+                            Quick access to payments, pending fees, and daily collections. Use the buttons below to continue your work.
                         </p>
 
                         

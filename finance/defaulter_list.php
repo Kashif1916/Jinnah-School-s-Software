@@ -141,7 +141,13 @@ if ($defaulters) {
                     
                     <!-- Defaulter List Table -->
                     <div class="table-section">
-                        <h4>Pending Fees (<?php echo count($defaulter_list); ?>)</h4>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="mb-0">Pending Fees (<?php echo count($defaulter_list); ?>)</h4>
+                            <a href="../master/defaulter_report.php<?php echo (($class_filter || $section_filter || $month_filter) ? '?class=' . urlencode($class_filter) . '&section=' . urlencode($section_filter) . '&month=' . urlencode($month_filter) : ''); ?>" 
+                               class="btn-primary" target="_blank">
+                                <i class="fas fa-file-pdf"></i> Export PDF
+                            </a>
+                        </div>
                         
                         <?php if (count($defaulter_list) > 0): ?>
                             <table class="table table-striped table-hover">
@@ -174,7 +180,7 @@ if ($defaulters) {
                             </table>
                         <?php else: ?>
                             <div class="alert alert-info">
-                                <i class="fas fa-info-circle"></i> No defaulters found with the selected filters!
+                                <i class="fas fa-info-circle"></i> No pending fees found with the selected filters!
                             </div>
                         <?php endif; ?>
                     </div>

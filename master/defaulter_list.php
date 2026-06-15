@@ -38,19 +38,15 @@ if ($defaulters) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Defaulter List - <?php echo SITE_NAME; ?></title>
+    <title>Pending List - <?php echo SITE_NAME; ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-
     <link href="../assets/css/style.css" rel="stylesheet">
 </head>
 <body>
-
     <div class="wrapper feature-shell">
         <main class="main-content">
             <div class="topbar">
-
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <?php echo render_system_logo('topbar-logo'); ?>
                     <div class="panel-brand">
@@ -58,7 +54,6 @@ if ($defaulters) {
                         <span>Principal Panel</span>
                     </div>
                 </div>
-
                 <div class="topbar-right">
                     <span class="user-info">
                         <i class="fas fa-user-circle"></i> <?php echo get_username(); ?>
@@ -92,7 +87,7 @@ if ($defaulters) {
                         </a>
 
                         <a href="defaulter_list.php" class="module-nav-btn active">
-                            <i class="fas fa-list"></i> Defaulters
+                            <i class="fas fa-list"></i> Pending List
                         </a>
 
                         <a href="payment_analytics.php" class="module-nav-btn">
@@ -112,8 +107,7 @@ if ($defaulters) {
 
                 <div class="form-section">
                     <div class="filter-section">
-                        <h4>Filter Defaulters</h4>
-
+                        <h4>Filter Pending List</h4>
                         <form method="POST" class="filter-form">
                             <div class="form-grid">
                                 <div class="form-group">
@@ -219,7 +213,7 @@ if ($defaulters) {
 
                         <?php else: ?>
                             <div class="alert alert-info">
-                                <i class="fas fa-info-circle"></i> No defaulters found with the selected filters!
+                                <i class="fas fa-info-circle"></i> No pending fees found with the selected filters!
                             </div>
 
                         <?php endif; ?>
