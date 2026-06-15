@@ -20,6 +20,11 @@ $student_fees = [];
 $student = null;
 $search_results = [];
 
+// Initialize Session Cart for Batch Payments if not exists
+if (!isset($_SESSION['fee_cart'])) {
+    $_SESSION['fee_cart'] = [];
+}
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action']) && $_POST['action'] == 'search') {
         // Search students with multiple filters
@@ -58,56 +63,68 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $search_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
             $stmt->close();
         }
-    } elseif (isset($_POST['action']) && $_POST['action'] == 'mark_paid') {
-        // Mark fee as paid
-        $fee_record_id = intval($_POST['fee_record_id'] ?? 0);
-        $student_id = intval($_POST['student_id'] ?? 0);
-        $paid_amounts = $_POST['paid_amount'] ?? []; // Array of paid amounts
-        $selected_fee_records = $_POST['selected_fee_records'] ?? []; // Array of fee_record_ids
+    } elseif (isset($_POST['action']) && $_POST['action'] == 'add_to_cart') {
+        // Add selected months to the temporary batch list
+        $selected_records = $_POST['selected_fee_records'] ?? [];
+        $amounts = $_POST['paid_amount'] ?? [];
+        
+        foreach ($selected_records as $rec_id) {
+            $rec_id = intval($rec_id);
+            $paid_amt = floatval($amounts[$rec_id] ?? 0);
+            
+            // Check if this record is already in the batch to avoid duplicates
+            $exists = false;
+            foreach ($_SESSION['fee_cart'] as $item) {
+                if ($item['record_id'] == $rec_id) { $exists = true; break; }
+            }
 
-        $generated_payment_ids = [];
-
-        if (!empty($selected_fee_records) && is_array($selected_fee_records)) {
-            foreach ($selected_fee_records as $record_id) {
-                $record_id = intval($record_id);
-                $paid_amount = floatval($paid_amounts[$record_id] ?? 0);
-
-                // Get fee record details for validation
-                $query = "SELECT amount, month, student_id FROM fee_records WHERE id = ?";
+            if (!$exists && $paid_amt > 0) {
+                $query = "SELECT fr.*, s.name, s.class, s.section FROM fee_records fr 
+                          JOIN students s ON fr.student_id = s.id WHERE fr.id = ?";
                 $stmt = $conn->prepare($query);
-                $stmt->bind_param('i', $record_id);
+                $stmt->bind_param('i', $rec_id);
                 $stmt->execute();
-                $fee_record = $stmt->get_result()->fetch_assoc();
+                $details = $stmt->get_result()->fetch_assoc();
                 $stmt->close();
 
-                if ($fee_record && $fee_record['student_id'] == $student_id) { // Ensure record belongs to current student
-                    if ($paid_amount > 0 && $paid_amount <= $fee_record['amount']) {
-                        $payment_id = record_payment($student_id, $paid_amount, $fee_record['month'], get_username());
-                        if ($payment_id) {
-                            $generated_payment_ids[] = $payment_id;
-                        } else {
-                            $error .= 'Error recording payment for ' . $fee_record['month'] . '! ';
-                        }
-                    } else {
-                        $error .= 'Invalid payment amount for ' . $fee_record['month'] . '! ';
-                    }
-                } else {
-                    $error .= 'Fee record not found or mismatched student for ID: ' . $record_id . '! ';
+                if ($details) {
+                    $_SESSION['fee_cart'][] = [
+                        'record_id' => $rec_id,
+                        'student_id' => $details['student_id'],
+                        'name' => $details['name'],
+                        'month' => $details['month'],
+                        'amount' => $paid_amt,
+                        'class_info' => $details['class'] . '-' . $details['section']
+                    ];
                 }
             }
-        } else {
-            $error = 'Fee record not found!';
         }
+        $success = "Fees added to batch list! You can search another student now.";
+    } elseif (isset($_POST['action']) && $_POST['action'] == 'clear_cart') {
+        $_SESSION['fee_cart'] = [];
+        $success = "Batch list cleared.";
+    } elseif (isset($_POST['action']) && $_POST['action'] == 'process_batch') {
+        // Process all payments in the cart and generate one receipt
+        $generated_payment_ids = [];
+        
+        if (!empty($_SESSION['fee_cart'])) {
+            foreach ($_SESSION['fee_cart'] as $item) {
+                $p_id = record_payment($item['student_id'], $item['amount'], $item['month'], get_username());
+                if ($p_id) {
+                    $generated_payment_ids[] = $p_id;
+                } else {
+                    $error .= "Error recording fee for " . $item['name'] . " (" . $item['month'] . ") ";
+                }
+            }
 
-        if (!empty($generated_payment_ids)) {
-            $success = 'Payments recorded successfully! Payment IDs: ' . implode(', ', $generated_payment_ids);
-            // Reload student fees
-            $student = get_student($student_id);
-            // Redirect to receipt page with multiple payment IDs
-            header('Location: ../master/receipt.php?payment_ids=' . implode(',', $generated_payment_ids));
-            exit();
-        } elseif (empty($error)) {
-            $error = 'No valid payments were processed.';
+            if (!empty($generated_payment_ids)) {
+                $_SESSION['fee_cart'] = []; // Clear cart after success
+                $_SESSION['print_receipt_url'] = '../master/receipt.php?payment_ids=' . implode(',', $generated_payment_ids);
+                header('Location: fee_payment.php'); // Redirect to clear the search/student screen
+                exit();
+            }
+        } else {
+            $error = "Batch list is empty!";
         }
     }
 }
@@ -193,7 +210,10 @@ if (isset($_GET['id'])) {
                     <!-- Search Section -->
                     <?php if ($student === null): ?>
                         <div class="search-section">
-                            <h4>Search Student to Record Payment</h4>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h4>Step 1: Search Student</h4>
+                                <a href="fee_payment.php" class="btn btn-sm btn-outline-primary"><i class="fas fa-sync"></i> Reset Search</a>
+                            </div>
                             <form method="POST" class="search-form">
                                 <input type="hidden" name="action" value="search">
                                 <div class="search-grid">
@@ -240,7 +260,6 @@ if (isset($_GET['id'])) {
                                                 <th>Name</th>
                                                 <th>Class</th>
                                                 <th>Section</th>
-                                                <th>Monthly Fee</th>
                                                 <th>Unpaid Amount</th>
                                                 <th>Action</th>
                                             </tr>
@@ -253,11 +272,10 @@ if (isset($_GET['id'])) {
                                                     <td><?php echo $res['name']; ?></td>
                                                     <td><?php echo $res['class']; ?></td>
                                                     <td><?php echo $res['section']; ?></td>
-                                                    <td><?php echo format_currency($res['monthly_fee']); ?></td>
                                                     <td><strong><?php echo format_currency($unpaid); ?></strong></td>
                                                     <td>
                                                         <a href="?id=<?php echo $res['id']; ?>" class="btn-action">
-                                                            <i class="fas fa-file-invoice"></i> View Fees
+                                                            <i class="fas fa-plus-circle"></i> Select Fees
                                                         </a>
                                                     </td>
                                                 </tr>
@@ -270,7 +288,7 @@ if (isset($_GET['id'])) {
                             <?php endif; ?>
                         </div>
                     <?php else: ?>
-                        <!-- Fee Details Section -->
+                        <!-- Step 2: Fee Selection for found student -->
                         <div class="fee-details">
                             <div class="fee-header">
                                 <div>
@@ -293,19 +311,26 @@ if (isset($_GET['id'])) {
                                 </div>
                             </div>
                             
+                            <form method="POST" id="multiPaymentForm">
+                            <input type="hidden" name="student_id" value="<?php echo $student['id']; ?>">
                             <table class="table table-striped">
                                 <thead>
                                     <tr>
+                                        <th style="width: 40px;">Pay</th>
                                         <th>Month</th>
-                                        <th>Amount</th>
+                                        <th>Balance Due</th>
                                         <th>Status</th>
-                                        <th>Payment Date</th>
-                                        <th>Action</th>
+                                        <th>Pay Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($student_fees as $fee): ?>
                                         <tr>
+                                            <td>
+                                                <?php if ($fee['status'] == 'unpaid'): ?>
+                                                    <input type="checkbox" name="selected_fee_records[]" value="<?php echo $fee['id']; ?>" class="form-check-input fee-checkbox">
+                                                <?php endif; ?>
+                                            </td>
                                             <td><?php echo $fee['month']; ?></td>
                                             <td><?php echo format_currency($fee['amount']); ?></td>
                                             <td>
@@ -315,7 +340,6 @@ if (isset($_GET['id'])) {
                                                     <span class="badge bg-danger">Unpaid</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td><?php echo format_datetime($fee['payment_date']); ?></td>
                                             <td>
                                                 <?php if ($fee['status'] == 'unpaid'): ?>                                                    
                                                     <div class="d-flex gap-2 align-items-center">
@@ -324,9 +348,6 @@ if (isset($_GET['id'])) {
                                                                value="<?php echo $fee['amount']; ?>" step="0.01" min="0.01" max="<?php echo $fee['amount']; ?>" style="width: 100px;" disabled>
                                                     </div>
                                                 <?php endif; ?>
-                                                <a href="../master/receipt.php?fee_id=<?php echo $fee['id']; ?>" class="btn-action" target="_blank">
-                                                    <i class="fas fa-file-pdf"></i> Receipt
-                                                </a>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -334,20 +355,61 @@ if (isset($_GET['id'])) {
                             </table>
                             <?php if (!empty($student_fees)): ?>
                                 <div class="form-actions mt-3">
-                                    <button type="submit" name="action" value="mark_paid" class="btn-primary" id="processPaymentsBtn" disabled onclick="return confirm('Process selected payments?')">
-                                        <i class="fas fa-money-bill-wave"></i> Process Selected Payments
+                                    <button type="submit" name="action" value="add_to_cart" class="btn-primary" id="addBatchBtn" disabled>
+                                        <i class="fas fa-plus"></i> Add to Receipt
                                     </button>
-                                    <a href="fee_payment.php" class="btn-secondary">
-                                        <i class="fas fa-arrow-left"></i> Back to Search
-                                    </a>
                                 </div>
                             <?php endif; ?>
                         </form>
-                            
-                            <div class="form-actions">
-                                <a href="fee_payment.php" class="btn-secondary">
-                                    <i class="fas fa-arrow-left"></i> Back to Search
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- Step 3: Global Batch Summary (Always visible if not empty) -->
+                    <?php if (!empty($_SESSION['fee_cart'])): ?>
+                        <div class="batch-summary mt-5 p-4 border rounded shadow-sm bg-white">
+                            <h4 class="text-success mb-3"><i class="fas fa-receipt"></i> Current Receipt Batch List</h4>
+                            <table class="table table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Student Name</th>
+                                        <th>Class</th>
+                                        <th>Month</th>
+                                        <th>Amount to Pay</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php 
+                                    $batch_total = 0;
+                                    foreach ($_SESSION['fee_cart'] as $item): 
+                                        $batch_total += $item['amount'];
+                                    ?>
+                                        <tr>
+                                            <td><strong><?php echo $item['name']; ?></strong></td>
+                                            <td><?php echo $item['class_info']; ?></td>
+                                            <td><?php echo $item['month']; ?></td>
+                                            <td><?php echo format_currency($item['amount']); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    <tr class="table-dark">
+                                        <td colspan="3" class="text-end"><strong>Grand Total:</strong></td>
+                                        <td><strong><?php echo format_currency($batch_total); ?></strong></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div class="d-flex gap-3 mt-3">
+                                <a href="fee_payment.php" class="btn btn-outline-primary btn-lg">
+                                    <i class="fas fa-user-plus"></i> Add New Payment
                                 </a>
+                                <form method="POST" class="d-inline">
+                                    <button type="submit" name="action" value="process_batch" class="btn btn-success btn-lg">
+                                        <i class="fas fa-print"></i> Process & Print Combined Receipt
+                                    </button>
+                                </form>
+                                <form method="POST" class="d-inline">
+                                    <button type="submit" name="action" value="clear_cart" class="btn btn-link text-danger">
+                                        <i class="fas fa-trash"></i> Clear All
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     <?php endif; ?>
@@ -360,20 +422,25 @@ if (isset($_GET['id'])) {
     <script src="../assets/js/script.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const feeTable = document.querySelector('.table-striped');
-            if (feeTable) {
-                const checkboxes = feeTable.querySelectorAll('.fee-checkbox');
-                const paidAmountInputs = feeTable.querySelectorAll('.paid-amount-input');
-                const processPaymentsBtn = document.getElementById('processPaymentsBtn');
+            // Check if there is a receipt to be opened in a new tab
+            <?php if (isset($_SESSION['print_receipt_url'])): ?>
+                const receiptUrl = '<?php echo $_SESSION['print_receipt_url']; ?>';
+                window.open(receiptUrl, '_blank');
+                <?php unset($_SESSION['print_receipt_url']); // Clear it after opening ?>
+            <?php endif; ?>
 
-                checkboxes.forEach(checkbox => {
-                    checkbox.addEventListener('change', function() {
-                        const input = this.closest('tr').querySelector('.paid-amount-input');
-                        input.disabled = !this.checked;
-                        processPaymentsBtn.disabled = !Array.from(checkboxes).some(cb => cb.checked);
-                    });
+            const checkboxes = document.querySelectorAll('.fee-checkbox');
+            const addBatchBtn = document.getElementById('addBatchBtn');
+
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const input = this.closest('tr').querySelector('.paid-amount-input');
+                    if(input) input.disabled = !this.checked;
+                    
+                    const anyChecked = Array.from(checkboxes).some(c => c.checked);
+                    if(addBatchBtn) addBatchBtn.disabled = !anyChecked;
                 });
-            }
+            });
         });
     </script>
 </body>
