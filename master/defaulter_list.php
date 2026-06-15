@@ -6,13 +6,9 @@
 
 require_once '../config/config.php';
 require_once '../config/db.php';
-$CLASSES = $CLASSES ?? ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
-
-$SECTIONS = $SECTIONS ?? ['A', 'B', 'C', 'D', 'E'];
 require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
-$MONTHS = $MONTHS ?? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 $class_filter = '';
 $section_filter = '';
 $month_filter = '';
