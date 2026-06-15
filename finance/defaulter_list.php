@@ -37,7 +37,7 @@ if ($defaulters) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Defaulter List - <?php echo SITE_NAME; ?></title>
+    <title>Pending List - <?php echo SITE_NAME; ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
@@ -50,7 +50,7 @@ if ($defaulters) {
             <div class="topbar">
                 <div class="topbar-left">
                     <div class="panel-brand">
-                        <h2>Defaulter List</h2>
+                        <h2>Pending List</h2>
                         <span>Finance / Clerk Panel</span>
                     </div>
                 </div>
@@ -75,7 +75,10 @@ if ($defaulters) {
                             <i class="fas fa-money-bill-wave"></i> Fee Payment
                         </a>
                         <a href="defaulter_list.php" class="module-nav-btn active">
-                            <i class="fas fa-list"></i> Defaulters
+                            <i class="fas fa-list"></i> Pending List
+                        </a>
+                        <a href="payment_analytics.php" class="module-nav-btn">
+                            <i class="fas fa-chart-line"></i> Analytics
                         </a>
                     </div>
                 </div>
@@ -83,7 +86,7 @@ if ($defaulters) {
                 <div class="form-section">
                     <!-- Filter Section -->
                     <div class="filter-section">
-                        <h4>Filter Defaulters</h4>
+                        <h4>Filter Pending List</h4>
                         <form method="POST" class="filter-form">
                             <div class="form-grid">
                                 <div class="form-group">
@@ -137,7 +140,7 @@ if ($defaulters) {
                     
                     <!-- Defaulter List Table -->
                     <div class="table-section">
-                        <h4>Defaulters (<?php echo count($defaulter_list); ?>)</h4>
+                        <h4>Pending Fees (<?php echo count($defaulter_list); ?>)</h4>
                         
                         <?php if (count($defaulter_list) > 0): ?>
                             <table class="table table-striped table-hover">

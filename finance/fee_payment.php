@@ -187,7 +187,10 @@ if (isset($_GET['id'])) {
                             <i class="fas fa-money-bill-wave"></i> Fee Payment
                         </a>
                         <a href="defaulter_list.php" class="module-nav-btn">
-                            <i class="fas fa-list"></i> Defaulters
+                            <i class="fas fa-list"></i> Pending List
+                        </a>
+                        <a href="payment_analytics.php" class="module-nav-btn">
+                            <i class="fas fa-chart-line"></i> Analytics
                         </a>
                     </div>
                 </div>

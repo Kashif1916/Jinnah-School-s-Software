@@ -166,7 +166,7 @@ $today_collection = get_daily_collection(date('Y-m-d'));
                         </a>
                         <a href="defaulter_list.php" class="action-btn">
                             <i class="fas fa-exclamation-triangle"></i>
-                            <span>Defaulter List</span>
+                            <span>Pending List</span>
                         </a>
                         <a href="payment_analytics.php" class="action-btn">
                             <i class="fas fa-chart-bar"></i>
@@ -192,5 +192,3 @@ $today_collection = get_daily_collection(date('Y-m-d'));
     <script src="../assets/js/script.js"></script>
 </body>
 </html>
-
-

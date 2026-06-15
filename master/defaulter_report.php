@@ -120,7 +120,7 @@ if ($defaulters) {
     <div class="report-container">
         <div class="header">
             <?php echo render_system_logo('report-logo'); ?>
-            <p>Defaulter Students Report</p>
+            <p>Pending Fees Students Report</p>
             <p>Generated on <?php echo date('d-m-Y H:i'); ?></p>
         </div>
         
@@ -131,7 +131,7 @@ if ($defaulters) {
                 Section: <?php echo !empty($section_filter) ? $section_filter : 'All'; ?> | 
                 Month: <?php echo !empty($month_filter) ? $month_filter : 'All'; ?>
             </p>
-            <p><strong>Total Defaulters:</strong> <?php echo count($defaulter_list); ?></p>
+            <p><strong>Total Pending:</strong> <?php echo count($defaulter_list); ?></p>
         </div>
         
         <?php if (count($defaulter_list) > 0): ?>

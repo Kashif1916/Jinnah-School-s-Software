@@ -1,6 +1,6 @@
 <?php
 /**
- * Payment Analytics
+ * Payment Analytics - Finance Module
  * School Finance Management System
  */
 
@@ -9,7 +9,7 @@ require_once '../config/db.php';
 require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
-require_master();
+require_finance();
 
 $filter_date = isset($_GET['date']) ? sanitize_input($_GET['date']) : date('Y-m-d');
 $filter_month = isset($_GET['month']) ? sanitize_input($_GET['month']) : date('Y-m');
@@ -57,13 +57,12 @@ if ($result) {
                 <div class="topbar-left">
                     <div class="panel-brand">
                         <h2>Payment Analytics</h2>
-                        <span>Principal Panel</span>
+                        <span>Finance / Clerk Panel</span>
                     </div>
                 </div>
                 <div class="topbar-right">
                     <span class="user-info">
                         <i class="fas fa-user-circle"></i> <?php echo get_username(); ?>
-                        <small>(Principal)</small>
                     </span>
                     <a href="../logout.php" class="btn-secondary">
                         <i class="fas fa-sign-out-alt"></i> Logout
@@ -77,14 +76,8 @@ if ($result) {
                         <a href="dashboard.php" class="module-nav-btn">
                             <i class="fas fa-chart-bar"></i> Dashboard
                         </a>
-                        <a href="add_student.php" class="module-nav-btn">
-                            <i class="fas fa-user-plus"></i> Add Student
-                        </a>
-                        <a href="edit_student.php" class="module-nav-btn">
-                            <i class="fas fa-user-edit"></i> Edit Student
-                        </a>
-                        <a href="fee_management.php" class="module-nav-btn">
-                            <i class="fas fa-money-bill-wave"></i> Fee Management
+                        <a href="fee_payment.php" class="module-nav-btn">
+                            <i class="fas fa-money-bill-wave"></i> Fee Payment
                         </a>
                         <a href="defaulter_list.php" class="module-nav-btn">
                             <i class="fas fa-list"></i> Pending List
@@ -92,17 +85,9 @@ if ($result) {
                         <a href="payment_analytics.php" class="module-nav-btn active">
                             <i class="fas fa-chart-line"></i> Analytics
                         </a>
-                        <a href="promotion.php" class="module-nav-btn">
-                            <i class="fas fa-arrow-up"></i> Promotion
-                        </a>
-                        <a href="drop_student.php" class="module-nav-btn">
-                            <i class="fas fa-trash"></i> Drop Student
-                        </a>
                     </div>
                 </div>
 
-                <!-- Summary Cards -->
-                
                 <!-- Filter and Daily Collection -->
                 <div class="analytics-section">
                     <div class="section-header">

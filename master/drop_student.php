@@ -106,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <i class="fas fa-money-bill-wave"></i> Fee Management
                         </a>
                         <a href="defaulter_list.php" class="module-nav-btn">
-                            <i class="fas fa-list"></i> Defaulters
+                            <i class="fas fa-list"></i> Pending List
                         </a>
                         <a href="payment_analytics.php" class="module-nav-btn">
                             <i class="fas fa-chart-line"></i> Analytics
