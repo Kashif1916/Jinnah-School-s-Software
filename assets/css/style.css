@@ -84,6 +84,11 @@ body {
     backdrop-filter: blur(10px);
 }
 
+.topbar-logo {
+    width: 70px; /* Logo size reduced significantly */
+    height: 70px;
+}
+
 .topbar-left h2 {
     font-size: 26px;
     font-weight: 600;

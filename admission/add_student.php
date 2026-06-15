@@ -62,7 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="wrapper feature-shell">
         <main class="main-content">
             <div class="topbar">
-                <div class="topbar-left">
+                <div class="topbar-left d-flex align-items-center gap-3">
+                    <?php echo render_system_logo('topbar-logo'); ?>
                     <div class="panel-brand">
                         <h2>Add New Student</h2>
                         <span>Admission Panel</span>

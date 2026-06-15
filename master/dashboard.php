@@ -37,7 +37,8 @@ $today_collection = get_daily_collection(date('Y-m-d'));
         <main class="main-content">
             <!-- Top Bar -->
             <div class="topbar">
-                <div class="topbar-left">
+                <div class="topbar-left d-flex align-items-center gap-3">
+                    <?php echo render_system_logo('topbar-logo'); ?>
                     <div class="panel-brand">
                         <h2>Dashboard</h2>
                         <span>Principal Panel</span>
@@ -62,8 +63,10 @@ $today_collection = get_daily_collection(date('Y-m-d'));
                         <h3>Control the school finance system from one place.</h3>
                         <p>Track students, manage fees, review defaulters, and keep promotion work moving with quick access to every major module.</p>
                         <div class="hero-row">
-                            
                             <span class="hero-tag"><i class="fas fa-shield-alt"></i> Principal access only</span>
+                            <a href="backup.php" class="hero-tag" style="text-decoration:none; color:inherit;">
+                                <i class="fas fa-database"></i> Backup System
+                            </a>
                         </div>
                     </section>
 

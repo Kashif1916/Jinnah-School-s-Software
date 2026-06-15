@@ -32,7 +32,8 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
         <main class="main-content">
             <!-- Top Bar -->
             <div class="topbar">
-                <div class="topbar-left">
+                <div class="topbar-left d-flex align-items-center gap-3">
+                    <?php echo render_system_logo('topbar-logo'); ?>
                     <div class="panel-brand">
                         <h2>Finance Dashboard</h2>
                         <span>Finance / Clerk Panel</span>

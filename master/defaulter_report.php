@@ -49,7 +49,7 @@ if ($defaulters) {
         }
         .report-logo {
             display: block;
-            width: 95px;
+            width: 90px; /* Matched with login page logo size */
             height: auto;
             margin: 0 auto 4mm;
         }
