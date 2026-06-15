@@ -52,35 +52,27 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
             <!-- Dashboard Content -->
             <div class="content">
                 <div class="dashboard-stage dashboard-stage--single">
-                    <aside class="stage-panel stage-panel--welcome" style="background: linear-gradient(135deg, #163325 0%, #1f5f46 100%); color: white; border-radius: 12px;">
-                        <div class="welcome-card">
-                            <div class="welcome-card__header">
-                                <div class="welcome-avatar">
-                                    <i class="fas fa-user-tie"></i>
-                                </div>
-                                <div>
-                                    <span class="welcome-label">Welcome</span>
-                                    <h4 style="color: white;"><?php echo get_username(); ?></h4>
-                                    <p style="color: rgba(255,255,255,0.8);">Finance clerk active</p>
-                                </div>
+                    <aside class="stage-panel stage-panel--hero">
+                        <div class="welcome-card__header">
+                            <div class="welcome-avatar">
+                                <i class="fas fa-user-tie"></i>
                             </div>
+                            <div>
+                                <span class="welcome-label">Welcome</span>
+                                <h4 style="color: white;"><?php echo get_username(); ?></h4>
+                                <p style="color: rgba(255,255,255,0.8);">Finance clerk active</p>
+                            </div>
+                        </div>
 
-                            <p class="welcome-card__text" style="color: rgba(255,255,255,0.9);">
-                                Quick access to payments, defaulters, and daily collections. Use the buttons below to continue your work.
-                            </p>
+                        <p class="welcome-card__text" style="color: rgba(255,255,255,0.9);">
+                            Quick access to payments, defaulters, and daily collections. Use the buttons below to continue your work.
+                        </p>
 
+                        
+
+                        <div class="hero-row">
                             
-
-                            <div class="welcome-card__actions">
-                                <a href="fee_payment.php" class="welcome-card__button welcome-card__button--solid" style="background: white; color: #1f5f46;">
-                                    <i class="fas fa-bolt"></i>
-                                    <span>Record Payment</span>
-                                </a>
-                                <a href="defaulter_list.php" class="welcome-card__button" style="border-color: white; color: white;">
-                                    <i class="fas fa-list-check"></i>
-                                    <span>View Pending List</span>
-                                </a>
-                            </div>
+                            <span class="hero-tag"><i class="fas fa-shield-alt"></i> Finance access only</span>
                         </div>
                     </aside>
                 </div>
@@ -128,10 +120,7 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                             <i class="fas fa-money-bill-wave"></i>
                             <span>Record Payment</span>
                         </a>
-                        <a href="dashboard.php" class="action-btn">
-                            <i class="fas fa-chart-bar"></i>
-                            <span>Dashboard</span>
-                        </a>
+                        
                         <a href="defaulter_list.php" class="action-btn">
                             <i class="fas fa-exclamation-triangle"></i>
                             <span>Pending List</span>
