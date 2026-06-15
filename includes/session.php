@@ -28,6 +28,13 @@ function is_finance() {
 }
 
 /**
+ * Check if user is Admission
+ */
+function is_admission() {
+    return is_logged_in() && $_SESSION['role'] === 'admission';
+}
+
+/**
  * Get current user ID
  */
 function get_user_id() {
@@ -92,6 +99,17 @@ function require_master() {
 function require_finance() {
     require_login();
     if (!is_finance()) {
+        header('Location: ' . BASE_URL . 'index.php');
+        exit();
+    }
+}
+
+/**
+ * Require admission role
+ */
+function require_admission() {
+    require_login();
+    if (!is_admission()) {
         header('Location: ' . BASE_URL . 'index.php');
         exit();
     }

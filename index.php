@@ -22,6 +22,8 @@ require_login();
 // Route to appropriate dashboard
 if (is_master()) {
     header('Location: ' . BASE_URL . 'master/dashboard.php');
+} elseif (is_admission()) {
+    header('Location: ' . BASE_URL . 'admission/add_student.php');
 } elseif (is_finance()) {
     header('Location: ' . BASE_URL . 'finance/dashboard.php');
 } else {
