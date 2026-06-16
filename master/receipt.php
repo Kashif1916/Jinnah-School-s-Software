@@ -219,11 +219,11 @@ ob_start();
             </div>
             
             <div class="section payment-details">
-                <div class="section-title">Items</div>
+                
                 <table>
                     <thead>
                         <tr>
-                            <th>Description</th>
+                            <th>Payment Details</th>
                             <th class="amount-col">Amount</th>
                         </tr>
                     </thead>
