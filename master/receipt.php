@@ -188,55 +188,64 @@ ob_start();
     </style>
 </head>
 <body>
-    <div class="receipt-container">
+    <div class="receipt-container" style="position: relative;"> <!-- Yahan position relative lazmi hai -->
         <div class="header">
-            <h1><?php echo SITE_NAME; ?></h1>
-            <p>School Management Fee Receipt</p>
+            <img src="../images/logo.jfif" style="width: 120px !important; height: auto" alt="Logo">
+            <h2> Jinnah School & Inter College Khushab </h2>
+            <p>Fee Receipt</p>
         </div>
 
-        <div style="text-align: center;">
-            <div class="paid-stamp">PAID</div>
-        </div>
+        <!-- PAID Stamp ab Background mai chala gaya hai -->
+        <div class="paid-stamp" style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-15deg);
+            font-size: 70px;
+            font-weight: bold;
+            color: rgba(0, 0, 0, 0.18); /* Bohot halka grey jo thermal print mai piche base banayega */
+            border: 5px solid rgba(0, 0, 0, 0.08);
+            padding: 10px 20px;
+            z-index: 1; /* Isko piche rakhne ke liye */
+            pointer-events: none;
+            letter-spacing: 5px;
+        ">PAID</div>
         
-        <div class="receipt-number">
-            <p><strong>Receipt #:</strong> <?php echo str_pad($payments_to_display[0]['id'], 6, '0', STR_PAD_LEFT); ?></p>
-            <p><strong>Date:</strong> <?php echo date('d-m-Y H:i'); ?></p>
-        </div>
-        
-        <div class="section">
-            <div class="section-title">Common Info</div>
-            <div class="student-info">
-                <div><span class="info-label">Father:</span> <?php echo $student_info['father_name']; ?></div>
-                <div><span class="info-label">Contact:</span> <?php echo $student_info['contact_number']; ?></div>
+        <!-- Baqi saara data z-index 2 par hai taake stamp ke uper aaye -->
+        <div style="position: relative; z-index: 2;">
+            <div class="receipt-number">
+                <p><strong>Receipt #:</strong> <?php echo str_pad($payments_to_display[0]['id'], 6, '0', STR_PAD_LEFT); ?></p>
+                <p><strong>Date:</strong> <?php echo date('d-m-Y H:i'); ?></p>
+            </div>
+            
+            <div class="section payment-details">
+                <div class="section-title">Items</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th class="amount-col">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($payments_to_display as $payment): ?>
+                            <tr>
+                                <td>
+                                    <strong><?php echo $payment['name']; ?></strong><br>
+                                    <?php echo $payment['class'] . '-' . $payment['section']; ?> | <?php echo $payment['paid_for_month']; ?>
+                                </td>
+                                <td class="amount-col"><?php echo number_format($payment['amount'], 2); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <tr style="font-weight: bold;">
+                            <td style="text-align: right; padding-top: 4mm;">TOTAL:</td>
+                            <td class="amount-col" style="padding-top: 4mm;"><?php echo format_currency($total_amount_paid); ?></td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
-        
-        <div class="section payment-details">
-            <div class="section-title">Items</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Description</th>
-                        <th class="amount-col">Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($payments_to_display as $payment): ?>
-                        <tr>
-                            <td>
-                                <strong><?php echo $payment['name']; ?></strong><br>
-                                <?php echo $payment['class'] . '-' . $payment['section']; ?> | <?php echo $payment['paid_for_month']; ?>
-                            </td>
-                            <td class="amount-col"><?php echo number_format($payment['amount'], 2); ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    <tr style="font-weight: bold;">
-                        <td style="text-align: right; padding-top: 4mm;">TOTAL:</td>
-                        <td class="amount-col" style="padding-top: 4mm;"><?php echo format_currency($total_amount_paid); ?></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+</div>
         
         <script>
             window.onload = function() {
