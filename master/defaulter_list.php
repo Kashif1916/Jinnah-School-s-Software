@@ -77,9 +77,7 @@ if ($defaulters) {
                             <i class="fas fa-address-book"></i> Student Record
                         </a>
 
-                        <a href="edit_student.php" class="module-nav-btn">
-                            <i class="fas fa-user-edit"></i> Edit Student
-                        </a>
+                        
 
                         <a href="fee_management.php" class="module-nav-btn">
                             <i class="fas fa-money-bill-wave"></i> Fee Management

@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $father_name = sanitize_input($_POST['father_name'] ?? '');
     $class = sanitize_input($_POST['class'] ?? '');
     $section = sanitize_input($_POST['section'] ?? '');
-    $monthly_fee = floatval($_POST['monthly_fee'] ?? 0);
+    $fixed_monthly_fee = floatval($_POST['fixed_monthly_fee'] ?? 0);
     //$description = sanitize_input($_POST['description'] ?? '');
     $contact_number = sanitize_input($_POST['contact_number'] ?? '');
     $contact_number2 = sanitize_input($_POST['contact_number2'] ?? '');
@@ -32,20 +32,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $concession_reason = sanitize_input($_POST['concession_reason'] ?? '');
     
     // Validation
-    if (empty($name) || empty($father_name) || empty($class) || empty($section) || $monthly_fee <= 0) {
+    if (empty($name) || empty($father_name) || empty($class) || empty($section) || $fixed_monthly_fee <= 0) {
         $error = 'All required fields must be filled correctly!';
     } else {
         // Insert student
-        $query = "INSERT INTO students (name, father_name, class, section, monthly_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status) 
+        $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')";
         $stmt = $conn->prepare($query);
-        $stmt->bind_param('ssssdsssds', $name, $father_name, $class, $section, $monthly_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason);
+        $stmt->bind_param('ssssdsssds', $name, $father_name, $class, $section, $fixed_monthly_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason);
         
         if ($stmt->execute()) {
             $student_id = $conn->insert_id;
             
             // Create annual fee records (apply concession if any)
-            create_annual_fees($student_id, $monthly_fee, $concession_amount);
+            create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount);
             
             $success = 'Student added successfully! Annual fees created.';
         } else {
@@ -153,8 +153,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="monthly_fee">Monthly Fee *</label>
-                                <input type="number" id="monthly_fee" name="monthly_fee" class="form-control" required step="0.01" min="0">
+                                <label class="form-label" for="fixed_monthly_fee">Fixed Monthly Fee *</label>
+                                <input type="number" id="fixed_monthly_fee" name="fixed_monthly_fee" class="form-control" required step="0.01" min="0">
                             </div>
                         </div>
                         <div class="row mb-3">
@@ -209,16 +209,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         document.getElementById('addStudentForm').addEventListener('submit', function(e) {
             const name = document.getElementById('name').value.trim();
             const fatherName = document.getElementById('father_name').value.trim();
-            const monthlyFee = parseFloat(document.getElementById('monthly_fee').value);
+            const fixedMonthlyFee = parseFloat(document.getElementById('fixed_monthly_fee').value);
             const concession = parseFloat(document.getElementById('concession_amount').value || 0);
             
-            if (!name || !fatherName || monthlyFee <= 0) {
+            if (!name || !fatherName || fixedMonthlyFee <= 0) {
                 e.preventDefault();
                 alert('Please fill all required fields correctly!');
                 return;
             }
 
-            if (concession < 0 || concession > monthlyFee) {
+            if (concession < 0 || concession > fixedMonthlyFee) {
                 e.preventDefault();
                 alert('Concession amount must be between 0 and the monthly fee.');
             }

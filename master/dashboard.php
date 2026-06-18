@@ -163,9 +163,7 @@ $today_collection = get_daily_collection(date('Y-m-d'));
                             <i class="fas fa-address-book"></i>
                             <span>Student Record</span>
                         </a>
-                        <a href="edit_student.php" class="action-btn">
-                            <i class="fas fa-user-edit"></i>
-                            <span>Edit Student</span>
+                        
                         </a>
                         <a href="fee_management.php" class="action-btn">
                             <i class="fas fa-money-bill-wave"></i>
