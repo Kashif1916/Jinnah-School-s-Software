@@ -69,8 +69,21 @@ if (isset($_GET['id'])) {
     <div class="wrapper feature-shell">
         <main class="main-content">
             <div class="topbar">
-                <div class="topbar-left"><h2>Edit Student</h2><span>Finance Panel</span></div>
-                <div class="topbar-right"><a href="../logout.php" class="btn-secondary">Logout</a></div>
+                <div class="topbar-left d-flex align-items-center gap-3">
+                    <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
+                    <div class="panel-brand">
+                        <h2>Edit Student</h2>
+                        <span>Finance / Clerk Panel</span>
+                    </div>
+                </div>
+                <div class="topbar-right">
+                    <span class="user-info">
+                        <i class="fas fa-user-circle"></i> <?php echo get_username(); ?>
+                    </span>
+                    <a href="../logout.php" class="btn-secondary">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
             </div>
             <div class="content">
                 <div class="module-nav-panel">

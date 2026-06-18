@@ -71,7 +71,7 @@ if ($defaulters) {
         <main class="main-content">
             <div class="topbar">
                 <div class="topbar-left d-flex align-items-center gap-3">
-                    <?php echo render_system_logo('topbar-logo'); ?>
+                    <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
                     <div class="panel-brand">
                         <h2>Pending List</h2>
                         <span>Principal Panel</span>

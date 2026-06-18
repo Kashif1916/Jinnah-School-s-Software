@@ -9,7 +9,7 @@ require_once '../config/db.php';
 require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
-require_master();
+require_admission();
 
 $error = '';
 $success = '';
@@ -84,7 +84,7 @@ $stmt->close();
         <main class="main-content">
             <div class="topbar">
                 <div class="topbar-left d-flex align-items-center gap-3">
-                    <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
+                    <?php echo render_system_logo('topbar-logo'); ?>
                     <div class="panel-brand">
                         <h2>Drop Student</h2>
                         <span>Principal Panel</span>
@@ -103,27 +103,16 @@ $stmt->close();
             <div class="content">
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
-                        <a href="dashboard.php" class="module-nav-btn">
-                            <i class="fas fa-chart-bar"></i> Dashboard
-                        </a>
                         <a href="add_student.php" class="module-nav-btn">
                             <i class="fas fa-user-plus"></i> Add Student
                         </a>
-                        <a href="student_record.php" class="module-nav-btn">
+                        <a href="student_record.php" class="module-nav-btn ">
                             <i class="fas fa-address-book"></i> Student Record
                         </a>
-                        <a href="fee_management.php" class="module-nav-btn">
-                            <i class="fas fa-money-bill-wave"></i> Fee Management
-                        </a>
-                        <a href="defaulter_list.php" class="module-nav-btn">
-                            <i class="fas fa-list"></i> Pending List
-                        </a>
-                        <a href="payment_analytics.php" class="module-nav-btn">
-                            <i class="fas fa-chart-line"></i> Analytics
-                        </a>
-                        <a href="promotion.php" class="module-nav-btn">
+                        <a href="promotion.php" class="module-nav-btn ">
                             <i class="fas fa-arrow-up"></i> Promotion
                         </a>
+                       
                         <a href="drop_student.php" class="module-nav-btn active">
                             <i class="fas fa-trash"></i> Drop Student
                         </a>
