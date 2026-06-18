@@ -181,9 +181,13 @@ if (isset($_GET['id'])) {
                         <a href="dashboard.php" class="module-nav-btn">
                             <i class="fas fa-chart-bar"></i> Dashboard
                         </a>
+                        <a href="student_record.php" class="module-nav-btn ">
+                            <i class="fas fa-address-book"></i> Student Record
+                        </a>
                         <a href="fee_payment.php" class="module-nav-btn active">
                             <i class="fas fa-money-bill-wave"></i> Fee Payment
                         </a>
+                        
                         <a href="defaulter_list.php" class="module-nav-btn">
                             <i class="fas fa-list"></i> Pending List
                         </a>

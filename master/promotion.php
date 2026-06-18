@@ -14,39 +14,89 @@ require_master();
 $success = '';
 $error = '';
 
+// Variables ko initialize karna taake HTML mai undefined error na aaye
+$from_class_selected = '';
+$from_section_selected = '';
+$to_class_selected = '';
+$to_section_selected = '';
+$show_student_list = false;
+$students_to_promote = [];
+
+// फर्ज करें $CLASSES aur $SECTIONS arrays config.php mai hain, agar nahi hain to hum default set kar dete hain
+if (!isset($CLASSES)) { $CLASSES = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']; }
+if (!isset($SECTIONS)) { $SECTIONS = ['A', 'B', 'C', 'D']; }
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $from_class = sanitize_input($_POST['from_class'] ?? '');
-    $from_section = sanitize_input($_POST['from_section'] ?? '');
-    $to_class = sanitize_input($_POST['to_class'] ?? '');
-    $to_section = sanitize_input($_POST['to_section'] ?? '');
-    
-    if (!empty($from_class) && !empty($from_section) && !empty($to_class) && !empty($to_section)) {
-        // Get students to promote
-        $query = "SELECT COUNT(*) as count FROM students WHERE class = ? AND section = ? AND status = 'active'";
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param('ss', $from_class, $from_section);
-        $stmt->execute();
-        $count_result = $stmt->get_result()->fetch_assoc();
-        $student_count = $count_result['count'];
-        $stmt->close();
-        
-        if ($student_count > 0) {
-            // Promote students
-            $query = "UPDATE students SET class = ?, section = ? WHERE class = ? AND section = ? AND status = 'active'";
+    $action = sanitize_input($_POST['action'] ?? '');
+
+    // STEP 1: Jab user sirf students load karega
+    if ($action == 'load_students') {
+        $from_class_selected = sanitize_input($_POST['from_class'] ?? '');
+        $from_section_selected = sanitize_input($_POST['from_section'] ?? '');
+
+        if (!empty($from_class_selected) && !empty($from_section_selected)) {
+            $query = "SELECT id, name, father_name, fixed_monthly_fee FROM students WHERE class = ? AND section = ? AND status = 'active'";
             $stmt = $conn->prepare($query);
-            $stmt->bind_param('ssss', $to_class, $to_section, $from_class, $from_section);
+            $stmt->bind_param('ss', $from_class_selected, $from_section_selected);
+            $stmt->execute();
+            $result = $stmt->get_result();
             
-            if ($stmt->execute()) {
-                $success = $student_count . ' student(s) promoted from ' . $from_class . '-' . $from_section . ' to ' . $to_class . '-' . $to_section . ' successfully!';
-            } else {
-                $error = 'Error promoting students: ' . $stmt->error;
+            while ($row = $result->fetch_assoc()) {
+                $students_to_promote[] = $row;
             }
             $stmt->close();
+            $show_student_list = true;
         } else {
-            $error = 'No active students found in ' . $from_class . '-' . $from_section;
+            $error = 'Please select both Class and Section to load students.';
         }
-    } else {
-        $error = 'All fields are required!';
+    }
+    
+    // STEP 2: Jab user students select karke promote button dabayega
+    elseif ($action == 'promote_selected') {
+        // Purani values retain rakhne ke liye taake form khali na ho
+        $from_class_selected = sanitize_input($_POST['from_class'] ?? '');
+        $from_section_selected = sanitize_input($_POST['from_section'] ?? '');
+        
+        $to_class = sanitize_input($_POST['to_class'] ?? '');
+        $to_section = sanitize_input($_POST['to_section'] ?? '');
+        $new_fee = sanitize_input($_POST['new_fixed_monthly_fee'] ?? '');
+        $student_ids = $_POST['student_ids'] ?? [];
+
+        if (!empty($to_class) && !empty($to_section) && $new_fee !== '' && !empty($student_ids)) {
+            $conn->begin_transaction(); // Transaction start taake data secure rahe
+            try {
+                $promoted_count = 0;
+                
+                // Aik aik karke select kiye gaye student ko update karna
+                $query = "UPDATE students SET class = ?, section = ?, fixed_monthly_fee = ?, concession_amount = 0 WHERE id = ? AND status = 'active'";
+                $stmt = $conn->prepare($query);
+
+                foreach ($student_ids as $id) {
+                    $student_id = sanitize_input($id);
+                    $stmt->bind_param('ssdi', $to_class, $to_section, $new_fee, $student_id);
+                    $stmt->execute();
+                    if ($stmt->affected_rows > 0) {
+                        $promoted_count++;
+                    }
+                }
+                $stmt->close();
+
+                if ($promoted_count > 0) {
+                    $conn->commit();
+                    $success = $promoted_count . ' student(s) promoted to ' . $to_class . '-' . $to_section . ' successfully with new monthly fee ' . format_currency($new_fee) . '!';
+                    $show_student_list = false; // Kaam hone ke baad list chupa dein
+                } else {
+                    $conn->rollback();
+                    $error = 'No students were updated. Please try again.';
+                }
+            } catch (Exception $e) {
+                $conn->rollback();
+                $error = 'Database Error: ' . $e->getMessage();
+            }
+        } else {
+            $error = 'All fields and at least one student selection are required!';
+            $show_student_list = true; // Error pe list wapis dikhayen
+        }
     }
 }
 ?>
@@ -62,9 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 </head>
 <body>
     <div class="wrapper feature-shell">
-        <!-- Main Content -->
         <main class="main-content">
-            <!-- Top Bar -->
             <div class="topbar">
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <?php echo render_system_logo('topbar-logo'); ?>
@@ -83,7 +131,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
             </div>
             
-            <!-- Dashboard Content -->
             <div class="content">
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
@@ -135,7 +182,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             </div>
                         <?php endif; ?>
                         
-                        <!-- Step 1: Select Class and Section to Load Students -->
                         <form method="POST" id="loadStudentsForm" class="mb-4">
                             <input type="hidden" name="action" value="load_students">
                             <div class="row g-3 align-items-end">
@@ -147,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                 <option value="<?php echo $cls; ?>" <?php echo ($from_class_selected == $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
                                             <?php endforeach; ?>
                                         </select>
-                                    </div>
+                                </div>
                                     
                                 <div class="col-md-4">
                                     <label for="from_section" class="form-label">From Section *</label>
@@ -157,7 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                 <option value="<?php echo $sec; ?>" <?php echo ($from_section_selected == $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
                                             <?php endforeach; ?>
                                         </select>
-                                    </div>
+                                </div>
                                 <div class="col-md-4">
                                     <button type="submit" class="btn-primary w-100">
                                         <i class="fas fa-users"></i> Load Students
@@ -167,10 +213,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         </form>
 
                         <?php if ($show_student_list && !empty($students_to_promote)): ?>
-                            <!-- Step 2: Select Students and Promotion Details -->
                             <hr class="my-4">
                             <form method="POST" id="promoteStudentsForm">
                                 <input type="hidden" name="action" value="promote_selected">
+                                <input type="hidden" name="from_class" value="<?php echo $from_class_selected; ?>">
+                                <input type="hidden" name="from_section" value="<?php echo $from_section_selected; ?>">
                                 
                                 <div class="row mb-3">
                                     <div class="col-md-4">
@@ -178,7 +225,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         <select id="to_class" name="to_class" class="form-select" required>
                                             <option value="">Select Class</option>
                                             <?php foreach ($CLASSES as $cls): ?>
-                                                <option value="<?php echo $cls; ?>" <?php echo ($to_class_selected == $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
+                                                <option value="<?php echo $cls; ?>"><?php echo $cls; ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
@@ -187,13 +234,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         <select id="to_section" name="to_section" class="form-select" required>
                                             <option value="">Select Section</option>
                                             <?php foreach ($SECTIONS as $sec): ?>
-                                                <option value="<?php echo $sec; ?>" <?php echo ($to_section_selected == $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
+                                                <option value="<?php echo $sec; ?>"><?php echo $sec; ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
                                     <div class="col-md-4">
-                                        <label for="new_fixed_monthly_fee" class="form-label">New Fixed Monthly Fee *</label>
-                                        <input type="number" id="new_fixed_monthly_fee" name="new_fixed_monthly_fee" class="form-control" step="0.01" min="0" required>
+                                        <label for="new_fixed_monthly_fee" class="form-label">New Fixed Monthly Fee </label>
+                                        <input type="number" id="new_fixed_monthly_fee" name="new_fixed_monthly_fee" class="form-control" step="0.01" min="0" >
                                     </div>
                                 </div>
 

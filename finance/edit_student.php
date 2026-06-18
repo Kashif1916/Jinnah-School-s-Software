@@ -75,7 +75,21 @@ if (isset($_GET['id'])) {
             <div class="content">
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
-                        <a href="student_record.php" class="module-nav-btn"><i class="fas fa-arrow-left"></i> Back to Records</a>
+                        <a href="dashboard.php" class="module-nav-btn">
+                            <i class="fas fa-chart-bar"></i> Dashboard
+                        </a>
+                        <a href="student_record.php" class="module-nav-btn active">
+                            <i class="fas fa-address-book"></i> Student Record
+                        </a>
+                        <a href="fee_payment.php" class="module-nav-btn">
+                            <i class="fas fa-money-bill-wave"></i> Fee Payment
+                        </a>
+                        <a href="defaulter_list.php" class="module-nav-btn">
+                            <i class="fas fa-list"></i> Pending List
+                        </a>
+                        <a href="payment_analytics.php" class="module-nav-btn">
+                            <i class="fas fa-chart-line"></i> Analytics
+                        </a>
                     </div>
                 </div>
 
