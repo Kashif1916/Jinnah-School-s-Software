@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if ($stmt->execute()) {
             $student_id = $conn->insert_id;
             
-            // Create annual fee records (apply concession if any)
+            // Create initial 12 months fee records starting from current month
             create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount);
             
             $success = 'Student added successfully! Annual fees created.';

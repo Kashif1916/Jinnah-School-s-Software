@@ -80,22 +80,71 @@ function get_fee_record($student_id, $month) {
 /**
  * Create fee records for new student for 12 months
  */
-function create_annual_fees($student_id, $monthly_fee, $concession_amount = 0) {
+function create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount = 0) {
     global $conn;
-    
-    $months = array_map(function($m) {
-        return $m . '-' . date('Y');
-    }, ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
-    
-    foreach ($months as $month) {
-        $amount = floatval($monthly_fee) - floatval($concession_amount);
-        if ($amount < 0) $amount = 0;
+    $monthly_fee = floatval($fixed_monthly_fee) - floatval($concession_amount);
+    if ($monthly_fee < 0) $monthly_fee = 0;
+
+    for ($i = 0; $i < 12; $i++) {
+        $month = date('M-Y', strtotime("+$i months"));
         $query = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')";
         $stmt = $conn->prepare($query);
-        $stmt->bind_param('isd', $student_id, $month, $amount);
+        $stmt->bind_param('isd', $student_id, $month, $monthly_fee);
         $stmt->execute();
         $stmt->close();
     }
+}
+
+/**
+ * Automatically generate next 5 months of fees if unpaid months are 5 or less
+ */
+function auto_generate_fee_buffer($student_id, $monthly_fee) {
+    global $conn;
+    
+    // Count current unpaid months
+    $query = "SELECT COUNT(*) as unpaid_count FROM fee_records WHERE student_id = ? AND status = 'unpaid'";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('i', $student_id);
+    $stmt->execute();
+    $count = $stmt->get_result()->fetch_assoc()['unpaid_count'];
+    $stmt->close();
+
+    if ($count <= 5) {
+        // Find the last generated month for this student
+        $query = "SELECT month FROM fee_records WHERE student_id = ? ORDER BY STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y') DESC LIMIT 1";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param('i', $student_id);
+        $stmt->execute();
+        $last_month_row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        $start_date = $last_month_row ? strtotime("01-" . $last_month_row['month']) : time();
+        
+        for ($i = 1; $i <= 5; $i++) {
+            $next_month = date('M-Y', strtotime("+$i month", $start_date));
+            $query = "INSERT IGNORE INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')";
+            $stmt = $conn->prepare($query);
+            $stmt->bind_param('isd', $student_id, $next_month, $monthly_fee);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
+}
+
+/**
+ * Update all UNPAID records from current month onwards with new fee structure
+ */
+function sync_unpaid_fee_amounts($student_id, $new_monthly_fee) {
+    global $conn;
+    $current_month_start = date('Y-m-01');
+    
+    $query = "UPDATE fee_records SET amount = ? 
+              WHERE student_id = ? AND status = 'unpaid' 
+              AND STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y') >= ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('dis', $new_monthly_fee, $student_id, $current_month_start);
+    $stmt->execute();
+    $stmt->close();
 }
 
 /**
@@ -228,6 +277,11 @@ function record_payment($student_id, $amount, $month, $received_by) {
         $stmt->execute();
         $stmt->close();
         
+        // Auto check for buffer after payment
+        $student = get_student($student_id);
+        $net_fee = floatval($student['fixed_monthly_fee']) - floatval($student['concession_amount']);
+        auto_generate_fee_buffer($student_id, $net_fee);
+
         $conn->commit();
         return $payment_id;
     } catch (Exception $e) {

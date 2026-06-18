@@ -23,6 +23,10 @@ A complete, production-ready School Finance Management System built with PHP, My
    - Update student information
    - Modify monthly fees
 
+3. **Student Record**
+   - View all student details
+   - Search and filter students
+
 3. **Fee Management**
    - Search students by name, class, section
    - View complete fee history (month-wise)
@@ -55,6 +59,7 @@ A complete, production-ready School Finance Management System built with PHP, My
 
 ### Finance Dashboard Features
 
+1. **Student Record** - View student records (read-only)
 1. **Add Student** - Add new students (unified with Master)
 2. **Fee Payment** - Record payment for unpaid fees
 3. **Defaulter List** - View students with unpaid fees (read-only)

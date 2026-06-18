@@ -77,6 +77,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if ($stmt->execute()) {
                 $success = 'Student updated successfully!';
                 $student = get_student($student_id);
+                
+                // Automatically sync future unpaid records with new fee
+                $net_fee = floatval($fixed_monthly_fee) - floatval($concession_amount);
+                sync_unpaid_fee_amounts($student_id, $net_fee);
+                auto_generate_fee_buffer($student_id, $net_fee);
+                
             } else {
                 $error = 'Error updating student: ' . $stmt->error;
             }

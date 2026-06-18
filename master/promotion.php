@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                 <div class="form-section">
                     <div class="promotion-card">
-                        <div class="card-header">
+                        <div class="card-header mb-4">
                             <i class="fas fa-arrow-up"></i> Promote Class
                         </div>
                         
@@ -135,63 +135,107 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             </div>
                         <?php endif; ?>
                         
-                        <form method="POST" id="promotionForm">
-                            <div class="promotion-form">
-                                <div class="promotion-column">
-                                    <h5>FROM</h5>
-                                    <div class="form-group">
-                                        <label for="from_class">Class</label>
-                                        <select id="from_class" name="from_class" class="form-control" required>
+                        <!-- Step 1: Select Class and Section to Load Students -->
+                        <form method="POST" id="loadStudentsForm" class="mb-4">
+                            <input type="hidden" name="action" value="load_students">
+                            <div class="row g-3 align-items-end">
+                                <div class="col-md-4">
+                                    <label for="from_class" class="form-label">From Class *</label>
+                                    <select id="from_class" name="from_class" class="form-select" required>
                                             <option value="">Select Class</option>
                                             <?php foreach ($CLASSES as $cls): ?>
-                                                <option value="<?php echo $cls; ?>"><?php echo $cls; ?></option>
+                                                <option value="<?php echo $cls; ?>" <?php echo ($from_class_selected == $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
                                     
-                                    <div class="form-group">
-                                        <label for="from_section">Section</label>
-                                        <select id="from_section" name="from_section" class="form-control" required>
+                                <div class="col-md-4">
+                                    <label for="from_section" class="form-label">From Section *</label>
+                                    <select id="from_section" name="from_section" class="form-select" required>
                                             <option value="">Select Section</option>
                                             <?php foreach ($SECTIONS as $sec): ?>
-                                                <option value="<?php echo $sec; ?>"><?php echo $sec; ?></option>
+                                                <option value="<?php echo $sec; ?>" <?php echo ($from_section_selected == $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-                                </div>
-                                
-                                <div class="promotion-arrow">
-                                    <i class="fas fa-arrow-right"></i>
-                                </div>
-                                
-                                <div class="promotion-column">
-                                    <h5>TO</h5>
-                                    <div class="form-group">
-                                        <label for="to_class">Class</label>
-                                        <select id="to_class" name="to_class" class="form-control" required>
-                                            <option value="">Select Class</option>
-                                            <?php foreach ($CLASSES as $cls): ?>
-                                                <option value="<?php echo $cls; ?>"><?php echo $cls; ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    
-                                    <div class="form-group">
-                                        <label for="to_section">Section</label>
-                                        <select id="to_section" name="to_section" class="form-control" required>
-                                            <option value="">Select Section</option>
-                                            <?php foreach ($SECTIONS as $sec): ?>
-                                                <option value="<?php echo $sec; ?>"><?php echo $sec; ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
+                                <div class="col-md-4">
+                                    <button type="submit" class="btn-primary w-100">
+                                        <i class="fas fa-users"></i> Load Students
+                                    </button>
                                 </div>
                             </div>
-                            
-                            <button type="submit" class="btn-primary btn-lg" onclick="return confirm('Are you sure you want to promote this class? This action cannot be undone.')">
-                                <i class="fas fa-check"></i> Promote Class
-                            </button>
                         </form>
+
+                        <?php if ($show_student_list && !empty($students_to_promote)): ?>
+                            <!-- Step 2: Select Students and Promotion Details -->
+                            <hr class="my-4">
+                            <form method="POST" id="promoteStudentsForm">
+                                <input type="hidden" name="action" value="promote_selected">
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label for="to_class" class="form-label">To Class *</label>
+                                        <select id="to_class" name="to_class" class="form-select" required>
+                                            <option value="">Select Class</option>
+                                            <?php foreach ($CLASSES as $cls): ?>
+                                                <option value="<?php echo $cls; ?>" <?php echo ($to_class_selected == $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="to_section" class="form-label">To Section *</label>
+                                        <select id="to_section" name="to_section" class="form-select" required>
+                                            <option value="">Select Section</option>
+                                            <?php foreach ($SECTIONS as $sec): ?>
+                                                <option value="<?php echo $sec; ?>" <?php echo ($to_section_selected == $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="new_fixed_monthly_fee" class="form-label">New Fixed Monthly Fee *</label>
+                                        <input type="number" id="new_fixed_monthly_fee" name="new_fixed_monthly_fee" class="form-control" step="0.01" min="0" required>
+                                    </div>
+                                </div>
+
+                                <h5 class="mb-3">Select Students to Promote (<?php echo count($students_to_promote); ?> found)</h5>
+                                <div class="table-responsive mb-4">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 50px;">
+                                                    <input type="checkbox" id="selectAllStudents" class="form-check-input" checked>
+                                                </th>
+                                                <th>ID</th>
+                                                <th>Name</th>
+                                                <th>Father Name</th>
+                                                <th>Current Fee</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($students_to_promote as $student): ?>
+                                                <tr>
+                                                    <td>
+                                                        <input type="checkbox" name="student_ids[]" value="<?php echo $student['id']; ?>" class="form-check-input student-checkbox" checked>
+                                                    </td>
+                                                    <td><?php echo $student['id']; ?></td>
+                                                    <td><?php echo $student['name']; ?></td>
+                                                    <td><?php echo $student['father_name']; ?></td>
+                                                    <td><?php echo format_currency($student['fixed_monthly_fee']); ?></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div class="form-actions">
+                                    <button type="submit" class="btn-primary btn-lg" onclick="return confirm('Are you sure you want to promote the selected students? This action will update their class, section, and fee structure for the next academic year.')">
+                                        <i class="fas fa-check"></i> Promote Selected Students
+                                    </button>
+                                </div>
+                            </form>
+                        <?php elseif ($show_student_list && empty($students_to_promote)): ?>
+                            <div class="alert alert-info mt-4">No active students found in <?php echo $from_class_selected . '-' . $from_section_selected; ?>.</div>
+                        <?php endif; ?>
                     </div>
                     
                     <div class="info-box">
@@ -200,7 +244,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <li>Select the current class and section</li>
                             <li>Select the target class and section</li>
                             <li>Click "Promote Class" to move all active students</li>
-                            <li>All students in the selected class and section will be promoted</li>
+                            <li>First, select the current class and section and click "Load Students".</li>
+                            <li>A list of active students from that class/section will appear.</li>
+                            <li>You can uncheck any student who should not be promoted (e.g., failed students).</li>
+                            <li>Select the target class and section for the promoted students.</li>
+                            <li>Enter the new fixed monthly fee that will apply to all promoted students in their new class. Their concession amount will be reset to zero.</li>
+                            <li>Click "Promote Selected Students" to update their records and generate new fee records for the next academic year.</li>
                             <li>This action cannot be undone - please be careful!</li>
                         </ul>
                     </div>
@@ -216,30 +265,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             padding: 30px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
             margin-bottom: 30px;
-        }
-        
-        .card-header {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 25px;
-            color: #1f5f46;
-        }
-        
-        .promotion-form {
-            display: flex;
-            align-items: flex-end;
-            gap: 30px;
-            margin-bottom: 30px;
-        }
-        
-        .promotion-column {
-            flex: 1;
-        }
-        
-        .promotion-arrow {
-            font-size: 28px;
-            color: #1f5f46;
-            margin-bottom: 10px;
         }
         
         .info-box {
@@ -280,6 +305,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-size: 16px;
         }
     </style>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectAllCheckbox = document.getElementById('selectAllStudents');
+            const studentCheckboxes = document.querySelectorAll('.student-checkbox');
+
+            if (selectAllCheckbox) {
+                selectAllCheckbox.addEventListener('change', function() {
+                    studentCheckboxes.forEach(checkbox => {
+                        checkbox.checked = this.checked;
+                    });
+                });
+            }
+        });
+    </script>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/script.js"></script>
