@@ -9,7 +9,11 @@ require_once '../config/db.php';
 require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
-require_master();
+// Allow both Master and Admission roles
+if (!is_master() && !is_admission()) {
+    header('Location: ../login.php');
+    exit();
+}
 
 $error = '';
 $success = '';
@@ -132,73 +136,69 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <?php endif; ?>
                     
                     <form method="POST" class="student-form" id="addStudentForm">
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label for="name">Student Name *</label>
-                                <input type="text" id="name" name="name" class="form-control" 
-                                       required placeholder="Enter student name">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="name">Student Name *</label>
+                                <input type="text" id="name" name="name" class="form-control" required>
                             </div>
-                            
-                            <div class="form-group">
-                                <label for="father_name">Father's Name *</label>
-                                <input type="text" id="father_name" name="father_name" class="form-control" 
-                                       required placeholder="Enter father's name">
+                            <div class="col-md-6">
+                                <label class="form-label" for="father_name">Father's Name *</label>
+                                <input type="text" id="father_name" name="father_name" class="form-control" required>
                             </div>
-                            
-                            <div class="form-group">
-                                <label for="class">Class *</label>
-                                <select id="class" name="class" class="form-control" required>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <label class="form-label" for="class">Class *</label>
+                                <select id="class" name="class" class="form-select" required>
                                     <option value="">Select Class</option>
                                     <?php foreach ($CLASSES as $cls): ?>
                                         <option value="<?php echo $cls; ?>"><?php echo $cls; ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            
-                            <div class="form-group">
-                                <label for="section">Section *</label>
-                                <select id="section" name="section" class="form-control" required>
+                            <div class="col-md-3">
+                                <label class="form-label" for="section">Section *</label>
+                                <select id="section" name="section" class="form-select" required>
                                     <option value="">Select Section</option>
                                     <?php foreach ($SECTIONS as $sec): ?>
                                         <option value="<?php echo $sec; ?>"><?php echo $sec; ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            
-                            <div class="form-group">
-                                <label for="monthly_fee">Monthly Fee *</label>
-                                <input type="number" id="monthly_fee" name="monthly_fee" class="form-control" 
-                                       required placeholder="Enter monthly fee" step="0.01" min="0">
+                            <div class="col-md-6">
+                                <label class="form-label" for="monthly_fee">Monthly Fee *</label>
+                                <input type="number" id="monthly_fee" name="monthly_fee" class="form-control" required step="0.01" min="0">
                             </div>
-                            
-                            <div class="form-group">
-                                <label for="contact_number">Contact Number 1</label>
-                                <input type="tel" id="contact_number" name="contact_number" class="form-control" 
-                                       placeholder="Enter primary contact number">
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label" for="contact_number">Contact Number 1</label>
+                                <input type="tel" id="contact_number" name="contact_number" class="form-control">
                             </div>
-
-                            <div class="form-group">
-                                <label for="contact_number2">Contact Number 2</label>
-                                <input type="tel" id="contact_number2" name="contact_number2" class="form-control" 
-                                       placeholder="Enter alternate contact number">
+                            <div class="col-md-4">
+                                <label class="form-label" for="contact_number2">Contact Number 2</label>
+                                <input type="tel" id="contact_number2" name="contact_number2" class="form-control">
                             </div>
-
-                            <div class="form-group">
-                                <label for="whatsapp_number">WhatsApp Number</label>
-                                <input type="tel" id="whatsapp_number" name="whatsapp_number" class="form-control" 
-                                       placeholder="Enter WhatsApp number">
+                            <div class="col-md-4">
+                                <label class="form-label" for="whatsapp_number">WhatsApp Number</label>
+                                <input type="tel" id="whatsapp_number" name="whatsapp_number" class="form-control">
                             </div>
-
-                            <div class="form-group">
-                                <label for="concession_amount">Concession Amount</label>
-                                <input type="number" id="concession_amount" name="concession_amount" class="form-control" 
-                                       placeholder="Enter concession amount" step="0.01" min="0" value="0">
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="concession_amount">Concession Amount</label>
+                                <input type="number" id="concession_amount" name="concession_amount" class="form-control" value="0" step="0.01" min="0">
                             </div>
-
-                            <div class="form-group full-width">
-                                <label for="concession_reason">Concession Reason</label>
-                                <input type="text" id="concession_reason" name="concession_reason" class="form-control" 
-                                       placeholder="Enter reason for concession">
+                            <div class="col-md-6">
+                                <label class="form-label" for="concession_reason">Concession Reason</label>
+                                <select id="concession_reason" name="concession_reason" class="form-select">
+                                    <option value="">None</option>
+                                    <option value="Sibling">Sibling</option>
+                                    <option value="Hafiz">Hafiz</option>
+                                    <option value="Orfan">Orfan</option>
+                                    <option value="S.C">S.C</option>
+                                    <option value="EMP">EMP</option>
+                                </select>
                             </div>
                         </div>
                         

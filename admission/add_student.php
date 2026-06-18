@@ -1,6 +1,6 @@
 <?php
 /**
- * Add Student - Admission Module
+ * Add Student
  * School Finance Management System
  */
 
@@ -9,7 +9,11 @@ require_once '../config/db.php';
 require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
-require_admission();
+// Allow both Master and Admission roles
+if (!is_master() && !is_admission()) {
+    header('Location: ../login.php');
+    exit();
+}
 
 $error = '';
 $success = '';
@@ -20,15 +24,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $class = sanitize_input($_POST['class'] ?? '');
     $section = sanitize_input($_POST['section'] ?? '');
     $monthly_fee = floatval($_POST['monthly_fee'] ?? 0);
+    //$description = sanitize_input($_POST['description'] ?? '');
     $contact_number = sanitize_input($_POST['contact_number'] ?? '');
     $contact_number2 = sanitize_input($_POST['contact_number2'] ?? '');
     $whatsapp_number = sanitize_input($_POST['whatsapp_number'] ?? '');
     $concession_amount = floatval($_POST['concession_amount'] ?? 0);
     $concession_reason = sanitize_input($_POST['concession_reason'] ?? '');
     
+    // Validation
     if (empty($name) || empty($father_name) || empty($class) || empty($section) || $monthly_fee <= 0) {
         $error = 'All required fields must be filled correctly!';
     } else {
+        // Insert student
         $query = "INSERT INTO students (name, father_name, class, section, monthly_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')";
         $stmt = $conn->prepare($query);
@@ -36,11 +43,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         if ($stmt->execute()) {
             $student_id = $conn->insert_id;
+            
+            // Create annual fee records (apply concession if any)
             create_annual_fees($student_id, $monthly_fee, $concession_amount);
+            
             $success = 'Student added successfully! Annual fees created.';
         } else {
             $error = 'Error adding student: ' . $stmt->error;
         }
+        
         $stmt->close();
     }
 }
@@ -50,14 +61,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add Student - Admission Panel</title>
+    <title>Add Student - <?php echo SITE_NAME; ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
 </head>
 <body>
     <div class="wrapper feature-shell">
+        <!-- Main Content -->
         <main class="main-content">
+            <!-- Top Bar -->
             <div class="topbar">
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <?php echo render_system_logo('topbar-logo'); ?>
@@ -76,7 +89,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
             </div>
             
+            <!-- Dashboard Content -->
             <div class="content">
+                <div class="module-nav-panel">
+                    <div class="module-nav-row">
+                        
+                        <a href="add_student.php" class="module-nav-btn active">
+                            <i class="fas fa-user-plus"></i> Add Student
+                        </a>
+                        <a href="edit_student.php" class="module-nav-btn">
+                            <i class="fas fa-user-edit"></i> Edit Student
+                        </a>
+                        
+                        <a href="drop_student.php" class="module-nav-btn">
+                            <i class="fas fa-trash"></i> Drop Student
+                        </a>
+                    </div>
+                </div>
+
                 <div class="form-section">
                     <?php if (!empty($success)): ?>
                         <div class="alert alert-success alert-dismissible fade show">
@@ -93,69 +123,88 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <?php endif; ?>
                     
                     <form method="POST" class="student-form" id="addStudentForm">
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label for="name">Student Name *</label>
-                                <input type="text" id="name" name="name" class="form-control" required placeholder="Enter student name">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="name">Student Name *</label>
+                                <input type="text" id="name" name="name" class="form-control" required>
                             </div>
-                            <div class="form-group">
-                                <label for="father_name">Father's Name *</label>
-                                <input type="text" id="father_name" name="father_name" class="form-control" required placeholder="Enter father's name">
+                            <div class="col-md-6">
+                                <label class="form-label" for="father_name">Father's Name *</label>
+                                <input type="text" id="father_name" name="father_name" class="form-control" required>
                             </div>
-                            <div class="form-group">
-                                <label for="class">Class *</label>
-                                <select id="class" name="class" class="form-control" required>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <label class="form-label" for="class">Class *</label>
+                                <select id="class" name="class" class="form-select" required>
                                     <option value="">Select Class</option>
                                     <?php foreach ($CLASSES as $cls): ?>
                                         <option value="<?php echo $cls; ?>"><?php echo $cls; ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label for="section">Section *</label>
-                                <select id="section" name="section" class="form-control" required>
+                            <div class="col-md-3">
+                                <label class="form-label" for="section">Section *</label>
+                                <select id="section" name="section" class="form-select" required>
                                     <option value="">Select Section</option>
                                     <?php foreach ($SECTIONS as $sec): ?>
                                         <option value="<?php echo $sec; ?>"><?php echo $sec; ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label for="monthly_fee">Monthly Fee *</label>
-                                <input type="number" id="monthly_fee" name="monthly_fee" class="form-control" required placeholder="Enter monthly fee" step="0.01" min="0">
-                            </div>
-                            <div class="form-group">
-                                <label for="contact_number">Contact Number 1</label>
-                                <input type="tel" id="contact_number" name="contact_number" class="form-control" placeholder="Enter primary contact number">
-                            </div>
-                            <div class="form-group">
-                                <label for="contact_number2">Contact Number 2</label>
-                                <input type="tel" id="contact_number2" name="contact_number2" class="form-control" placeholder="Enter alternate contact number">
-                            </div>
-                            <div class="form-group">
-                                <label for="whatsapp_number">WhatsApp Number</label>
-                                <input type="tel" id="whatsapp_number" name="whatsapp_number" class="form-control" placeholder="Enter WhatsApp number">
-                            </div>
-                            <div class="form-group">
-                                <label for="concession_amount">Concession Amount</label>
-                                <input type="number" id="concession_amount" name="concession_amount" class="form-control" placeholder="Enter concession amount" step="0.01" min="0" value="0">
-                            </div>
-                            <div class="form-group full-width">
-                                <label for="concession_reason">Concession Reason</label>
-                                <input type="text" id="concession_reason" name="concession_reason" class="form-control" placeholder="Enter reason for concession">
+                            <div class="col-md-6">
+                                <label class="form-label" for="monthly_fee">Monthly Fee *</label>
+                                <input type="number" id="monthly_fee" name="monthly_fee" class="form-control" required step="0.01" min="0">
                             </div>
                         </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label" for="contact_number">Contact Number 1</label>
+                                <input type="tel" id="contact_number" name="contact_number" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="contact_number2">Contact Number 2</label>
+                                <input type="tel" id="contact_number2" name="contact_number2" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="whatsapp_number">WhatsApp Number</label>
+                                <input type="tel" id="whatsapp_number" name="whatsapp_number" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="concession_amount">Concession Amount</label>
+                                <input type="number" id="concession_amount" name="concession_amount" class="form-control" value="0" step="0.01" min="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="concession_reason">Concession Reason</label>
+                                <select id="concession_reason" name="concession_reason" class="form-select">
+                                    <option value="">None</option>
+                                    <option value="Sibling">Sibling</option>
+                                    <option value="Hafiz">Hafiz</option>
+                                    <option value="Orfan">Orfan</option>
+                                    <option value="S.C">S.C</option>
+                                    <option value="EMP">EMP</option>
+                                </select>
+                            </div>
+                        </div>
+                        
                         <div class="form-actions">
                             <button type="submit" class="btn-primary">
                                 <i class="fas fa-save"></i> Add Student
                             </button>
+                            <a href="dashboard.php" class="btn-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
                         </div>
                     </form>
                 </div>
             </div>
         </main>
     </div>
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/js/script.js"></script>
     <script>
         document.getElementById('addStudentForm').addEventListener('submit', function(e) {
             const name = document.getElementById('name').value.trim();
@@ -168,6 +217,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 alert('Please fill all required fields correctly!');
                 return;
             }
+
             if (concession < 0 || concession > monthlyFee) {
                 e.preventDefault();
                 alert('Concession amount must be between 0 and the monthly fee.');

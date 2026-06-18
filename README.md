@@ -55,8 +55,9 @@ A complete, production-ready School Finance Management System built with PHP, My
 
 ### Finance Dashboard Features
 
-1. **Fee Payment** - Record payment for unpaid fees
-2. **Defaulter List** - View students with unpaid fees (read-only)
+1. **Add Student** - Add new students (unified with Master)
+2. **Fee Payment** - Record payment for unpaid fees
+3. **Defaulter List** - View students with unpaid fees (read-only)
 
 
 ## 🔐 Default Credentials
@@ -116,4 +117,3 @@ A complete, production-ready School Finance Management System built with PHP, My
 1. Go to "Defaulter List"
 2. Apply filters to search
 3. Contact students for payment
-
