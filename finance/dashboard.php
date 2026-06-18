@@ -52,6 +52,25 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
             
             <!-- Dashboard Content -->
             <div class="content">
+                <div class="module-nav-panel">
+                    <div class="module-nav-row">
+                        <a href="dashboard.php" class="module-nav-btn active">
+                            <i class="fas fa-chart-bar"></i> Dashboard
+                        </a>
+                        <a href="student_record.php" class="module-nav-btn ">
+                            <i class="fas fa-address-book"></i> Student Record
+                        </a>
+                        <a href="fee_payment.php" class="module-nav-btn">
+                            <i class="fas fa-money-bill-wave"></i> Fee Payment
+                        </a>
+                        <a href="defaulter_list.php" class="module-nav-btn">
+                            <i class="fas fa-list"></i> Pending List
+                        </a>
+                        <a href="payment_analytics.php" class="module-nav-btn">
+                            <i class="fas fa-chart-line"></i> Analytics
+                        </a>
+                    </div>
+                </div>
                 <div class="dashboard-stage dashboard-stage--single">
                     <aside class="stage-panel stage-panel--hero">
                         <div class="welcome-card__header">

@@ -142,21 +142,33 @@ if ($defaulters) {
                                     </select>
                                 </div>
 
-                                <div class="form-group">
-                                    <label>Select Month(s)</label>
-                                    <div class="months-checkbox-container">
-                                        <?php
-                                        for ($i = 1; $i <= 12; $i++) {
-                                            $month_str = $MONTHS[$i - 1] . '-' . date('Y');
-                                            $checked = (in_array($month_str, (array)$months_filter)) ? 'checked' : '';
-                                            ?>
-                                            <label class="month-tick-item">
-                                                <input type="checkbox" name="months[]" value="<?php echo $month_str; ?>" <?php echo $checked; ?>>
-                                                <?php echo $month_str; ?>
-                                            </label>
-                                        <?php } ?>
-                                    </div>
-                                </div>
+                               <!-- Naya Dynamic Year Ticks UI -->
+<div class="form-group">
+    <label>Select Month(s)</label>
+    <div class="months-checkbox-container">
+        <?php
+        $current_year = (int)date('Y');
+        // Hum pichla saal aur maujuda saal dono ke months generate karenge
+        $years_to_show = [$current_year - 1, $current_year]; 
+
+        foreach ($years_to_show as $yr) {
+            // Ek choti si heading saal ko alag dikhane ke liye
+            echo "<div class='text-muted fw-bold border-bottom mt-2 mb-1' style='font-size: 11px;'>— $yr —</div>";
+            
+            for ($i = 1; $i <= 12; $i++) {
+                $month_str = $MONTHS[$i-1] . '-' . $yr;
+                $checked = (in_array($month_str, (array)$months_filter)) ? 'checked' : '';
+                ?>
+                <label class="month-tick-item">
+                    <input type="checkbox" name="months[]" value="<?php echo $month_str; ?>" <?php echo $checked; ?>>
+                    <?php echo $month_str; ?>
+                </label>
+                <?php 
+            }
+        } 
+        ?>
+    </div>
+</div>
 
                                 <div class="form-group">
                                     <button type="submit" class="btn-primary" style="margin-top: 30px;">

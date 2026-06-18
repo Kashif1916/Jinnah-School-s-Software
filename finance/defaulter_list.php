@@ -37,12 +37,38 @@ if ($defaulters) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
+
+    <style>
+        .months-checkbox-container {
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 10px;
+            max-height: 120px;
+            overflow-y: auto;
+            background-color: #fff;
+        }
+        .month-tick-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+        .month-tick-item:hover {
+            background-color: #f8f9fa;
+        }
+        .month-tick-item input {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+    </style>
 </head>
 <body>
     <div class="wrapper feature-shell">
-        <!-- Main Content -->
         <main class="main-content">
-            <!-- Top Bar -->
             <div class="topbar">
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <?php echo render_system_logo('topbar-logo'); ?>
@@ -61,8 +87,8 @@ if ($defaulters) {
                 </div>
             </div>
             
-            <!-- Dashboard Content -->
             <div class="content">
+                
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
                         <a href="dashboard.php" class="module-nav-btn">
@@ -84,7 +110,6 @@ if ($defaulters) {
                 </div>
 
                 <div class="form-section">
-                    <!-- Filter Section -->
                     <div class="filter-section">
                         <h4>Filter Pending List</h4>
                         <form method="POST" class="filter-form">
@@ -115,18 +140,33 @@ if ($defaulters) {
                                     </select>
                                 </div>
                                 
-                                <div class="form-group">
-                                    <label for="month">Select Month(s) <small>(Hold Ctrl to select multiple)</small></label>
-                                    <select id="month" name="months[]" class="form-control" multiple style="height: 100px;">
-                                        <?php
-                                        for ($i = 1; $i <= 12; $i++) {
-                                            $month_str = $MONTHS[$i-1] . '-' . date('Y');
-                                            $selected = (in_array($month_str, (array)$months_filter)) ? 'selected' : '';
-                                            echo "<option value='$month_str' $selected>$month_str</option>";
-                                        }
-                                        ?>
-                                    </select>
-                                </div>
+                                <!-- Naya Dynamic Year Ticks UI -->
+<div class="form-group">
+    <label>Select Month(s)</label>
+    <div class="months-checkbox-container">
+        <?php
+        $current_year = (int)date('Y');
+        // Hum pichla saal aur maujuda saal dono ke months generate karenge
+        $years_to_show = [$current_year - 1, $current_year]; 
+
+        foreach ($years_to_show as $yr) {
+            // Ek choti si heading saal ko alag dikhane ke liye
+            echo "<div class='text-muted fw-bold border-bottom mt-2 mb-1' style='font-size: 11px;'>— $yr —</div>";
+            
+            for ($i = 1; $i <= 12; $i++) {
+                $month_str = $MONTHS[$i-1] . '-' . $yr;
+                $checked = (in_array($month_str, (array)$months_filter)) ? 'checked' : '';
+                ?>
+                <label class="month-tick-item">
+                    <input type="checkbox" name="months[]" value="<?php echo $month_str; ?>" <?php echo $checked; ?>>
+                    <?php echo $month_str; ?>
+                </label>
+                <?php 
+            }
+        } 
+        ?>
+    </div>
+</div>
                                 
                                 <div class="form-group">
                                     <button type="submit" class="btn-primary" style="margin-top: 30px;">
@@ -137,7 +177,6 @@ if ($defaulters) {
                         </form>
                     </div>
                     
-                    <!-- Defaulter List Table -->
                     <div class="table-section">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h4 class="mb-0">Pending Fees (<?php echo count($defaulter_list); ?>)</h4>
@@ -161,7 +200,7 @@ if ($defaulters) {
                                         <th>Class-Sec</th>
                                         <th>Pending Month(s)</th>
                                         <th>Monthly Fee</th>
-                                        <th>Total Pending</th>
+                                        
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -179,7 +218,7 @@ if ($defaulters) {
                                                 <?php echo str_replace(',', ', ', $defaulter['pending_months']); ?>
                                             </td>
                                             <td><?php echo format_currency($defaulter['monthly_fee']); ?></td>
-                                            <td><strong style="color: #e74c3c;"><?php echo format_currency($defaulter['filtered_unpaid_amount']); ?></strong></td>
+                                            
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>

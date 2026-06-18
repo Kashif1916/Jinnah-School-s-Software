@@ -57,6 +57,36 @@ $today_collection = get_daily_collection(date('Y-m-d'));
             
             <!-- Dashboard Content -->
             <div class="content">
+                <div class="module-nav-panel">
+                    <div class="module-nav-row">
+                        <a href="dashboard.php" class="module-nav-btn active">
+                            <i class="fas fa-chart-bar"></i> Dashboard
+                        </a>
+                        <a href="add_student.php" class="module-nav-btn ">
+                            <i class="fas fa-user-plus"></i> Add Student
+                        </a>
+                        <a href="student_record.php" class="module-nav-btn">
+                            <i class="fas fa-address-book"></i> Student Record
+                        </a>
+                        
+                        <a href="fee_management.php" class="module-nav-btn">
+                            <i class="fas fa-money-bill-wave"></i> Fee Management
+                        </a>
+                        <a href="defaulter_list.php" class="module-nav-btn">
+                            <i class="fas fa-list"></i> Pending List
+                        </a>
+                        <a href="payment_analytics.php" class="module-nav-btn">
+                            <i class="fas fa-chart-line"></i> Analytics
+                        </a>
+                        <a href="promotion.php" class="module-nav-btn">
+                            <i class="fas fa-arrow-up"></i> Promotion
+                        </a>
+                        <a href="drop_student.php" class="module-nav-btn">
+                            <i class="fas fa-trash"></i> Drop Student
+                        </a>
+                    </div>
+                </div>
+
                 <div class="dashboard-stage">
                     <section class="stage-panel stage-panel--hero">
                         <span class="dashboard-kicker"><i class="fas fa-school"></i> Principal Dashboard</span>
@@ -152,41 +182,6 @@ $today_collection = get_daily_collection(date('Y-m-d'));
                 </div>
                 
                 <!-- Quick Actions -->
-                <div class="quick-actions">
-                    <h4>Quick Actions</h4>
-                    <div class="actions-grid">
-                        <a href="add_student.php" class="action-btn">
-                            <i class="fas fa-user-plus"></i>
-                            <span>Add Student</span>
-                        </a>
-                        <a href="student_record.php" class="action-btn">
-                            <i class="fas fa-address-book"></i>
-                            <span>Student Record</span>
-                        </a>
-                        
-                        </a>
-                        <a href="fee_management.php" class="action-btn">
-                            <i class="fas fa-money-bill-wave"></i>
-                            <span>Fee Management</span>
-                        </a>
-                        <a href="defaulter_list.php" class="action-btn">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <span>Pending List</span>
-                        </a>
-                        <a href="payment_analytics.php" class="action-btn">
-                            <i class="fas fa-chart-bar"></i>
-                            <span>Analytics</span>
-                        </a>
-                        <a href="promotion.php" class="action-btn">
-                            <i class="fas fa-arrow-up"></i>
-                            <span>Promotion</span>
-                        </a>
-                        <a href="drop_student.php" class="action-btn">
-                            <i class="fas fa-trash"></i>
-                            <span>Drop Student</span>
-                        </a>
-                    </div>
-                </div>
                 
                 
             </div>
