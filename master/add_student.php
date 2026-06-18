@@ -99,6 +99,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <a href="add_student.php" class="module-nav-btn active">
                             <i class="fas fa-user-plus"></i> Add Student
                         </a>
+                        <a href="student_record.php" class="module-nav-btn">
+                            <i class="fas fa-address-book"></i> Student Record
+                        </a>
                         <a href="edit_student.php" class="module-nav-btn">
                             <i class="fas fa-user-edit"></i> Edit Student
                         </a>
