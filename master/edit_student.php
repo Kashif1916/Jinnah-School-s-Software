@@ -306,7 +306,14 @@ if (isset($_GET['id'])) {
                                     </div>
                                     <div class="col-md-6">
                                         <label for="concession_reason" class="form-label">Concession Reason</label>
-                                        <input type="text" id="concession_reason" name="concession_reason" class="form-control" value="<?php echo $student['concession_reason'] ?? ''; ?>">
+                                        <select id="concession_reason" name="concession_reason" class="form-control" value="<?php echo $student['concession_reason'] ?? ''; ?>">
+                                            <option value="">None</option>
+                                            <option value="Sibling">Sibling</option>
+                                            <option value="Hafiz">Hafiz</option>
+                                            <option value="Orfan">Orfan</option>
+                                    <option value="S.C">S.C</option>
+                                    <option value="EMP">EMP</option>
+                                </select>
                                     </div>
                                 </div>
                                 
