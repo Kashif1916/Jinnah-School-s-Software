@@ -157,8 +157,6 @@ $stmt->close();
                                     <th>Father Name</th>
                                     <th>Class</th>
                                     <th>Section</th>
-                                    <th>Monthly Fee</th>
-                                    <th>Status</th>
                                     <th>Monthly Fee</th>                                    
                                     <th>Contact Number(s)</th>
                                     <th>Action</th>
@@ -173,11 +171,8 @@ $stmt->close();
                                             <td><?php echo $s['father_name']; ?></td>
                                             <td><?php echo $s['class']; ?></td>
                                             <td><?php echo $s['section']; ?></td>
-                                            <td><?php echo format_currency($s['monthly_fee']); ?></td>
                                             <td><?php echo format_currency($s['monthly_fee']); ?></td>                                            
                                             <td>
-                                                <span class="badge <?php echo $s['status'] == 'active' ? 'bg-success' : 'bg-danger'; ?>">
-                                                    <?php echo ucfirst($s['status']); ?>
                                                 <?php echo !empty($s['contact_number']) ? $s['contact_number'] . '<br>' : ''; ?>
                                                 <?php echo !empty($s['contact_number2']) ? $s['contact_number2'] . '<br>' : ''; ?>
                                                 <?php echo !empty($s['whatsapp_number']) ? $s['whatsapp_number'] : ''; ?>
@@ -194,7 +189,6 @@ $stmt->close();
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="8" class="text-center">No students found.</td>
                                         <td colspan="8" class="text-center">No students found.</td>                                        
                                     </tr>
                                 <?php endif; ?>
