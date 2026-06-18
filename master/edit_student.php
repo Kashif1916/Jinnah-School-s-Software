@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         if (!empty($name) && !empty($father_name) && $monthly_fee > 0) {
             $query = "UPDATE students SET name = ?, father_name = ?, class = ?, section = ?, 
-                     monthly_fee = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ? WHERE id = ?";
+                      monthly_fee = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ? WHERE id = ?";
             $stmt = $conn->prepare($query);
             $stmt->bind_param('ssssdsssdsi', $name, $father_name, $class, $section, $monthly_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
             
@@ -111,9 +111,7 @@ if (isset($_GET['id'])) {
 </head>
 <body>
     <div class="wrapper feature-shell">
-        <!-- Main Content -->
         <main class="main-content">
-            <!-- Top Bar -->
             <div class="topbar">
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <?php echo render_system_logo('topbar-logo'); ?>
@@ -132,7 +130,6 @@ if (isset($_GET['id'])) {
                 </div>
             </div>
             
-            <!-- Dashboard Content -->
             <div class="content">
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
@@ -142,10 +139,9 @@ if (isset($_GET['id'])) {
                         <a href="add_student.php" class="module-nav-btn">
                             <i class="fas fa-user-plus"></i> Add Student
                         </a>
-                        <a href="student_record.php" class="module-nav-btn">
+                        <a href="student_record.php" class="module-nav-btn active">
                             <i class="fas fa-address-book"></i> Student Record
                         </a>
-                        
                         <a href="fee_management.php" class="module-nav-btn">
                             <i class="fas fa-money-bill-wave"></i> Fee Management
                         </a>
@@ -165,55 +161,42 @@ if (isset($_GET['id'])) {
                 </div>
 
                 <div class="form-section">
-                    <?php if (!empty($success)): ?>
-                        <div class="alert alert-success alert-dismissible fade show">
-                            <i class="fas fa-check-circle"></i> <?php echo $success; ?>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    <?php endif; ?>
+                    <?php if (!empty($success)) echo "<div class='alert alert-success alert-dismissible fade show'><i class='fas fa-check-circle'></i> $success<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>"; ?>
+                    <?php if (!empty($error)) echo "<div class='alert alert-danger alert-dismissible fade show'><i class='fas fa-exclamation-circle'></i> $error<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>"; ?>
                     
-                    <?php if (!empty($error)): ?>
-                        <div class="alert alert-danger alert-dismissible fade show">
-                            <i class="fas fa-exclamation-circle"></i> <?php echo $error; ?>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <!-- Search Section -->
                     <?php if ($student === null): ?>
                         <div class="search-section">
-                            <h4>Search Student to Edit</h4>
+                            <h4 class="mb-4">Search Student to Edit</h4>
                             <form method="POST" class="search-form">
                                 <input type="hidden" name="action" value="search">
-                                <div class="search-grid">
-                                    <div class="form-group">
-                                        <label for="search_name">Student Name</label>
-                                        <input type="text" id="search_name" name="search_name" class="form-control" 
-                                               placeholder="Enter student name (optional)">
+                                <div class="row mb-3 align-items-end">
+                                    <div class="col-md-3">
+                                        <label for="search_name" class="form-label">Student Name</label>
+                                        <input type="text" id="search_name" name="search_name" class="form-control" placeholder="Enter student name (optional)">
                                     </div>
                                     
-                                    <div class="form-group">
-                                        <label for="search_class">Class</label>
-                                        <select id="search_class" name="search_class" class="form-control">
-                                            <option value="">-- Select Class (optional) --</option>
+                                    <div class="col-md-3">
+                                        <label for="search_class" class="form-label">Class</label>
+                                        <select id="search_class" name="search_class" class="form-select">
+                                            <option value="">-- Select Class --</option>
                                             <?php foreach ($CLASSES as $cls): ?>
                                                 <option value="<?php echo $cls; ?>"><?php echo $cls; ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
                                     
-                                    <div class="form-group">
-                                        <label for="search_section">Section</label>
-                                        <select id="search_section" name="search_section" class="form-control">
-                                            <option value="">-- Select Section (optional) --</option>
+                                    <div class="col-md-3">
+                                        <label for="search_section" class="form-label">Section</label>
+                                        <select id="search_section" name="search_section" class="form-select">
+                                            <option value="">-- Select Section --</option>
                                             <?php foreach ($SECTIONS as $sec): ?>
                                                 <option value="<?php echo $sec; ?>"><?php echo $sec; ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
                                     
-                                    <div class="form-group">
-                                        <button type="submit" class="btn-primary" style="margin-top: 30px;">
+                                    <div class="col-md-3">
+                                        <button type="submit" class="btn-primary w-100">
                                             <i class="fas fa-search"></i> Search
                                         </button>
                                     </div>
@@ -221,7 +204,7 @@ if (isset($_GET['id'])) {
                             </form>
                             
                             <?php if (count($search_results) > 0): ?>
-                                <div class="search-results">
+                                <div class="search-results mt-4">
                                     <h5>Search Results</h5>
                                     <table class="table table-hover">
                                         <thead>
@@ -253,92 +236,82 @@ if (isset($_GET['id'])) {
                                     </table>
                                 </div>
                             <?php elseif (isset($_POST['action']) && $_POST['action'] == 'search'): ?>
-                                <div class="alert alert-info">No students found!</div>
+                                <div class="alert alert-info mt-3">No students found!</div>
                             <?php endif; ?>
                         </div>
                     <?php else: ?>
-                        <!-- Edit Form -->
                         <div class="edit-form">
-                            <h4>Edit Student: <?php echo $student['name']; ?></h4>
+                            <h4 class="mb-4">Edit Student: <?php echo $student['name']; ?></h4>
                             <form method="POST" id="editStudentForm">
                                 <input type="hidden" name="action" value="update">
                                 <input type="hidden" name="student_id" value="<?php echo $student['id']; ?>">
                                 
-                                <div class="form-grid">
-                                    <div class="form-group">
-                                        <label for="name">Student Name *</label>
-                                        <input type="text" id="name" name="name" class="form-control" 
-                                               value="<?php echo $student['name']; ?>" required>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label for="name" class="form-label">Student Name *</label>
+                                        <input type="text" id="name" name="name" class="form-control" value="<?php echo $student['name']; ?>" required>
                                     </div>
-                                    
-                                    <div class="form-group">
-                                        <label for="father_name">Father's Name *</label>
-                                        <input type="text" id="father_name" name="father_name" class="form-control" 
-                                               value="<?php echo $student['father_name']; ?>" required>
+                                    <div class="col-md-6">
+                                        <label for="father_name" class="form-label">Father's Name *</label>
+                                        <input type="text" id="father_name" name="father_name" class="form-control" value="<?php echo $student['father_name']; ?>" required>
                                     </div>
-                                    
-                                    <div class="form-group">
-                                        <label for="class">Class *</label>
-                                        <select id="class" name="class" class="form-control" required>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <label for="class" class="form-label">Class *</label>
+                                        <select id="class" name="class" class="form-select" required>
                                             <?php foreach ($CLASSES as $cls): ?>
-                                                <option value="<?php echo $cls; ?>" 
-                                                    <?php echo ($cls === $student['class']) ? 'selected' : ''; ?>>
+                                                <option value="<?php echo $cls; ?>" <?php echo ($cls === $student['class']) ? 'selected' : ''; ?>>
                                                     <?php echo $cls; ?>
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-                                    
-                                    <div class="form-group">
-                                        <label for="section">Section *</label>
-                                        <select id="section" name="section" class="form-control" required>
+                                    <div class="col-md-3">
+                                        <label for="section" class="form-label">Section *</label>
+                                        <select id="section" name="section" class="form-select" required>
                                             <?php foreach ($SECTIONS as $sec): ?>
-                                                <option value="<?php echo $sec; ?>" 
-                                                    <?php echo ($sec === $student['section']) ? 'selected' : ''; ?>>
+                                                <option value="<?php echo $sec; ?>" <?php echo ($sec === $student['section']) ? 'selected' : ''; ?>>
                                                     <?php echo $sec; ?>
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-                                    
-                                    <div class="form-group">
-                                        <label for="monthly_fee">Monthly Fee *</label>
-                                        <input type="number" id="monthly_fee" name="monthly_fee" class="form-control" 
-                                               value="<?php echo $student['monthly_fee']; ?>" required step="0.01" min="0">
+                                    <div class="col-md-6">
+                                        <label for="monthly_fee" class="form-label">Fixed Monthly Fee </label>
+                                        <input type="number" id="monthly_fee" name="monthly_fee" class="form-control" value="<?php echo $student['fixed_monthly_fee']; ?>" required step="0.01" min="0">
                                     </div>
-                                    
-                                    <div class="form-group">
-                                        <label for="contact_number">Contact Number 1</label>
-                                        <input type="tel" id="contact_number" name="contact_number" class="form-control" 
-                                               value="<?php echo $student['contact_number'] ?? ''; ?>">
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label for="contact_number" class="form-label">Contact Number 1</label>
+                                        <input type="tel" id="contact_number" name="contact_number" class="form-control" value="<?php echo $student['contact_number'] ?? ''; ?>">
                                     </div>
-
-                                    <div class="form-group">
-                                        <label for="contact_number2">Contact Number 2</label>
-                                        <input type="tel" id="contact_number2" name="contact_number2" class="form-control" 
-                                               value="<?php echo $student['contact_number2'] ?? ''; ?>">
+                                    <div class="col-md-4">
+                                        <label for="contact_number2" class="form-label">Contact Number 2</label>
+                                        <input type="tel" id="contact_number2" name="contact_number2" class="form-control" value="<?php echo $student['contact_number2'] ?? ''; ?>">
                                     </div>
-
-                                    <div class="form-group">
-                                        <label for="whatsapp_number">WhatsApp Number</label>
-                                        <input type="tel" id="whatsapp_number" name="whatsapp_number" class="form-control" 
-                                               value="<?php echo $student['whatsapp_number'] ?? ''; ?>">
+                                    <div class="col-md-4">
+                                        <label for="whatsapp_number" class="form-label">WhatsApp Number</label>
+                                        <input type="tel" id="whatsapp_number" name="whatsapp_number" class="form-control" value="<?php echo $student['whatsapp_number'] ?? ''; ?>">
                                     </div>
-
-                                    <div class="form-group">
-                                        <label for="concession_amount">Concession Amount</label>
-                                        <input type="number" id="concession_amount" name="concession_amount" class="form-control" 
-                                               value="<?php echo $student['concession_amount'] ?? 0; ?>" step="0.01" min="0">
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label for="concession_amount" class="form-label">Concession Amount</label>
+                                        <input type="number" id="concession_amount" name="concession_amount" class="form-control" value="<?php echo $student['concession_amount'] ?? 0; ?>" step="0.01" min="0">
                                     </div>
-
-                                    <div class="form-group full-width">
-                                        <label for="concession_reason">Concession Reason</label>
+                                    <div class="col-md-6">
+                                        <label for="concession_reason" class="form-label">Concession Reason</label>
                                         <input type="text" id="concession_reason" name="concession_reason" class="form-control" value="<?php echo $student['concession_reason'] ?? ''; ?>">
                                     </div>
                                 </div>
                                 
-                                <div class="form-actions">
-                                    <button type="submit" class="btn-primary">
+                                <div class="form-actions mt-4">
+                                    <button type="submit" class="btn-primary me-2">
                                         <i class="fas fa-save"></i> Update Student
                                     </button>
                                     <a href="edit_student.php" class="btn-secondary">

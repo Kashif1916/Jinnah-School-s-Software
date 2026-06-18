@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $from_section_selected = sanitize_input($_POST['from_section'] ?? '');
 
         if (!empty($from_class_selected) && !empty($from_section_selected)) {
-            $query = "SELECT id, name, father_name, fixed_monthly_fee FROM students WHERE class = ? AND section = ? AND status = 'active'";
+            $query = "SELECT id, name, father_name, monthly_fee FROM students WHERE class = ? AND section = ? AND status = 'active'";
             $stmt = $conn->prepare($query);
             $stmt->bind_param('ss', $from_class_selected, $from_section_selected);
             $stmt->execute();
@@ -267,7 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                     <td><?php echo $student['id']; ?></td>
                                                     <td><?php echo $student['name']; ?></td>
                                                     <td><?php echo $student['father_name']; ?></td>
-                                                    <td><?php echo format_currency($student['fixed_monthly_fee']); ?></td>
+                                                    <td><?php echo format_currency($student['monthly_fee']); ?></td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
