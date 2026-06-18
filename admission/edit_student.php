@@ -63,7 +63,18 @@ if (isset($_GET['id'])) {
             <div class="content">
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
-                        <a href="student_record.php" class="module-nav-btn"><i class="fas fa-arrow-left"></i> Back to Records</a>
+                        
+                        <a href="add_student.php" class="module-nav-btn ">
+                            <i class="fas fa-user-plus"></i> Add Student
+                        </a>
+                        <a href="student_record.php" class="module-nav-btn active">
+                            <i class="fas fa-address-book"></i> Student Record
+                        </a>
+                        
+                        
+                        <a href="drop_student.php" class="module-nav-btn">
+                            <i class="fas fa-trash"></i> Drop Student
+                        </a>
                     </div>
                 </div>
 

@@ -77,6 +77,9 @@ if ($result) {
                         <a href="dashboard.php" class="module-nav-btn">
                             <i class="fas fa-chart-bar"></i> Dashboard
                         </a>
+                        <a href="student_record.php" class="module-nav-btn">
+                            <i class="fas fa-address-book"></i> Student Record
+                        </a>
                         <a href="fee_payment.php" class="module-nav-btn">
                             <i class="fas fa-money-bill-wave"></i> Fee Payment
                         </a>

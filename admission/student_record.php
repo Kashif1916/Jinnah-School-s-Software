@@ -88,9 +88,7 @@ $stmt->close();
                         <a href="student_record.php" class="module-nav-btn active">
                             <i class="fas fa-address-book"></i> Student Record
                         </a>
-                        <a href="edit_student.php" class="module-nav-btn">
-                            <i class="fas fa-user-edit"></i> Edit Student
-                        </a>
+                       
                         <a href="drop_student.php" class="module-nav-btn">
                             <i class="fas fa-trash"></i> Drop Student
                         </a>
