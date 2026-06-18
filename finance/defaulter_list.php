@@ -13,16 +13,16 @@ require_finance();
 
 $class_filter = '';
 $section_filter = '';
-$month_filter = '';
+$months_filter = [];
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $class_filter = sanitize_input($_POST['class'] ?? '');
     $section_filter = sanitize_input($_POST['section'] ?? '');
-    $month_filter = sanitize_input($_POST['month'] ?? '');
+    $months_filter = $_POST['months'] ?? [];
 }
 
 // Get defaulters
-$defaulters = get_defaulters($class_filter, $section_filter, $month_filter);
+$defaulters = get_defaulters($class_filter, $section_filter, $months_filter);
 $defaulter_list = [];
 if ($defaulters) {
     $defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
@@ -116,13 +116,12 @@ if ($defaulters) {
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label for="month">Month</label>
-                                    <select id="month" name="month" class="form-control">
-                                        <option value="">All Months</option>
+                                    <label for="month">Select Month(s) <small>(Hold Ctrl to select multiple)</small></label>
+                                    <select id="month" name="months[]" class="form-control" multiple style="height: 100px;">
                                         <?php
                                         for ($i = 1; $i <= 12; $i++) {
                                             $month_str = $MONTHS[$i-1] . '-' . date('Y');
-                                            $selected = ($month_filter === $month_str) ? 'selected' : '';
+                                            $selected = (in_array($month_str, (array)$months_filter)) ? 'selected' : '';
                                             echo "<option value='$month_str' $selected>$month_str</option>";
                                         }
                                         ?>
@@ -142,7 +141,11 @@ if ($defaulters) {
                     <div class="table-section">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h4 class="mb-0">Pending Fees (<?php echo count($defaulter_list); ?>)</h4>
-                            <a href="../master/defaulter_report.php<?php echo (($class_filter || $section_filter || $month_filter) ? '?class=' . urlencode($class_filter) . '&section=' . urlencode($section_filter) . '&month=' . urlencode($month_filter) : ''); ?>" 
+                            <?php 
+                                $query_data = ['class' => $class_filter, 'section' => $section_filter, 'months' => $months_filter];
+                                $report_url = "../master/defaulter_report.php?" . http_build_query($query_data);
+                            ?>
+                            <a href="<?php echo $report_url; ?>" 
                                class="btn-primary" target="_blank">
                                 <i class="fas fa-file-pdf"></i> Export PDF
                             </a>
@@ -154,25 +157,29 @@ if ($defaulters) {
                                     <tr>
                                         <th>Name</th>
                                         <th>Father Name</th>
-                                        <th>Class</th>
-                                        <th>Section</th>
-                                        <th>Contact</th>
+                                        <th>Contact Number(s)</th>
+                                        <th>Class-Sec</th>
+                                        <th>Pending Month(s)</th>
                                         <th>Monthly Fee</th>
-                                        <th>Unpaid Amount</th>
+                                        <th>Total Pending</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($defaulter_list as $defaulter):
-                                        $unpaid = get_total_unpaid_fees($defaulter['id']);
-                                    ?>
+                                    <?php foreach ($defaulter_list as $defaulter): ?>
                                         <tr>
                                             <td><?php echo $defaulter['name']; ?></td>
                                             <td><?php echo $defaulter['father_name']; ?></td>
-                                            <td><?php echo $defaulter['class']; ?></td>
-                                            <td><?php echo $defaulter['section']; ?></td>
-                                            <td><?php echo $defaulter['contact_number']; ?></td>
+                                            <td>
+                                                <?php echo !empty($defaulter['contact_number']) ? $defaulter['contact_number'] . '<br>' : ''; ?>
+                                                <?php echo !empty($defaulter['whatsapp_number']) ? '<i class="fab fa-whatsapp"></i> ' . $defaulter['whatsapp_number'] : ''; ?>
+                                            </td>
+                                            <td><?php echo $defaulter['class'] . '-' . $defaulter['section']; ?></td>
+                                            <td style="max-width: 200px; font-size: 11px;">
+                                                <strong>(<?php echo $defaulter['pending_count']; ?> Month)</strong><br>
+                                                <?php echo str_replace(',', ', ', $defaulter['pending_months']); ?>
+                                            </td>
                                             <td><?php echo format_currency($defaulter['monthly_fee']); ?></td>
-                                            <td><strong style="color: #e74c3c;"><?php echo format_currency($unpaid); ?></strong></td>
+                                            <td><strong style="color: #e74c3c;"><?php echo format_currency($defaulter['filtered_unpaid_amount']); ?></strong></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>

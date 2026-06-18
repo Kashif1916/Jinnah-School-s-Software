@@ -176,27 +176,35 @@ function get_total_paid_fees($student_id) {
 /**
  * Get defaulters list
  */
-function get_defaulters($class = '', $section = '', $month = '') {
+function get_defaulters($class = '', $section = '', $months = []) {
     global $conn;
     
-    $query = "SELECT DISTINCT s.id, s.name, s.father_name, s.class, s.section, s.monthly_fee, s.contact_number 
+    $query = "SELECT s.id, s.name, s.father_name, s.class, s.section, s.fixed_monthly_fee, s.monthly_fee, 
+                     s.contact_number, s.contact_number2, s.whatsapp_number,
+                     GROUP_CONCAT(f.month ORDER BY STR_TO_DATE(CONCAT('01-', f.month), '%d-%b-%Y')) as pending_months,
+                     COUNT(f.id) as pending_count,
+                     SUM(f.amount) as filtered_unpaid_amount
               FROM students s 
               INNER JOIN fee_records f ON s.id = f.student_id 
               WHERE s.status = 'active' AND f.status = 'unpaid'";
     
     if (!empty($class)) {
-        $query .= " AND s.class = '" . escape_string($class) . "'";
+        $query .= " AND s.class = '" . $conn->real_escape_string($class) . "'";
     }
     
     if (!empty($section)) {
-        $query .= " AND s.section = '" . escape_string($section) . "'";
+        $query .= " AND s.section = '" . $conn->real_escape_string($section) . "'";
     }
     
-    if (!empty($month)) {
-        $query .= " AND f.month = '" . escape_string($month) . "'";
+    if (!empty($months)) {
+        if (!is_array($months)) $months = [$months];
+        $escaped_months = array_map(function($m) use ($conn) { 
+            return "'" . $conn->real_escape_string($m) . "'"; 
+        }, $months);
+        $query .= " AND f.month IN (" . implode(',', $escaped_months) . ")";
     }
     
-    $query .= " ORDER BY s.class, s.section, s.name";
+    $query .= " GROUP BY s.id ORDER BY s.class, s.section, s.name";
     
     return $conn->query($query);
 }

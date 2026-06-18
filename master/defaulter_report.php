@@ -17,10 +17,10 @@ if (!is_master() && !is_finance()) {
 
 $class_filter = isset($_GET['class']) ? sanitize_input($_GET['class']) : '';
 $section_filter = isset($_GET['section']) ? sanitize_input($_GET['section']) : '';
-$month_filter = isset($_GET['month']) ? sanitize_input($_GET['month']) : '';
+$months_filter = isset($_GET['months']) ? (is_array($_GET['months']) ? $_GET['months'] : [sanitize_input($_GET['months'])]) : [];
 
 // Get defaulters
-$defaulters = get_defaulters($class_filter, $section_filter, $month_filter);
+$defaulters = get_defaulters($class_filter, $section_filter, $months_filter);
 $defaulter_list = [];
 if ($defaulters) {
     $defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
@@ -131,9 +131,9 @@ if ($defaulters) {
         <div class="report-info">
             <p><strong>Report Criteria:</strong></p>
             <p>
-                Class: <?php echo !empty($class_filter) ? $class_filter : 'All'; ?> | 
-                Section: <?php echo !empty($section_filter) ? $section_filter : 'All'; ?> | 
-                Month: <?php echo !empty($month_filter) ? $month_filter : 'All'; ?>
+                Class: <?php echo !empty($class_filter) ? $class_filter : 'All'; ?> |
+                Section: <?php echo !empty($section_filter) ? $section_filter : 'All'; ?> |
+                Months: <?php echo !empty($months_filter) ? implode(', ', $months_filter) : 'All'; ?>
             </p>
             <p><strong>Total Pending:</strong> <?php echo count($defaulter_list); ?></p>
         </div>
@@ -145,11 +145,10 @@ if ($defaulters) {
                         <th>#</th>
                         <th>Student Name</th>
                         <th>Father Name</th>
-                        <th>Class</th>
-                        <th>Section</th>
-                        <th>Contact</th>
-                        <th>Monthly Fee</th>
-                        <th class="amount">Unpaid Amount</th>
+                        <th>Contact Number(s)</th>
+                        <th>Class-Sec</th>
+                        <th>Pending Month(s)</th>
+                        <th>Monthly Fee</th> 
                     </tr>
                 </thead>
                 <tbody>
@@ -164,17 +163,19 @@ if ($defaulters) {
                             <td><?php echo $counter++; ?></td>
                             <td><?php echo $defaulter['name']; ?></td>
                             <td><?php echo $defaulter['father_name']; ?></td>
-                            <td><?php echo $defaulter['class']; ?></td>
-                            <td><?php echo $defaulter['section']; ?></td>
-                            <td><?php echo $defaulter['contact_number']; ?></td>
-                            <td class="amount"><?php echo format_currency($defaulter['monthly_fee']); ?></td>
-                            <td class="amount"><strong><?php echo format_currency($unpaid); ?></strong></td>
+                            <td>
+                                <?php echo !empty($defaulter['contact_number']) ? $defaulter['contact_number'] . '<br>' : ''; ?>
+                                <?php echo !empty($defaulter['whatsapp_number']) ? '<i class="fab fa-whatsapp"></i> ' . $defaulter['whatsapp_number'] : ''; ?>
+                            </td>
+                            <td><?php echo $defaulter['class'] . '-' . $defaulter['section']; ?></td>
+                            <td>
+                                <strong>(<?php echo $defaulter['pending_count']; ?> Month)</strong><br>
+                                <?php echo str_replace(',', ', ', $defaulter['pending_months']); ?>
+                            </td>
+                            <td class="amount"><?php echo format_currency($defaulter['monthly_fee']); ?></td>                           
                         </tr>
                     <?php endforeach; ?>
-                    <tr class="total-row">
-                        <td colspan="7" style="text-align: right;">TOTAL UNPAID:</td>
-                        <td class="amount"><?php echo format_currency($total_unpaid); ?></td>
-                    </tr>
+                    
                 </tbody>
             </table>
         <?php else: ?>
