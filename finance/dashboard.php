@@ -138,33 +138,7 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                     </div>
                 </div>
                 
-                <!-- Quick Actions -->
-                <div class="quick-actions">
-                    <h4>Quick Actions</h4>
-                    <div class="actions-grid">
-                        <a href="fee_payment.php" class="action-btn">
-                            <i class="fas fa-money-bill-wave"></i>
-                            <span>Record Payment</span>
-                        </a>
-                        <a href="student_record.php" class="action-btn">
-                            <i class="fas fa-address-book"></i>
-                            <span>Student Record</span>
-                        </a>
-                        
-                        <a href="defaulter_list.php" class="action-btn">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <span>Pending List</span>
-                        </a>
-                        <a href="payment_analytics.php" class="action-btn">
-                            <i class="fas fa-chart-line"></i>
-                            <span>Analytics</span>
-                        </a>
-                        <a href="expenses.php" class="action-btn">
-                            <i class="fas fa-wallet"></i>
-                            <span>Expenses</span>
-                        </a>
-                    </div>
-                </div>
+                
                 
                 
             </div>
