@@ -22,9 +22,9 @@ if (!empty($payment_ids_str)) {
     $types = str_repeat('i', count($payment_ids_arr));
 
     $query = "SELECT p.*, s.name, s.father_name, s.class, s.section, s.contact_number, s.fixed_monthly_fee, s.concession_amount 
-             FROM payments p 
-             JOIN students s ON p.student_id = s.id 
-             WHERE p.id IN ($placeholders) ORDER BY p.payment_date ASC";
+              FROM payments p 
+              JOIN students s ON p.student_id = s.id 
+              WHERE p.id IN ($placeholders) ORDER BY p.payment_date ASC";
     $stmt = $conn->prepare($query);
     $stmt->bind_param($types, ...$payment_ids_arr);
     $stmt->execute();
@@ -40,10 +40,10 @@ if (!empty($payment_ids_str)) {
     }
 } elseif ($fee_id) { // Fallback for single fee_id if payment_ids not provided
     $query = "SELECT f.*, s.name, s.father_name, s.class, s.section, s.monthly_fee, s.fixed_monthly_fee, s.concession_amount, s.contact_number, p.amount as paid_amount, p.payment_date as payment_recorded_date, p.received_by, p.payment_mode
-             FROM fee_records f 
-             JOIN students s ON f.student_id = s.id 
-             LEFT JOIN payments p ON f.student_id = p.student_id AND f.month = p.paid_for_month AND f.payment_date = p.payment_date
-             WHERE f.id = ? ORDER BY p.payment_date DESC LIMIT 1"; // Get the latest payment for this fee record
+              FROM fee_records f 
+              JOIN students s ON f.student_id = s.id 
+              LEFT JOIN payments p ON f.student_id = p.student_id AND f.month = p.paid_for_month AND f.payment_date = p.payment_date
+              WHERE f.id = ? ORDER BY p.payment_date DESC LIMIT 1"; // Get the latest payment for this fee record
     $stmt = $conn->prepare($query);
     $stmt->bind_param('i', $fee_id);
     $stmt->execute();
@@ -80,7 +80,11 @@ if (!empty($payments_to_display)) {
         $p_month = $payment['paid_for_month'] ?? $payment['month'] ?? '';
         
         if ($stud_id && $p_month) {
-            $q = "SELECT amount, status FROM fee_records WHERE student_id = ? AND month = ?";
+            // Hum student details bhi fetch kar rahy hain pending section ke liye
+            $q = "SELECT f.amount, f.status, s.name, s.father_name 
+                  FROM fee_records f 
+                  JOIN students s ON f.student_id = s.id 
+                  WHERE f.student_id = ? AND f.month = ?";
             $stmt = $conn->prepare($q);
             $stmt->bind_param('is', $stud_id, $p_month);
             $stmt->execute();
@@ -89,6 +93,8 @@ if (!empty($payments_to_display)) {
             
             if ($rec && $rec['status'] == 'unpaid' && $rec['amount'] > 0) {
                 $pending_balances[] = [
+                    'student_name' => $rec['name'],
+                    'father_name' => $rec['father_name'],
                     'month' => $p_month,
                     'amount' => $rec['amount']
                 ];
@@ -227,14 +233,12 @@ ob_start();
     </style>
 </head>
 <body>
-    <div class="receipt-container" style="position: relative;"> <!-- Yahan position relative lazmi hai -->
-        <div class="header">
+    <div class="receipt-container" style="position: relative;"> <div class="header">
             <img src="../images/logo.jfif" style="width: 120px !important; height: auto" alt="Logo">
             <h2> Jinnah School & Inter College Khushab </h2>
             <p>Fee Receipt</p>
         </div>
 
-        <!-- PAID Stamp ab Background mai chala gaya hai -->
         <div class="paid-stamp" style="
             position: absolute;
             top: 50%;
@@ -250,7 +254,6 @@ ob_start();
             letter-spacing: 5px;
         ">PAID</div>
         
-        <!-- Baqi saara data z-index 2 par hai taake stamp ke uper aaye -->
         <div style="position: relative; z-index: 2;">
             <div class="receipt-number">
                 <p><strong>Receipt #:</strong> <?php echo str_pad($payments_to_display[0]['id'], 6, '0', STR_PAD_LEFT); ?></p>
@@ -271,7 +274,7 @@ ob_start();
                         <?php foreach ($payments_to_display as $payment): ?>
                             <tr>
                                 <td>
-                                    <strong><?php echo $payment['name']; ?></strong><br>
+                                    <strong><?php echo $payment['name'] . ' / ' . $payment['father_name']; ?></strong><br>
                                     <?php echo $payment['class'] . '-' . $payment['section']; ?> | <?php echo $payment['paid_for_month']; ?>
                                     <?php 
                                     // If there is concession, show standard - concession = payable
@@ -296,33 +299,31 @@ ob_start();
                 <div style="margin-top: 2mm; border: 1px dashed #c0392b; padding: 2mm; font-size: 10px; background-color: #fdf2f2; border-radius: 4px;">
                     <strong style="color: #c0392b;"><i class="fas fa-exclamation-triangle"></i> Pending Fee:</strong><br>
                     <?php foreach ($pending_balances as $pending): ?>
-                        • <?php echo $pending['month']; ?>: <strong><?php echo format_currency($pending['amount']); ?></strong><br>
+                        • <?php echo $pending['student_name'] . ' / ' . $pending['father_name']; ?> (<?php echo $pending['month']; ?>): <strong><?php echo format_currency($pending['amount']); ?></strong><br>
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>
         </div>
-</div>
-        
-        <script>
-            window.onload = function() {
-                window.print();
-            };
-        </script>
-
-        <div class="signature-section">
-            <div class="signature-line">
-                <span>Receiver Signature</span>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <p>Thank you for your payment!</p>
-            <p><?php echo date('d-m-Y H:i:s'); ?></p>
-        </div>
-        
-        <!-- Extra space for thermal cutter -->
-        <div style="height: 10mm;"></div>
     </div>
+        
+    <script>
+        window.onload = function() {
+            window.print();
+        };
+    </script>
+
+    <div class="signature-section">
+        <div class="signature-line">
+            <span>Receiver Signature</span>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Thank you for your payment!</p>
+        <p><?php echo date('d-m-Y H:i:s'); ?></p>
+    </div>
+    
+    <div style="height: 10mm;"></div>
 </body>
 </html>
 <?php
