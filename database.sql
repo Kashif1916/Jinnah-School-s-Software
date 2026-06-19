@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS `payments` (
   `paid_for_month` VARCHAR(20) NOT NULL,
   `payment_date` DATETIME NOT NULL,
   `received_by` VARCHAR(100) NOT NULL,
+  `payment_mode` VARCHAR(20) DEFAULT 'cash',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`student_id`) REFERENCES `students`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

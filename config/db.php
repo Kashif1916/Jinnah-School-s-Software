@@ -33,8 +33,12 @@ if ($conn->connect_error) {
     if (!isset($redirect_to_setup)) {
         die("Database Connection Error: " . $conn->connect_error);
     }
-} else {
     $conn->set_charset("utf8mb4");
+    // Dynamically ensure payment_mode column exists
+    $colCheck = $conn->query("SHOW COLUMNS FROM `payments` LIKE 'payment_mode'");
+    if ($colCheck && $colCheck->num_rows == 0) {
+        $conn->query("ALTER TABLE `payments` ADD COLUMN `payment_mode` VARCHAR(20) DEFAULT 'cash'");
+    }
 }
 
 /**

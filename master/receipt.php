@@ -21,7 +21,7 @@ if (!empty($payment_ids_str)) {
     $placeholders = implode(',', array_fill(0, count($payment_ids_arr), '?'));
     $types = str_repeat('i', count($payment_ids_arr));
 
-    $query = "SELECT p.*, s.name, s.father_name, s.class, s.section, s.contact_number 
+    $query = "SELECT p.*, s.name, s.father_name, s.class, s.section, s.contact_number, s.fixed_monthly_fee, s.concession_amount 
              FROM payments p 
              JOIN students s ON p.student_id = s.id 
              WHERE p.id IN ($placeholders) ORDER BY p.payment_date ASC";
@@ -39,7 +39,7 @@ if (!empty($payment_ids_str)) {
         }
     }
 } elseif ($fee_id) { // Fallback for single fee_id if payment_ids not provided
-    $query = "SELECT f.*, s.name, s.father_name, s.class, s.section, s.monthly_fee, s.contact_number, p.amount as paid_amount, p.payment_date as payment_recorded_date, p.received_by
+    $query = "SELECT f.*, s.name, s.father_name, s.class, s.section, s.monthly_fee, s.fixed_monthly_fee, s.concession_amount, s.contact_number, p.amount as paid_amount, p.payment_date as payment_recorded_date, p.received_by, p.payment_mode
              FROM fee_records f 
              JOIN students s ON f.student_id = s.id 
              LEFT JOIN payments p ON f.student_id = p.student_id AND f.month = p.paid_for_month AND f.payment_date = p.payment_date
@@ -52,9 +52,48 @@ if (!empty($payment_ids_str)) {
     $stmt->close();
 
     if ($receipt_data) {
-        $payments_to_display[] = $receipt_data;
+        $payments_to_display[] = [
+            'id' => $receipt_data['id'],
+            'student_id' => $receipt_data['student_id'],
+            'name' => $receipt_data['name'],
+            'father_name' => $receipt_data['father_name'],
+            'class' => $receipt_data['class'],
+            'section' => $receipt_data['section'],
+            'contact_number' => $receipt_data['contact_number'],
+            'amount' => $receipt_data['paid_amount'] ?? $receipt_data['amount'],
+            'paid_for_month' => $receipt_data['month'],
+            'payment_date' => $receipt_data['payment_recorded_date'] ?? $receipt_data['payment_date'],
+            'received_by' => $receipt_data['received_by'] ?? 'System',
+            'payment_mode' => $receipt_data['payment_mode'] ?? 'cash',
+            'fixed_monthly_fee' => $receipt_data['fixed_monthly_fee'],
+            'concession_amount' => $receipt_data['concession_amount']
+        ];
         $student_info = $receipt_data;
-        $total_amount_paid = $receipt_data['paid_amount'] ?? $receipt_data['amount']; // Use paid_amount from payments table if available
+        $total_amount_paid = $receipt_data['paid_amount'] ?? $receipt_data['amount'];
+    }
+}
+
+$pending_balances = [];
+if (!empty($payments_to_display)) {
+    foreach ($payments_to_display as $payment) {
+        $stud_id = $payment['student_id'];
+        $p_month = $payment['paid_for_month'] ?? $payment['month'] ?? '';
+        
+        if ($stud_id && $p_month) {
+            $q = "SELECT amount, status FROM fee_records WHERE student_id = ? AND month = ?";
+            $stmt = $conn->prepare($q);
+            $stmt->bind_param('is', $stud_id, $p_month);
+            $stmt->execute();
+            $rec = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            
+            if ($rec && $rec['status'] == 'unpaid' && $rec['amount'] > 0) {
+                $pending_balances[] = [
+                    'month' => $p_month,
+                    'amount' => $rec['amount']
+                ];
+            }
+        }
     }
 }
 
@@ -216,6 +255,7 @@ ob_start();
             <div class="receipt-number">
                 <p><strong>Receipt #:</strong> <?php echo str_pad($payments_to_display[0]['id'], 6, '0', STR_PAD_LEFT); ?></p>
                 <p><strong>Date:</strong> <?php echo date('d-m-Y H:i'); ?></p>
+                <p><strong>Method:</strong> <?php echo strtoupper(str_replace('_', ' ', $payments_to_display[0]['payment_mode'] ?? 'cash')); ?></p>
             </div>
             
             <div class="section payment-details">
@@ -233,6 +273,13 @@ ob_start();
                                 <td>
                                     <strong><?php echo $payment['name']; ?></strong><br>
                                     <?php echo $payment['class'] . '-' . $payment['section']; ?> | <?php echo $payment['paid_for_month']; ?>
+                                    <?php 
+                                    // If there is concession, show standard - concession = payable
+                                    if (isset($payment['fixed_monthly_fee']) && isset($payment['concession_amount']) && $payment['concession_amount'] > 0) {
+                                        $payable = floatval($payment['fixed_monthly_fee']) - floatval($payment['concession_amount']);
+                                        echo "<br><small class='text-muted' style='font-size: 9px; color:#555;'>Fee: " . number_format($payment['fixed_monthly_fee'], 0) . " - " . number_format($payment['concession_amount'], 0) . " = " . number_format($payable, 0) . "</small>";
+                                    }
+                                    ?>
                                 </td>
                                 <td class="amount-col"><?php echo number_format($payment['amount'], 2); ?></td>
                             </tr>
@@ -244,6 +291,15 @@ ob_start();
                     </tbody>
                 </table>
             </div>
+            
+            <?php if (!empty($pending_balances)): ?>
+                <div style="margin-top: 2mm; border: 1px dashed #c0392b; padding: 2mm; font-size: 10px; background-color: #fdf2f2; border-radius: 4px;">
+                    <strong style="color: #c0392b;"><i class="fas fa-exclamation-triangle"></i> Pending/Remaining Balance:</strong><br>
+                    <?php foreach ($pending_balances as $pending): ?>
+                        • <?php echo $pending['month']; ?>: <strong><?php echo format_currency($pending['amount']); ?></strong><br>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
         </div>
 </div>
         

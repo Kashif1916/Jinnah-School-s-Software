@@ -238,7 +238,7 @@ function get_monthly_collection($month_year) {
 /**
  * Record payment
  */
-function record_payment($student_id, $amount, $month, $received_by) {
+function record_payment($student_id, $amount, $month, $received_by, $payment_mode = 'cash') {
     global $conn;
     
     // Start transaction
@@ -264,10 +264,10 @@ function record_payment($student_id, $amount, $month, $received_by) {
         $payment_date = date('Y-m-d H:i:s');
 
         // Record payment
-        $query = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by) 
-                 VALUES (?, ?, ?, ?, ?)";
+        $query = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) 
+                 VALUES (?, ?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($query);
-        $stmt->bind_param('idsss', $student_id, $amount, $month, $payment_date, $received_by);
+        $stmt->bind_param('idssss', $student_id, $amount, $month, $payment_date, $received_by, $payment_mode);
         $stmt->execute();
         $payment_id = $conn->insert_id;
         $stmt->close();
