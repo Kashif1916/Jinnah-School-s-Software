@@ -155,9 +155,7 @@ if (isset($_GET['id'])) {
 </head>
 <body>
     <div class="wrapper feature-shell">
-        <!-- Main Content -->
         <main class="main-content">
-            <!-- Top Bar -->
             <div class="topbar">
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
@@ -176,7 +174,6 @@ if (isset($_GET['id'])) {
                 </div>
             </div>
             
-            <!-- Dashboard Content -->
             <div class="content">
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
@@ -240,7 +237,6 @@ if (isset($_GET['id'])) {
                         </div>
                     <?php endif; ?>
                     
-                    <!-- Batch Payment Summary (Moved to top) -->
                     <?php if (!empty($_SESSION['fee_cart'])): ?>
                         <div class="batch-summary mb-5 p-4 border rounded shadow-sm bg-white">
                             <h4 class="text-success mb-3"><i class="fas fa-receipt"></i> Batch List for Receipt</h4>
@@ -301,7 +297,6 @@ if (isset($_GET['id'])) {
                         </div>
                     <?php endif; ?>
                     
-                    <!-- Search Section -->
                     <?php if ($student === null): ?>
                         <div class="search-section">
                             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -314,13 +309,13 @@ if (isset($_GET['id'])) {
                                     <div class="form-group">
                                         <label for="search_name">Student Name</label>
                                         <input type="text" id="search_name" name="search_name" class="form-control" 
-                                               placeholder="Enter student name (optional)">
+                                               placeholder="Enter Student Name ">
                                     </div>
                                     
                                     <div class="form-group">
                                         <label for="search_class">Class</label>
                                         <select id="search_class" name="search_class" class="form-control">
-                                            <option value="">-- Select Class (optional) --</option>
+                                            <option value="">All Classes</option>
                                             <?php foreach ($CLASSES as $cls): ?>
                                                 <option value="<?php echo $cls; ?>"><?php echo $cls; ?></option>
                                             <?php endforeach; ?>
@@ -330,7 +325,7 @@ if (isset($_GET['id'])) {
                                     <div class="form-group">
                                         <label for="search_section">Section</label>
                                         <select id="search_section" name="search_section" class="form-control">
-                                            <option value="">-- Select Section (optional) --</option>
+                                            <option value="">All Sections</option>
                                             <?php foreach ($SECTIONS as $sec): ?>
                                                 <option value="<?php echo $sec; ?>"><?php echo $sec; ?></option>
                                             <?php endforeach; ?>
@@ -352,9 +347,10 @@ if (isset($_GET['id'])) {
                                         <thead>
                                             <tr>
                                                 <th>Name</th>
+                                                <th>Father Name</th>
                                                 <th>Class</th>
                                                 <th>Section</th>
-                                                <th>Unpaid Amount</th>
+                                                
                                                 <th>Action</th>
                                             </tr>
                                         </thead>
@@ -364,9 +360,10 @@ if (isset($_GET['id'])) {
                                             ?>
                                                 <tr>
                                                     <td><?php echo $res['name']; ?></td>
+                                                    <td><?php echo $res['father_name']; ?></td>
                                                     <td><?php echo $res['class']; ?></td>
                                                     <td><?php echo $res['section']; ?></td>
-                                                    <td><strong><?php echo format_currency($unpaid); ?></strong></td>
+                                                    
                                                     <td>
                                                         <a href="?id=<?php echo $res['id']; ?>" class="btn-action">
                                                             <i class="fas fa-plus-circle"></i> Select Fees
@@ -382,7 +379,6 @@ if (isset($_GET['id'])) {
                             <?php endif; ?>
                         </div>
                     <?php else: ?>
-                        <!-- Step 2: Fee Selection for found student -->
                         <div class="fee-details">
                             <div class="fee-header">
                                 <div>
@@ -390,19 +386,7 @@ if (isset($_GET['id'])) {
                                     <p>Father: <?php echo $student['father_name']; ?> | Contact: <?php echo $student['contact_number']; ?></p>
                                 </div>
                                 <div class="fee-summary">
-                                    <div class="summary-item">
-                                        <span>Monthly Fee:</span>
-                                        <strong><?php echo format_currency($student['monthly_fee']); ?></strong>
-                                    </div>
-                                    <div class="summary-item">
-                                        <span>Total Unpaid:</span>
-                                        <strong style="color: #e74c3c;"><?php echo format_currency(get_total_unpaid_fees($student['id'])); ?></strong>
-                                    </div>
-                                    <div class="summary-item">
-                                        <span>Total Paid:</span>
-                                        <strong style="color: #27ae60;"><?php echo format_currency(get_total_paid_fees($student['id'])); ?></strong>
-                                    </div>
-                                </div>
+                                   
                             </div>
                             <form method="POST" id="multiPaymentForm" action="<?php echo $self_url; ?>?id=<?php echo $student['id']; ?>">
                             <input type="hidden" name="student_id" value="<?php echo $student['id']; ?>">
@@ -486,7 +470,7 @@ if (isset($_GET['id'])) {
             <?php if (isset($_SESSION['print_receipt_url'])): ?>
                 const receiptUrl = '<?php echo $_SESSION['print_receipt_url']; ?>';
                 window.open(receiptUrl, '_blank');
-                <?php unset($_SESSION['print_receipt_url']); // Clear it after opening ?>
+                <?php unset($_SESSION['print_receipt_url']); ?>
             <?php endif; ?>
 
             const checkboxes = document.querySelectorAll('.fee-checkbox');
@@ -501,14 +485,12 @@ if (isset($_GET['id'])) {
                     if (this.checked) {
                         if (input) {
                             input.disabled = false;
-                            input.dispatchEvent(new Event('input')); // Trigger remaining calc
+                            input.dispatchEvent(new Event('input'));
                         }
-                        // Enable the next checkbox in sequence if exists
                         if (checkboxes[index + 1]) {
                             checkboxes[index + 1].disabled = false;
                         }
                     } else {
-                        // Unchecking resets this and all subsequent checkboxes in sequence
                         for (let i = index; i < checkboxes.length; i++) {
                             checkboxes[i].checked = false;
                             if (i > index) {
