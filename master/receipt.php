@@ -294,7 +294,7 @@ ob_start();
             
             <?php if (!empty($pending_balances)): ?>
                 <div style="margin-top: 2mm; border: 1px dashed #c0392b; padding: 2mm; font-size: 10px; background-color: #fdf2f2; border-radius: 4px;">
-                    <strong style="color: #c0392b;"><i class="fas fa-exclamation-triangle"></i> Pending/Remaining Balance:</strong><br>
+                    <strong style="color: #c0392b;"><i class="fas fa-exclamation-triangle"></i> Pending Fee:</strong><br>
                     <?php foreach ($pending_balances as $pending): ?>
                         • <?php echo $pending['month']; ?>: <strong><?php echo format_currency($pending['amount']); ?></strong><br>
                     <?php endforeach; ?>
