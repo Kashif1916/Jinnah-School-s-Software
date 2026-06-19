@@ -232,168 +232,127 @@ $cash_remaining = $total_cash - $total_expenses;
         }
 
         /* -------------------------------------------------------------
-           PREMIUM PRINT STYLING - SIDE-BY-SIDE SIDEBAR & COMPACT TEXT
+           PREMIUM PRINT STYLING - KEEPS EXACT WEB LOOK & SIDE-BY-SIDE
            ------------------------------------------------------------- */
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 0.4cm !important;
+                margin: 0.5cm !important;
             }
 
             body {
-                background: #ffffff !important;
-                color: #000000 !important;
-                font-family: 'Segoe UI', Arial, sans-serif !important;
-                font-size: 10px !important;
+                background: #f8fbf8 !important;
+                color: var(--dark-text) !important;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+                font-size: 9.5px !important;
                 margin: 0 !important;
-                padding: 0 !important;
+                padding: 10px !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
 
-            /* Unwanted elements ko clear hide karna */
-            .topbar, .module-nav-panel, .no-print, button, form, .form-text, .alert .badge, .clerk-calc-block {
+            /* Hide screen navigation, controls and stats cards in print */
+            .topbar, .module-nav-panel, .no-print, button, form, .form-text, .alert-success, .stats-grid {
                 display: none !important;
             }
 
+            /* Show print header */
             .print-only-header {
                 display: block !important;
+                border-bottom: 2px solid var(--primary-color) !important;
+                padding-bottom: 8px !important;
                 margin-bottom: 15px !important;
-                border-bottom: 2px solid #333 !important;
-                padding-bottom: 5px !important;
-            }
-            .print-only-header h1 { font-size: 18px !important; margin: 0 0 2px 0 !important; }
-            .print-only-header h3 { font-size: 12px !important; margin: 0 0 8px 0 !important; color: #444 !important; }
-            
-            .print-meta-grid {
-                display: table !important;
-                width: 100% !important;
-                margin-bottom: 5px !important;
-                font-size: 9.5px !important;
-            }
-            .print-meta-col {
-                display: table-cell !important;
-                width: 33.33% !important;
             }
 
-            /* Side-by-Side Blueprint */
+            .print-only-header h1 {
+                font-size: 18px !important;
+                color: var(--primary-color) !important;
+                font-weight: 700 !important;
+                margin: 0 0 2px 0 !important;
+            }
+
+            .print-only-header h3 {
+                font-size: 11px !important;
+                color: #444 !important;
+                margin: 0 0 8px 0 !important;
+            }
+
+            .print-meta-grid {
+                display: flex !important;
+                justify-content: space-between !important;
+                font-size: 9.5px !important;
+                color: #333 !important;
+                margin-bottom: 10px !important;
+            }
+
+            /* Side-by-Side exact web layout replication */
             .row {
-                display: block !important;
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
+                align-items: flex-start !important; /* Prevents vertical stretching of columns */
+                gap: 15px !important;
                 width: 100% !important;
-                clear: both !important;
             }
-            
-            /* Left Side (Tables) */
+
             .col-lg-7 {
-                width: 60% !important;
-                float: left !important;
-                padding-right: 15px !important;
-                box-sizing: border-box !important;
+                width: 58% !important;
+                flex: 0 0 58% !important;
+                max-width: 58% !important;
             }
-            
-            /* Right Side (Calculator Boxes) */
+
             .col-lg-5 {
                 width: 40% !important;
-                float: right !important;
-                padding-left: 5px !important;
-                box-sizing: border-box !important;
+                flex: 0 0 40% !important;
+                max-width: 40% !important;
             }
 
-            /* Tables styling */
+            /* Force 3 stats cards to sit side-by-side in print */
+            .stats-grid {
+                display: grid !important;
+                grid-template-columns: repeat(3, 1fr) !important;
+                gap: 15px !important;
+                margin-bottom: 20px !important;
+            }
+
+            /* Keep standard sizing for print tables */
             .table-responsive {
                 overflow: visible !important;
             }
+
             table {
                 width: 100% !important;
-                font-size: 9.5px !important;
                 margin-bottom: 15px !important;
-                border-collapse: collapse !important;
+                font-size: 9px !important;
             }
-            th, td {
+
+            table th, table td {
                 padding: 4px 6px !important;
-                border: 1px solid #ddd !important;
-            }
-            thead th {
-                background-color: #f2f2f2 !important;
-                color: #000 !important;
             }
 
-            .section-sub-title {
-                font-size: 11px !important;
-                margin-bottom: 8px !important;
-                padding-bottom: 4px !important;
-                margin-top: 5px !important;
+            /* Force browser to print all colored gradients, shadows and borders */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
 
-            /* Right side calculations block adjustments */
-            .reconciliation-math-card {
-                padding: 15px !important;
-                background: #fdfdfd !important;
-                border: 1px solid #ccc !important;
-                border-left: 4px solid #1f5f46 !important;
+            .stat-card, .reconciliation-math-card, .net-cash-large-box, .badge {
                 box-shadow: none !important;
-                border-radius: 6px !important;
-                margin-bottom: 15px !important;
-            }
-            .reconciliation-math-card::after {
-                display: none !important;
+                border: 1px solid rgba(0,0,0,0.08) !important;
             }
 
-            .math-line {
-                padding: 6px 0 !important;
-                font-size: 10px !important;
+            .reconciliation-math-card {
+                border-left: 5px solid var(--primary-color) !important;
             }
 
-            .net-cash-large-box {
-                padding: 10px 15px !important;
-                background: #1f5f46 !important;
-                color: #ffffff !important;
-                border-radius: 4px !important;
-                margin-top: 5px !important;
-                text-align: right !important;
-                display: block !important;
-                width: 100% !important;
-            }
-            .net-cash-large-box h2 { font-size: 1.3rem !important; font-weight: bold !important; }
-            .net-cash-large-box span { font-size: 8px !important; }
-
-            /* Calculator Audit Log Section for Print */
+            /* Calculator audit log output wrapper */
             .print-calc-output-wrapper {
                 display: block !important;
-                background: #fafafa !important;
-                border: 1px solid #b5b5b5 !important;
-                border-top: 3px solid #e67e22 !important;
-                border-radius: 6px !important;
-                padding: 10px !important;
                 margin-top: 15px !important;
-            }
-            .print-calc-heading {
-                font-size: 10px !important;
-                font-weight: bold !important;
-                color: #333 !important;
-                margin-bottom: 6px !important;
-                border-bottom: 1px solid #ddd !important;
-                padding-bottom: 3px !important;
-            }
-            .print-calc-history-box {
-                font-family: 'Courier New', Courier, monospace !important;
-                font-size: 10px !important;
-                line-height: 1.4 !important;
-                white-space: pre-wrap !important;
-                background: #fff !important;
-                padding: 6px !important;
-                border: 1px dashed #999 !important;
-                color: #000 !important;
+                page-break-inside: avoid !important;
             }
 
-            /* Clearfix */
-            .content::after {
-                content: "";
-                display: table !important;
-                clear: both !important;
-            }
-            
-            tr, .reconciliation-math-card, .print-calc-output-wrapper {
+            tr, .stat-card, .reconciliation-math-card {
                 page-break-inside: avoid !important;
             }
         }
