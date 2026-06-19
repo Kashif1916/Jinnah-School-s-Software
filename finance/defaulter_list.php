@@ -106,6 +106,9 @@ if ($defaulters) {
                         <a href="payment_analytics.php" class="module-nav-btn">
                             <i class="fas fa-chart-line"></i> Analytics
                         </a>
+                        <a href="expenses.php" class="module-nav-btn">
+                            <i class="fas fa-wallet"></i> Expenses
+                        </a>
                     </div>
                 </div>
 

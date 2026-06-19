@@ -33,11 +33,29 @@ if ($conn->connect_error) {
     if (!isset($redirect_to_setup)) {
         die("Database Connection Error: " . $conn->connect_error);
     }
+}
+
+if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
     $conn->set_charset("utf8mb4");
+    
     // Dynamically ensure payment_mode column exists
     $colCheck = $conn->query("SHOW COLUMNS FROM `payments` LIKE 'payment_mode'");
     if ($colCheck && $colCheck->num_rows == 0) {
         $conn->query("ALTER TABLE `payments` ADD COLUMN `payment_mode` VARCHAR(20) DEFAULT 'cash'");
+    }
+
+    // Dynamically ensure expenses table exists
+    $tableCheck = $conn->query("SHOW TABLES LIKE 'expenses'");
+    if ($tableCheck && $tableCheck->num_rows == 0) {
+        $conn->query("CREATE TABLE `expenses` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `amount` DECIMAL(10, 2) NOT NULL,
+            `reason` VARCHAR(255) NOT NULL,
+            `user_id` INT NOT NULL,
+            `username` VARCHAR(50) NOT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
 }
 

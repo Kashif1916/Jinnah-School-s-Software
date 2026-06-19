@@ -58,6 +58,18 @@ CREATE TABLE IF NOT EXISTS `payments` (
   FOREIGN KEY (`student_id`) REFERENCES `students`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Table 5: Expenses
+CREATE TABLE IF NOT EXISTS `expenses` (
+  `id` INT PRIMARY KEY AUTO_INCREMENT,
+  `amount` DECIMAL(10, 2) NOT NULL,
+  `reason` VARCHAR(255) NOT NULL,
+  `user_id` INT NOT NULL,
+  `username` VARCHAR(50) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 -- Insert Default Admin Users
 INSERT INTO `users` (`username`, `password`, `role`) VALUES 
 ('master', '1234', 'master'),
