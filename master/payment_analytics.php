@@ -209,118 +209,118 @@ $cash_remaining = $total_cash - $total_expenses;
         /* -------------------------------------------------------------
            PREMIUM PRINT STYLING - KEEPS EXACT WEB LOOK & SIDE-BY-SIDE
            ------------------------------------------------------------- */
+        /* -------------------------------------------------------------
+           PREMIUM PRINT STYLING - FIXED FOR DRAWER STATEMENT
+           ------------------------------------------------------------- */
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 0.5cm !important;
+                margin: 0.8cm !important;
             }
 
             body {
-                background: #f8fbf8 !important;
-                color: var(--dark-text) !important;
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-                font-size: 9.5px !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+                font-family: 'Segoe UI', Arial, sans-serif !important;
+                font-size: 10px !important;
                 margin: 0 !important;
-                padding: 10px !important;
+                padding: 0 !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
 
-            /* Hide screen navigation, controls and stats cards in print */
-            .topbar, .module-nav-panel, .no-print, button, form, .form-text, .alert-success, .stats-grid {
+            /* 1. Hiding ALL unnecessary components (Including Stats Cards) */
+            .topbar, .module-nav-panel, .no-print, button, form, 
+            .form-text, .alert-success, .stats-grid, .stat-card {
                 display: none !important;
             }
 
-            /* Show print header */
+            /* 2. Show print header cleanly */
             .print-only-header {
                 display: block !important;
-                border-bottom: 2px solid var(--primary-color) !important;
-                padding-bottom: 8px !important;
+                border-bottom: 2px solid #1f5f46 !important;
+                padding-bottom: 5px !important;
                 margin-bottom: 15px !important;
             }
 
             .print-only-header h1 {
-                font-size: 18px !important;
-                color: var(--primary-color) !important;
-                font-weight: 700 !important;
-                margin: 0 0 2px 0 !important;
+                font-size: 20px !important;
+                color: #1f5f46 !important;
+                font-weight: bold !important;
+                margin: 0 !important;
             }
 
             .print-only-header h3 {
-                font-size: 11px !important;
-                color: #444 !important;
-                margin: 0 0 8px 0 !important;
+                font-size: 12px !important;
+                color: #333 !important;
+                margin: 5px 0 !important;
             }
 
             .print-meta-grid {
                 display: flex !important;
                 justify-content: space-between !important;
-                font-size: 9.5px !important;
-                color: #333 !important;
-                margin-bottom: 10px !important;
+                font-size: 10px !important;
+                margin-top: 5px !important;
             }
 
-            /* Side-by-Side exact web layout replication */
+            /* 3. Fixing Side-by-Side Flex Layout Structure */
             .row {
                 display: flex !important;
                 flex-direction: row !important;
                 flex-wrap: nowrap !important;
-                align-items: flex-start !important; /* Prevents vertical stretching of columns */
+                align-items: flex-start !important;
                 gap: 15px !important;
                 width: 100% !important;
             }
 
+            /* Left side: Tables (Payments & Expenses) */
             .col-lg-7 {
-                width: 58% !important;
-                flex: 0 0 58% !important;
-                max-width: 58% !important;
+                width: 60% !important;
+                flex: 0 0 60% !important;
+                max-width: 60% !important;
             }
 
+            /* Right side: Math Sheet Box */
             .col-lg-5 {
-                width: 40% !important;
-                flex: 0 0 40% !important;
-                max-width: 40% !important;
+                width: 38% !important;
+                flex: 0 0 38% !important;
+                max-width: 38% !important;
             }
 
-            /* Force 3 stats cards to sit side-by-side in print */
-            .stats-grid {
-                display: grid !important;
-                grid-template-columns: repeat(3, 1fr) !important;
-                gap: 15px !important;
-                margin-bottom: 20px !important;
-            }
-
-            /* Keep standard sizing for print tables */
+            /* 4. Table Formatting for Print */
             .table-responsive {
                 overflow: visible !important;
             }
 
             table {
                 width: 100% !important;
+                border-collapse: collapse !important;
                 margin-bottom: 15px !important;
-                font-size: 9px !important;
+                font-size: 9.5px !important;
             }
 
             table th, table td {
-                padding: 4px 6px !important;
+                padding: 5px 6px !important;
+                border: 1px solid #ddd !important;
             }
 
-            /* Force browser to print all colored gradients, shadows and borders */
-            * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-
-            .stat-card, .reconciliation-math-card, .net-cash-large-box, .badge {
-                box-shadow: none !important;
-                border: 1px solid rgba(0,0,0,0.08) !important;
-            }
-
+            /* 5. Keep Math Card Neat */
             .reconciliation-math-card {
-                border-left: 5px solid var(--primary-color) !important;
+                border: 1px solid #ccc !important;
+                border-left: 5px solid #1f5f46 !important;
+                padding: 15px !important;
+                background: #fdfdfd !important;
+                box-shadow: none !important;
             }
 
-            tr, .stat-card, .reconciliation-math-card {
+            .net-cash-large-box {
+                background: #1f5f46 !important;
+                color: #ffffff !important;
+                padding: 10px 15px !important;
+                border-radius: 4px !important;
+            }
+
+            tr, .reconciliation-math-card {
                 page-break-inside: avoid !important;
             }
         }
