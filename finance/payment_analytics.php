@@ -88,7 +88,7 @@ $cash_remaining = $total_cash - $total_expenses;
             border-radius: 12px;
             box-shadow: var(--shadow-medium);
             padding: 30px;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             position: relative;
             overflow: hidden;
         }
@@ -167,7 +167,67 @@ $cash_remaining = $total_cash - $total_expenses;
             gap: 8px;
         }
 
-        .print-only-header {
+        /* -------------------------------------------------------------
+           WORKING UI CALCULATOR STYLING (SCREEN ONLY)
+           ------------------------------------------------------------- */
+        .clerk-calc-block {
+            background: #22252a;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            max-width: 100%;
+        }
+        .calc-screen {
+            background: #111316;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 15px;
+            text-align: right;
+        }
+        .calc-history {
+            font-size: 0.8rem;
+            color: #7d848f;
+            min-height: 18px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: monospace;
+        }
+        .calc-display {
+            font-size: 1.8rem;
+            color: #ffffff;
+            font-weight: bold;
+            font-family: monospace;
+            word-wrap: break-word;
+            line-height: 1.2;
+        }
+        .calc-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+        .calc-btn {
+            background: #2e343d;
+            border: none;
+            color: white;
+            padding: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.1s ease;
+        }
+        .calc-btn:hover { background: #3d4550; }
+        .calc-btn.operator { background: #1f5f46; color: white; }
+        .calc-btn.operator:hover { background: #2a7e5d; }
+        .calc-btn.clear { background: #d90429; color: white; }
+        .calc-btn.clear:hover { background: #ef233c; }
+        .calc-btn.equal { grid-column: span 2; background: #e67e22; color: white; }
+        .calc-btn.equal:hover { background: #f39c12; }
+
+        /* Print elements layout preset */
+        .print-only-header, .print-calc-output-wrapper {
             display: none;
         }
 
@@ -184,7 +244,7 @@ $cash_remaining = $total_cash - $total_expenses;
                 background: #ffffff !important;
                 color: #000000 !important;
                 font-family: 'Segoe UI', Arial, sans-serif !important;
-                font-size: 10px !important; /* Mazeed chota font size */
+                font-size: 10px !important;
                 margin: 0 !important;
                 padding: 0 !important;
                 -webkit-print-color-adjust: exact !important;
@@ -192,7 +252,7 @@ $cash_remaining = $total_cash - $total_expenses;
             }
 
             /* Unwanted elements ko clear hide karna */
-            .topbar, .module-nav-panel, .no-print, button, form, .form-text, .alert .badge {
+            .topbar, .module-nav-panel, .no-print, button, form, .form-text, .alert .badge, .clerk-calc-block {
                 display: none !important;
             }
 
@@ -216,7 +276,7 @@ $cash_remaining = $total_cash - $total_expenses;
                 width: 33.33% !important;
             }
 
-            /* Web layout ko side-by-side rakhne ka sabse behtreen tareeqa */
+            /* Side-by-Side Blueprint */
             .row {
                 display: block !important;
                 width: 100% !important;
@@ -231,7 +291,7 @@ $cash_remaining = $total_cash - $total_expenses;
                 box-sizing: border-box !important;
             }
             
-            /* Right Side (Calculator Box) */
+            /* Right Side (Calculator Boxes) */
             .col-lg-5 {
                 width: 40% !important;
                 float: right !important;
@@ -239,7 +299,7 @@ $cash_remaining = $total_cash - $total_expenses;
                 box-sizing: border-box !important;
             }
 
-            /* Tables styling ko tight aur chota karne ke liye */
+            /* Tables styling */
             .table-responsive {
                 overflow: visible !important;
             }
@@ -250,7 +310,7 @@ $cash_remaining = $total_cash - $total_expenses;
                 border-collapse: collapse !important;
             }
             th, td {
-                padding: 4px 6px !important; /* Boht compact padding */
+                padding: 4px 6px !important;
                 border: 1px solid #ddd !important;
             }
             thead th {
@@ -265,7 +325,7 @@ $cash_remaining = $total_cash - $total_expenses;
                 margin-top: 5px !important;
             }
 
-            /* Right side wale Card ko properly adjust karna */
+            /* Right side calculations block adjustments */
             .reconciliation-math-card {
                 padding: 15px !important;
                 background: #fdfdfd !important;
@@ -273,10 +333,10 @@ $cash_remaining = $total_cash - $total_expenses;
                 border-left: 4px solid #1f5f46 !important;
                 box-shadow: none !important;
                 border-radius: 6px !important;
-                margin-bottom: 0 !important;
+                margin-bottom: 15px !important;
             }
             .reconciliation-math-card::after {
-                display: none !important; /* Graphic icon hata diya takay space bache */
+                display: none !important;
             }
 
             .math-line {
@@ -294,22 +354,46 @@ $cash_remaining = $total_cash - $total_expenses;
                 display: block !important;
                 width: 100% !important;
             }
-            .net-cash-large-box h2 {
-                font-size: 1.3rem !important;
-                font-weight: bold !important;
+            .net-cash-large-box h2 { font-size: 1.3rem !important; font-weight: bold !important; }
+            .net-cash-large-box span { font-size: 8px !important; }
+
+            /* Calculator Audit Log Section for Print */
+            .print-calc-output-wrapper {
+                display: block !important;
+                background: #fafafa !important;
+                border: 1px solid #b5b5b5 !important;
+                border-top: 3px solid #e67e22 !important;
+                border-radius: 6px !important;
+                padding: 10px !important;
+                margin-top: 15px !important;
             }
-            .net-cash-large-box span {
-                font-size: 8px !important;
+            .print-calc-heading {
+                font-size: 10px !important;
+                font-weight: bold !important;
+                color: #333 !important;
+                margin-bottom: 6px !important;
+                border-bottom: 1px solid #ddd !important;
+                padding-bottom: 3px !important;
+            }
+            .print-calc-history-box {
+                font-family: 'Courier New', Courier, monospace !important;
+                font-size: 10px !important;
+                line-height: 1.4 !important;
+                white-space: pre-wrap !important;
+                background: #fff !important;
+                padding: 6px !important;
+                border: 1px dashed #999 !important;
+                color: #000 !important;
             }
 
-            /* Clearfix taake layout break na ho */
+            /* Clearfix */
             .content::after {
                 content: "";
                 display: table !important;
                 clear: both !important;
             }
             
-            tr, .reconciliation-math-card {
+            tr, .reconciliation-math-card, .print-calc-output-wrapper {
                 page-break-inside: avoid !important;
             }
         }
@@ -318,6 +402,7 @@ $cash_remaining = $total_cash - $total_expenses;
 <body>
     <div class="wrapper feature-shell">
         <main class="main-content">
+            <!-- Screen Top Bar -->
             <div class="topbar no-print">
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
@@ -336,6 +421,7 @@ $cash_remaining = $total_cash - $total_expenses;
                 </div>
             </div>
 
+            <!-- Print Only Spreadsheet Header -->
             <div class="print-only-header">
                 <h1><?php echo SITE_NAME; ?></h1>
                 <h3>Clerk Cash Reconciliation & Reconciliation Statement</h3>
@@ -360,6 +446,7 @@ $cash_remaining = $total_cash - $total_expenses;
             </div>
 
             <div class="content">
+                <!-- Navigation Tab Bar -->
                 <div class="module-nav-panel no-print">
                     <div class="module-nav-row">
                         <a href="dashboard.php" class="module-nav-btn">
@@ -383,6 +470,7 @@ $cash_remaining = $total_cash - $total_expenses;
                     </div>
                 </div>
 
+                <!-- Active Date Heading Alert -->
                 <div class="alert alert-success d-flex align-items-center justify-content-between mb-4 no-print">
                     <div>
                         <i class="fas fa-calendar-day me-2"></i>
@@ -406,6 +494,7 @@ $cash_remaining = $total_cash - $total_expenses;
                     </span>
                 </div>
 
+                <!-- Date Filter Form (Screen Only) -->
                 <div class="search-section mb-4 no-print">
                     <form method="GET" class="row g-3 align-items-end">
                         <div class="col-md-4">
@@ -428,6 +517,7 @@ $cash_remaining = $total_cash - $total_expenses;
                     </form>
                 </div>
 
+                <!-- Reconciliation Summary Cards (Screen Only) -->
                 <div class="stats-grid mb-4 no-print">
                     <div class="stat-card">
                         <div class="stat-icon" style="background: #e3f1ea;">
@@ -459,7 +549,9 @@ $cash_remaining = $total_cash - $total_expenses;
                 </div>
 
                 <div class="row">
+                    <!-- Detailed Lists (Left Side in Print) -->
                     <div class="col-lg-7">
+                        <!-- Fee Payments Table -->
                         <div class="mb-4">
                             <h5 class="section-sub-title">
                                 <i class="fas fa-receipt"></i>
@@ -526,6 +618,7 @@ $cash_remaining = $total_cash - $total_expenses;
                             </div>
                         </div>
 
+                        <!-- Expenses Table -->
                         <div>
                             <h5 class="section-sub-title">
                                 <i class="fas fa-wallet"></i>
@@ -574,6 +667,7 @@ $cash_remaining = $total_cash - $total_expenses;
                         </div>
                     </div>
 
+                    <!-- Reconciliation Calculations Card (Right Side in Print) -->
                     <div class="col-lg-5">
                         <div class="reconciliation-math-card">
                             <h5 class="border-bottom pb-2 mb-3">
@@ -610,12 +704,129 @@ $cash_remaining = $total_cash - $total_expenses;
                                 </div>
                             </div>
                         </div>
+
+                        <!-- LIVE UI WORKING POCKET CALCULATOR -->
+                        <div class="clerk-calc-block no-print">
+                            <div class="calc-screen">
+                                <div id="calcHistory" class="calc-history"></div>
+                                <div id="calcDisplay" class="calc-display">0</div>
+                            </div>
+                            <div class="calc-buttons">
+                                <button type="button" class="calc-btn clear" onclick="clearCalc()">C</button>
+                                <button type="button" class="calc-btn operator" onclick="appendOp('/')">÷</button>
+                                <button type="button" class="calc-btn operator" onclick="appendOp('*')">×</button>
+                                <button type="button" class="calc-btn operator" onclick="appendOp('-')">-</button>
+                                
+                                <button type="button" class="calc-btn" onclick="appendNum('7')">7</button>
+                                <button type="button" class="calc-btn" onclick="appendNum('8')">8</button>
+                                <button type="button" class="calc-btn" onclick="appendNum('9')">9</button>
+                                <button type="button" class="calc-btn operator" onclick="appendOp('+')">+</button>
+                                
+                                <button type="button" class="calc-btn" onclick="appendNum('4')">4</button>
+                                <button type="button" class="calc-btn" onclick="appendNum('5')">5</button>
+                                <button type="button" class="calc-btn" onclick="appendNum('6')">6</button>
+                                <button type="button" class="calc-btn" onclick="deleteLast()"><i class="fas fa-backspace"></i></button>
+                                
+                                <button type="button" class="calc-btn" onclick="appendNum('1')">1</button>
+                                <button type="button" class="calc-btn" onclick="appendNum('2')">2</button>
+                                <button type="button" class="calc-btn" onclick="appendNum('3')">3</button>
+                                <button type="button" class="calc-btn" onclick="appendNum('.')">.</button>
+                                
+                                <button type="button" class="calc-btn" onclick="appendNum('0')">0</button>
+                                <button type="button" class="calc-btn equal" style="grid-column: span 3;" onclick="calculateResult()">=</button>
+                            </div>
+                        </div>
+
+                        <!-- PRINT LAYOUT AUTOMATIC CALCULATOR TAPE -->
+                        <div class="print-calc-output-wrapper">
+                            <div class="print-calc-heading">
+                                <i class="fas fa-calculator"></i> Clerk Calculator Audit Log
+                            </div>
+                            <div id="printCalcHistoryBox" class="print-calc-history-box">No calculator operations performed.</div>
+                        </div>
                     </div>
-                </div> </div>
+                </div> <!-- Row End -->
+            </div>
         </main>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/script.js"></script>
+    <script>
+        // JS Logic for Live Working Calculator with Print Audit Trail
+        let currentInput = "0";
+        let fullHistoryStr = "";
+        let sessionCalculations = [];
+
+        const display = document.getElementById("calcDisplay");
+        const historyView = document.getElementById("calcHistory");
+        const printBox = document.getElementById("printCalcHistoryBox");
+
+        function updateScreen() {
+            display.innerText = currentInput;
+            historyView.innerText = fullHistoryStr;
+        }
+
+        function appendNum(num) {
+            if (currentInput === "0" && num !== ".") {
+                currentInput = num;
+            } else {
+                if (num === "." && currentInput.includes(".")) return;
+                currentInput += num;
+            }
+            updateScreen();
+        }
+
+        function appendOp(op) {
+            let lastChar = fullHistoryStr.trim().slice(-1);
+            if (currentInput === "0" && fullHistoryStr !== "") {
+                if (["+", "-", "*", "/"].includes(lastChar)) {
+                    fullHistoryStr = fullHistoryStr.trim().slice(0, -1) + " " + op + " ";
+                    updateScreen();
+                    return;
+                }
+            }
+            
+            fullHistoryStr += currentInput + " " + op + " ";
+            currentInput = "0";
+            updateScreen();
+        }
+
+        function clearCalc() {
+            currentInput = "0";
+            fullHistoryStr = "";
+            updateScreen();
+        }
+
+        function deleteLast() {
+            if (currentInput.length > 1) {
+                currentInput = currentInput.slice(0, -1);
+            } else {
+                currentInput = "0";
+            }
+            updateScreen();
+        }
+
+        function calculateResult() {
+            if (fullHistoryStr === "") return;
+            
+            let expression = fullHistoryStr + currentInput;
+            try {
+                let result = eval(expression.replace(/×/g, '*').replace(/÷/g, '/'));
+                
+                let auditLine = expression + " = " + result;
+                sessionCalculations.push(auditLine);
+                
+                printBox.innerHTML = sessionCalculations.join("\n");
+                
+                currentInput = result.toString();
+                fullHistoryStr = "";
+                updateScreen();
+            } catch (e) {
+                display.innerText = "Error";
+                setTimeout(clearCalc, 1000);
+            }
+        }
+    </script>
 </body>
 </html>
