@@ -240,6 +240,67 @@ if (isset($_GET['id'])) {
                         </div>
                     <?php endif; ?>
                     
+                    <!-- Batch Payment Summary (Moved to top) -->
+                    <?php if (!empty($_SESSION['fee_cart'])): ?>
+                        <div class="batch-summary mb-5 p-4 border rounded shadow-sm bg-white">
+                            <h4 class="text-success mb-3"><i class="fas fa-receipt"></i> Batch List for Receipt</h4>
+                            <table class="table table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Student Name</th>
+                                        <th>Class</th>
+                                        <th>Month</th>
+                                        <th>Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php 
+                                    $batch_total = 0;
+                                    foreach ($_SESSION['fee_cart'] as $item): 
+                                        $batch_total += $item['amount'];
+                                    ?>
+                                        <tr>
+                                            <td><strong><?php echo $item['name']; ?></strong></td>
+                                            <td><?php echo $item['class_info']; ?></td>
+                                            <td><?php echo $item['month']; ?></td>
+                                            <td><?php echo format_currency($item['amount']); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    <tr class="fw-bold table-light">
+                                        <td colspan="3" class="text-end">Batch Total:</td>
+                                        <td><?php echo format_currency($batch_total); ?></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            
+                            <form method="POST" class="w-100 mt-4" action="<?php echo $self_url; ?>">
+                                <div class="d-flex flex-wrap gap-4 align-items-end justify-content-between bg-light p-3 rounded border">
+                                    <div class="form-group mb-0" style="min-width: 250px;">
+                                        <label for="payment_mode" class="form-label fw-bold text-success mb-2">
+                                            <i class="fas fa-wallet"></i> Choose Payment Method:
+                                        </label>
+                                        <select id="payment_mode" name="payment_mode" class="form-select bg-white" required>
+                                            <option value="cash" selected>💵 Cash Payment</option>
+                                            <option value="bank_transfer">🏦 Bank / Account Transfer</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="d-flex gap-3">
+                                        <a href="<?php echo $self_url; ?>" class="btn btn-outline-primary d-flex align-items-center">
+                                            <i class="fas fa-user-plus me-1"></i> Search & Add Another
+                                        </a>
+                                        <button type="submit" name="action" value="process_batch" class="btn btn-success px-4 d-flex align-items-center">
+                                            <i class="fas fa-print me-1"></i> Print Receipt
+                                        </button>
+                                        <button type="submit" name="action" value="clear_cart" class="btn btn-outline-danger d-flex align-items-center" onclick="return confirm('Clear batch list?')">
+                                            <i class="fas fa-trash me-1"></i> Clear Batch
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    <?php endif; ?>
+                    
                     <!-- Search Section -->
                     <?php if ($student === null): ?>
                         <div class="search-section">
@@ -412,66 +473,6 @@ if (isset($_GET['id'])) {
                         </div>
                     <?php endif; ?>
 
-                    <!-- Batch Payment Summary -->
-                    <?php if (!empty($_SESSION['fee_cart'])): ?>
-                        <div class="batch-summary mt-5 p-4 border rounded shadow-sm bg-white">
-                            <h4 class="text-success mb-3"><i class="fas fa-receipt"></i> Batch List for Receipt</h4>
-                            <table class="table table-bordered align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Student Name</th>
-                                        <th>Class</th>
-                                        <th>Month</th>
-                                        <th>Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php 
-                                    $batch_total = 0;
-                                    foreach ($_SESSION['fee_cart'] as $item): 
-                                        $batch_total += $item['amount'];
-                                    ?>
-                                        <tr>
-                                            <td><strong><?php echo $item['name']; ?></strong></td>
-                                            <td><?php echo $item['class_info']; ?></td>
-                                            <td><?php echo $item['month']; ?></td>
-                                            <td><?php echo format_currency($item['amount']); ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                    <tr class="table-dark">
-                                        <td colspan="3" class="text-end"><strong>Batch Total:</strong></td>
-                                        <td><strong><?php echo format_currency($batch_total); ?></strong></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            
-                            <form method="POST" class="w-100 mt-4" action="<?php echo $self_url; ?>">
-                                <div class="d-flex flex-wrap gap-4 align-items-end justify-content-between bg-light p-3 rounded border">
-                                    <div class="form-group mb-0" style="min-width: 250px;">
-                                        <label for="payment_mode" class="form-label fw-bold text-success mb-2">
-                                            <i class="fas fa-wallet"></i> Choose Payment Method:
-                                        </label>
-                                        <select id="payment_mode" name="payment_mode" class="form-select bg-white" required>
-                                            <option value="cash" selected>💵 Cash Payment</option>
-                                            <option value="bank_transfer">🏦 Bank / Account Transfer</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <div class="d-flex gap-3">
-                                        <a href="<?php echo $self_url; ?>" class="btn btn-outline-primary d-flex align-items-center">
-                                            <i class="fas fa-user-plus me-1"></i> Search & Add Another
-                                        </a>
-                                        <button type="submit" name="action" value="process_batch" class="btn btn-success px-4 d-flex align-items-center">
-                                            <i class="fas fa-print me-1"></i> Print Receipt
-                                        </button>
-                                        <button type="submit" name="action" value="clear_cart" class="btn btn-outline-danger d-flex align-items-center" onclick="return confirm('Clear batch list?')">
-                                            <i class="fas fa-trash me-1"></i> Clear Batch
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-                    <?php endif; ?>
                 </div>
             </div>
         </main>
