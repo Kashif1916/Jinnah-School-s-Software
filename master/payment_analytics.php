@@ -212,17 +212,20 @@ $cash_remaining = $total_cash - $total_expenses;
         /* -------------------------------------------------------------
            PREMIUM PRINT STYLING - FIXED FOR DRAWER STATEMENT
            ------------------------------------------------------------- */
+        /* -------------------------------------------------------------
+           PREMIUM PRINT STYLING - EXTRA COMPACT & FITTED
+           ------------------------------------------------------------- */
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 0.8cm !important;
+                margin: 0.3cm !important; /* Margin kam kar diya taaki zyada jagah mile */
             }
 
             body {
                 background: #ffffff !important;
                 color: #000000 !important;
                 font-family: 'Segoe UI', Arial, sans-serif !important;
-                font-size: 10px !important;
+                font-size: 9.5px !important; /* Default font size chota kiya */
                 margin: 0 !important;
                 padding: 0 !important;
                 -webkit-print-color-adjust: exact !important;
@@ -239,37 +242,36 @@ $cash_remaining = $total_cash - $total_expenses;
             .print-only-header {
                 display: block !important;
                 border-bottom: 2px solid #1f5f46 !important;
-                padding-bottom: 5px !important;
-                margin-bottom: 15px !important;
+                padding-bottom: 3px !important;
+                margin-bottom: 10px !important;
             }
 
             .print-only-header h1 {
-                font-size: 20px !important;
+                font-size: 16px !important;
                 color: #1f5f46 !important;
                 font-weight: bold !important;
                 margin: 0 !important;
             }
 
             .print-only-header h3 {
-                font-size: 12px !important;
+                font-size: 11px !important;
                 color: #333 !important;
-                margin: 5px 0 !important;
+                margin: 3px 0 !important;
             }
 
             .print-meta-grid {
                 display: flex !important;
                 justify-content: space-between !important;
-                font-size: 10px !important;
-                margin-top: 5px !important;
+                font-size: 9px !important;
+                margin-top: 3px !important;
             }
 
-            /* 3. Fixing Side-by-Side Flex Layout Structure */
+            /* 3. Columns Layout Structure */
             .row {
                 display: flex !important;
                 flex-direction: row !important;
                 flex-wrap: nowrap !important;
-                align-items: flex-start !important;
-                gap: 15px !important;
+                gap: 12px !important;
                 width: 100% !important;
             }
 
@@ -295,29 +297,48 @@ $cash_remaining = $total_cash - $total_expenses;
             table {
                 width: 100% !important;
                 border-collapse: collapse !important;
-                margin-bottom: 15px !important;
-                font-size: 9.5px !important;
+                margin-bottom: 10px !important;
+                font-size: 9px !important; /* Table data text chota kiya */
             }
 
             table th, table td {
-                padding: 5px 6px !important;
+                padding: 4px 5px !important; /* Tables ki spacing tight ki */
                 border: 1px solid #ddd !important;
             }
 
-            /* 5. Keep Math Card Neat */
+            /* 5. Drawer Math Card - Extra Compact & Small Text */
             .reconciliation-math-card {
                 border: 1px solid #ccc !important;
-                border-left: 5px solid #1f5f46 !important;
-                padding: 15px !important;
+                border-left: 4px solid #1f5f46 !important;
+                padding: 10px !important; /* Card ke andar ka gap kam kiya */
                 background: #fdfdfd !important;
                 box-shadow: none !important;
             }
 
+            /* Har line ki spacing aur font size ko chota kiya */
+            .math-line, .reconciliation-math-card div, .reconciliation-math-card p {
+                padding: 4px 0 !important; 
+                font-size: 8.5px !important; /* Text chota kiya taaki lamba na ho */
+                line-height: 1.2 !important;
+            }
+
+            /* Net Cash Large Box ko compact kiya */
             .net-cash-large-box {
                 background: #1f5f46 !important;
                 color: #ffffff !important;
-                padding: 10px 15px !important;
+                padding: 6px 10px !important;
                 border-radius: 4px !important;
+                margin-top: 8px !important;
+            }
+
+            .net-cash-large-box h2, .net-cash-large-box .h2 {
+                font-size: 13px !important; /* Main amount ka size chota kiya */
+                font-weight: 700 !important;
+                margin: 0 !important;
+            }
+
+            .net-cash-large-box span, .net-cash-large-box small {
+                font-size: 8px !important;
             }
 
             tr, .reconciliation-math-card {
