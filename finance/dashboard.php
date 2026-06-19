@@ -11,10 +11,29 @@ require_once '../includes/helpers.php';
 
 require_finance();
 
-// Get Statistics for Finance view
-$today_collection = get_daily_collection(date('Y-m-d'));
-$total_payments = $conn->query("SELECT COUNT(*) as count FROM payments")->fetch_assoc()['count'];
-$total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FROM fee_records WHERE status = 'unpaid'")->fetch_assoc()['count'];
+// Logged-in user ka username aur aaj ki date nikalna
+$current_user = get_username();
+$today_date = date('Y-m-d');
+
+// 1. Filtered Today's Collection: Aaj ki date aur sirf is specific clerk ne jo amount receive kiya ho
+$stmt_coll = $conn->prepare("SELECT SUM(amount) as total FROM payments WHERE received_by = ? AND DATE(payment_date) = ?");
+$stmt_coll->bind_param('ss', $current_user, $today_date);
+$stmt_coll->execute();
+$today_collection = $stmt_coll->get_result()->fetch_assoc()['total'] ?? 0;
+$stmt_coll->close();
+
+// 2. Today's Total Receipts Count: Aaj is clerk ne total kitni receipts/transactions handle keen
+$stmt_rec = $conn->prepare("SELECT COUNT(*) as count FROM payments WHERE received_by = ? AND DATE(payment_date) = ?");
+$stmt_rec->bind_param('ss', $current_user, $today_date);
+$stmt_rec->execute();
+$today_receipts = $stmt_rec->get_result()->fetch_assoc()['count'] ?? 0;
+$stmt_rec->close();
+
+// 3. Total Students Paid: Un unique students ka count jinki payment ho chuki hai
+$total_students_paid = $conn->query("SELECT COUNT(DISTINCT student_id) as count FROM payments")->fetch_assoc()['count'] ?? 0;
+
+// 4. Total Defaulters (Sahi count pure school ka unpaid status ke mutabik)
+$total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FROM fee_records WHERE status = 'unpaid'")->fetch_assoc()['count'] ?? 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -28,9 +47,7 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
 </head>
 <body>
     <div class="wrapper dashboard-shell">
-        <!-- Main Content -->
         <main class="main-content">
-            <!-- Top Bar -->
             <div class="topbar">
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <?php echo render_system_logo('topbar-logo'); ?>
@@ -41,7 +58,7 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                 </div>
                 <div class="topbar-right">
                     <span class="user-info">
-                        <i class="fas fa-user-circle"></i> <?php echo get_username(); ?> 
+                        <i class="fas fa-user-circle"></i> <?php echo htmlspecialchars($current_user); ?> 
                         <small>(Finance Clerk)</small>
                     </span>
                     <a href="../logout.php" class="btn-secondary">
@@ -50,7 +67,6 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                 </div>
             </div>
             
-            <!-- Dashboard Content -->
             <div class="content">
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
@@ -82,7 +98,7 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                             </div>
                             <div>
                                 <span class="welcome-label">Welcome</span>
-                                <h4 style="color: white;"><?php echo get_username(); ?></h4>
+                                <h4 style="color: white;"><?php echo htmlspecialchars($current_user); ?></h4>
                                 <p style="color: rgba(255,255,255,0.8);">Finance clerk active</p>
                             </div>
                         </div>
@@ -91,10 +107,7 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                             Quick access to payments, pending fees, and daily collections. Use the buttons below to continue your work.
                         </p>
 
-                        
-
                         <div class="hero-row">
-                            
                             <span class="hero-tag"><i class="fas fa-shield-alt"></i> Finance access only</span>
                             <a href="backup.php" class="hero-tag" style="text-decoration:none; color:inherit;">
                                 <i class="fas fa-database"></i> Backup Data
@@ -103,27 +116,34 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                     </aside>
                 </div>
 
-                
-
-                <!-- Statistics Cards -->
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <div class="stat-icon" style="background: #f0f4ef;">
-                            <i class="fas fa-calendar-day"></i>
+                        <div class="stat-icon" style="background: #e3f1ea;">
+                            <i class="fas fa-calendar-day" style="color: #198754;"></i>
                         </div>
                         <div class="stat-content">
                             <h3><?php echo format_currency($today_collection); ?></h3>
-                            <p>Today's Collection</p>
+                            <p>My Today's Collection</p>
                         </div>
                     </div>
                     
                     <div class="stat-card">
                         <div class="stat-icon" style="background: #e3f1ea;">
-                            <i class="fas fa-file-invoice-dollar"></i>
+                            <i class="fas fa-receipt" style="color: #198754;"></i>
                         </div>
                         <div class="stat-content">
-                            <h3><?php echo $total_payments; ?></h3>
-                            <p>Total Payments</p>
+                            <h3><?php echo $today_receipts; ?></h3>
+                            <p>Today's Total Receipts</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #e3f1ea;">
+                            <i class="fas fa-user-check" style="color: #198754;"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3><?php echo $total_students_paid; ?></h3>
+                            <p>Total Students Paid</p>
                         </div>
                     </div>
                     
@@ -137,9 +157,6 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                         </div>
                     </div>
                 </div>
-                
-                
-                
                 
             </div>
         </main>
