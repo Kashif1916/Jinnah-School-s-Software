@@ -43,7 +43,7 @@ if ($defaulters) {
             border: 1px solid #dee2e6;
             border-radius: 6px;
             padding: 10px;
-            max-height: 120px;
+            max-height: 150px; /* Thoda height behter kar di taake scroll smooth ho */
             overflow-y: auto;
             background-color: #fff;
         }
@@ -140,33 +140,29 @@ if ($defaulters) {
                                     </select>
                                 </div>
                                 
-                                <!-- Naya Dynamic Year Ticks UI -->
-<div class="form-group">
-    <label>Select Month(s)</label>
-    <div class="months-checkbox-container">
-        <?php
-        $current_year = (int)date('Y');
-        // Hum pichla saal aur maujuda saal dono ke months generate karenge
-        $years_to_show = [$current_year - 1, $current_year]; 
+                                <div class="form-group">
+                                    <label>Select Month(s)</label>
+                                    <div class="months-checkbox-container">
+                                        <?php
+                                        // Current month se pichle 11 mahine loop me generate karne ka dynamic logic
+                                        for ($i = 0; $i < 12; $i++) {
+                                            $date = new DateTime("-$i months");
+                                            
+                                            $month_name = $date->format('M'); // E.g., 'Jan'
+                                            $year_val   = $date->format('Y'); // E.g., '2026'
+                                            $month_str  = $month_name . '-' . $year_val;
 
-        foreach ($years_to_show as $yr) {
-            // Ek choti si heading saal ko alag dikhane ke liye
-            echo "<div class='text-muted fw-bold border-bottom mt-2 mb-1' style='font-size: 11px;'>— $yr —</div>";
-            
-            for ($i = 1; $i <= 12; $i++) {
-                $month_str = $MONTHS[$i-1] . '-' . $yr;
-                $checked = (in_array($month_str, (array)$months_filter)) ? 'checked' : '';
-                ?>
-                <label class="month-tick-item">
-                    <input type="checkbox" name="months[]" value="<?php echo $month_str; ?>" <?php echo $checked; ?>>
-                    <?php echo $month_str; ?>
-                </label>
-                <?php 
-            }
-        } 
-        ?>
-    </div>
-</div>
+                                            $checked = (in_array($month_str, (array)$months_filter)) ? 'checked' : '';
+                                            ?>
+                                            <label class="month-tick-item">
+                                                <input type="checkbox" name="months[]" value="<?php echo $month_str; ?>" <?php echo $checked; ?>>
+                                                <?php echo $month_str; ?>
+                                            </label>
+                                            <?php 
+                                        } 
+                                        ?>
+                                    </div>
+                                </div>
                                 
                                 <div class="form-group">
                                     <button type="submit" class="btn-primary" style="margin-top: 30px;">
@@ -200,7 +196,6 @@ if ($defaulters) {
                                         <th>Class-Sec</th>
                                         <th>Pending Month(s)</th>
                                         <th>Monthly Fee</th>
-                                        
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -218,7 +213,6 @@ if ($defaulters) {
                                                 <?php echo str_replace(',', ', ', $defaulter['pending_months']); ?>
                                             </td>
                                             <td><?php echo format_currency($defaulter['monthly_fee']); ?></td>
-                                            
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
