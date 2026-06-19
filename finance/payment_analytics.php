@@ -172,170 +172,145 @@ $cash_remaining = $total_cash - $total_expenses;
         }
 
         /* -------------------------------------------------------------
-           PREMIUM PRINT STYLING (Spreadsheet layout, highly professional)
+           PREMIUM PRINT STYLING - SIDE-BY-SIDE SIDEBAR & COMPACT TEXT
            ------------------------------------------------------------- */
         @media print {
-            body {
-                background: #ffffff !important;
-                color: #111111 !important;
-                font-family: 'Segoe UI', Arial, Helvetica, sans-serif !important;
-                font-size: 9.5px !important; /* Made smaller */
-                margin: 0 !important;
-                padding: 15px !important;
+            @page {
+                size: A4 portrait;
+                margin: 0.4cm !important;
             }
 
-            /* Hide general layout elements */
-            .topbar, .module-nav-panel, .no-print, .alert, .form-text, button {
+            body {
+                background: #ffffff !important;
+                color: #000000 !important;
+                font-family: 'Segoe UI', Arial, sans-serif !important;
+                font-size: 10px !important; /* Mazeed chota font size */
+                margin: 0 !important;
+                padding: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* Unwanted elements ko clear hide karna */
+            .topbar, .module-nav-panel, .no-print, button, form, .form-text, .alert .badge {
                 display: none !important;
             }
 
-            /* Show print-only header in grid style */
             .print-only-header {
                 display: block !important;
-                border-bottom: 1.5px solid #1f5f46;
-                padding-bottom: 8px;
-                margin-bottom: 15px;
+                margin-bottom: 15px !important;
+                border-bottom: 2px solid #333 !important;
+                padding-bottom: 5px !important;
             }
-
-            .print-only-header h1 {
-                font-size: 18px;
-                color: #1f5f46;
-                font-weight: 700;
-                margin: 0 0 2px 0;
-                text-transform: uppercase;
-            }
-
-            .print-only-header h3 {
-                font-size: 11px;
-                color: #444444;
-                margin: 0 0 8px 0;
-                font-weight: 600;
-            }
-
+            .print-only-header h1 { font-size: 18px !important; margin: 0 0 2px 0 !important; }
+            .print-only-header h3 { font-size: 12px !important; margin: 0 0 8px 0 !important; color: #444 !important; }
+            
             .print-meta-grid {
-                display: table;
-                width: 100%;
-                margin-top: 5px;
+                display: table !important;
+                width: 100% !important;
+                margin-bottom: 5px !important;
+                font-size: 9.5px !important;
             }
-
             .print-meta-col {
-                display: table-cell;
-                width: 33.33%;
-                font-size: 9.5px;
-                color: #333333;
+                display: table-cell !important;
+                width: 33.33% !important;
             }
 
-            /* Spreadsheet Style Tables with smaller paddings and font */
+            /* Web layout ko side-by-side rakhne ka sabse behtreen tareeqa */
+            .row {
+                display: block !important;
+                width: 100% !important;
+                clear: both !important;
+            }
+            
+            /* Left Side (Tables) */
+            .col-lg-7 {
+                width: 60% !important;
+                float: left !important;
+                padding-right: 15px !important;
+                box-sizing: border-box !important;
+            }
+            
+            /* Right Side (Calculator Box) */
+            .col-lg-5 {
+                width: 40% !important;
+                float: right !important;
+                padding-left: 5px !important;
+                box-sizing: border-box !important;
+            }
+
+            /* Tables styling ko tight aur chota karne ke liye */
+            .table-responsive {
+                overflow: visible !important;
+            }
             table {
                 width: 100% !important;
-                border-collapse: collapse !important;
-                margin-top: 5px !important;
+                font-size: 9.5px !important;
                 margin-bottom: 15px !important;
-                page-break-inside: auto !important;
+                border-collapse: collapse !important;
             }
-
-            tr {
-                page-break-inside: avoid !important;
-                page-break-after: auto !important;
+            th, td {
+                padding: 4px 6px !important; /* Boht compact padding */
+                border: 1px solid #ddd !important;
             }
-
-            table, th, td {
-                border: 1px solid #a4b8ad !important; /* slightly darker borders for visibility */
-            }
-
-            th {
-                background-color: #edf3f0 !important;
-                color: #1f5f46 !important;
-                font-weight: 700 !important;
-                text-transform: uppercase !important;
-                font-size: 9px !important; /* Smaller size */
-                padding: 5px 8px !important; /* Reduced padding */
-                text-align: left !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-
-            td {
-                padding: 4px 8px !important; /* Reduced padding */
-                font-size: 9.5px !important; /* Smaller size */
-                color: #222222 !important;
+            thead th {
+                background-color: #f2f2f2 !important;
+                color: #000 !important;
             }
 
             .section-sub-title {
-                border-bottom: 1.5px solid #1f5f46 !important;
-                color: #1f5f46 !important;
-                font-size: 10.5px !important; /* Smaller size */
-                font-weight: 700 !important;
-                text-transform: uppercase;
-                margin-top: 15px !important;
-                padding-bottom: 3px !important;
-            }
-
-            /* Math & Reconciliation Card */
-            .reconciliation-math-card {
-                border: 1px solid #a4b8ad !important;
-                background: #ffffff !important;
-                box-shadow: none !important;
-                padding: 12px 15px !important;
-                border-radius: 4px !important;
-                margin-top: 15px !important;
-                page-break-inside: avoid !important;
-            }
-
-            .reconciliation-math-card h5 {
-                font-size: 10px !important;
-                color: #1f5f46 !important;
-                font-weight: 700 !important;
-                border-bottom: 1px solid #a4b8ad !important;
+                font-size: 11px !important;
+                margin-bottom: 8px !important;
                 padding-bottom: 4px !important;
-                margin-bottom: 10px !important;
-                text-transform: uppercase;
+                margin-top: 5px !important;
+            }
+
+            /* Right side wale Card ko properly adjust karna */
+            .reconciliation-math-card {
+                padding: 15px !important;
+                background: #fdfdfd !important;
+                border: 1px solid #ccc !important;
+                border-left: 4px solid #1f5f46 !important;
+                box-shadow: none !important;
+                border-radius: 6px !important;
+                margin-bottom: 0 !important;
+            }
+            .reconciliation-math-card::after {
+                display: none !important; /* Graphic icon hata diya takay space bache */
             }
 
             .math-line {
-                font-size: 9.5px !important;
-                padding: 4px 0 !important;
-                border-bottom: 1px dashed #a4b8ad !important;
-            }
-
-            .math-line.subtraction {
-                color: #a00 !important;
-            }
-
-            .math-line.subtotal {
-                border-bottom: 1px solid #1f5f46 !important;
-                font-weight: bold !important;
+                padding: 6px 0 !important;
+                font-size: 10px !important;
             }
 
             .net-cash-large-box {
+                padding: 10px 15px !important;
                 background: #1f5f46 !important;
                 color: #ffffff !important;
-                padding: 10px 15px !important;
-                border-radius: 3px !important;
-                box-shadow: none !important;
-                display: inline-block !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
+                border-radius: 4px !important;
+                margin-top: 5px !important;
+                text-align: right !important;
+                display: block !important;
+                width: 100% !important;
             }
-
             .net-cash-large-box h2 {
-                font-size: 18px !important; /* Slightly smaller for prints */
+                font-size: 1.3rem !important;
                 font-weight: bold !important;
-                margin: 0 !important;
-                color: #ffffff !important;
             }
-
             .net-cash-large-box span {
-                color: #ffffff !important;
                 font-size: 8px !important;
-                font-weight: 600 !important;
             }
 
-            .badge {
-                border: 1px solid #ccc !important;
-                background: none !important;
-                color: #333 !important;
-                padding: 1px 3px !important;
+            /* Clearfix taake layout break na ho */
+            .content::after {
+                content: "";
+                display: table !important;
+                clear: both !important;
+            }
+            
+            tr, .reconciliation-math-card {
+                page-break-inside: avoid !important;
             }
         }
     </style>
@@ -343,7 +318,6 @@ $cash_remaining = $total_cash - $total_expenses;
 <body>
     <div class="wrapper feature-shell">
         <main class="main-content">
-            <!-- Screen Top Bar -->
             <div class="topbar no-print">
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
@@ -362,7 +336,6 @@ $cash_remaining = $total_cash - $total_expenses;
                 </div>
             </div>
 
-            <!-- Print Only Spreadsheet Header -->
             <div class="print-only-header">
                 <h1><?php echo SITE_NAME; ?></h1>
                 <h3>Clerk Cash Reconciliation & Reconciliation Statement</h3>
@@ -387,7 +360,6 @@ $cash_remaining = $total_cash - $total_expenses;
             </div>
 
             <div class="content">
-                <!-- Navigation Tab Bar -->
                 <div class="module-nav-panel no-print">
                     <div class="module-nav-row">
                         <a href="dashboard.php" class="module-nav-btn">
@@ -411,7 +383,6 @@ $cash_remaining = $total_cash - $total_expenses;
                     </div>
                 </div>
 
-                <!-- Active Date Heading Alert -->
                 <div class="alert alert-success d-flex align-items-center justify-content-between mb-4 no-print">
                     <div>
                         <i class="fas fa-calendar-day me-2"></i>
@@ -435,7 +406,6 @@ $cash_remaining = $total_cash - $total_expenses;
                     </span>
                 </div>
 
-                <!-- Date Filter Form (Screen Only) -->
                 <div class="search-section mb-4 no-print">
                     <form method="GET" class="row g-3 align-items-end">
                         <div class="col-md-4">
@@ -458,7 +428,6 @@ $cash_remaining = $total_cash - $total_expenses;
                     </form>
                 </div>
 
-                <!-- Reconciliation Summary Cards (Screen Only) -->
                 <div class="stats-grid mb-4 no-print">
                     <div class="stat-card">
                         <div class="stat-icon" style="background: #e3f1ea;">
@@ -489,10 +458,8 @@ $cash_remaining = $total_cash - $total_expenses;
                     </div>
                 </div>
 
-                <div class="row g-4">
-                    <!-- Detailed Lists -->
+                <div class="row">
                     <div class="col-lg-7">
-                        <!-- Fee Payments Table -->
                         <div class="mb-4">
                             <h5 class="section-sub-title">
                                 <i class="fas fa-receipt"></i>
@@ -532,17 +499,17 @@ $cash_remaining = $total_cash - $total_expenses;
                                                         }
                                                         ?>
                                                     </td>
-                                                    <td><strong><?php echo format_currency($p['amount']); ?></strong></td>
+                                                    <td><?php echo format_currency($p['amount']); ?></td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
                                         <tfoot>
                                             <tr class="table-light">
-                                                <td colspan="4" class="text-end text-success"><strong>Cash Payments Subtotal:</strong></td>
+                                                <td colspan="4" class="text-end text-success"><strong>Cash Subtotal:</strong></td>
                                                 <td class="text-success"><strong><?php echo format_currency($total_cash); ?></strong></td>
                                             </tr>
                                             <tr class="table-light">
-                                                <td colspan="4" class="text-end text-primary"><strong>Bank/Account Payments Subtotal:</strong></td>
+                                                <td colspan="4" class="text-end text-primary"><strong>Bank Subtotal:</strong></td>
                                                 <td class="text-primary"><strong><?php echo format_currency($total_bank_account); ?></strong></td>
                                             </tr>
                                             <tr class="table-dark">
@@ -559,7 +526,6 @@ $cash_remaining = $total_cash - $total_expenses;
                             </div>
                         </div>
 
-                        <!-- Expenses Table -->
                         <div>
                             <h5 class="section-sub-title">
                                 <i class="fas fa-wallet"></i>
@@ -608,7 +574,6 @@ $cash_remaining = $total_cash - $total_expenses;
                         </div>
                     </div>
 
-                    <!-- Reconciliation Calculations Card -->
                     <div class="col-lg-5">
                         <div class="reconciliation-math-card">
                             <h5 class="border-bottom pb-2 mb-3">
@@ -642,15 +607,11 @@ $cash_remaining = $total_cash - $total_expenses;
                                         <span>Reconciled Cash Remaining</span>
                                         <h2><?php echo format_currency($cash_remaining); ?></h2>
                                     </div>
-                                    <div class="form-text mt-2 text-muted no-print">
-                                        Expected physical cash balance in drawer.
-                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                </div> </div>
         </main>
     </div>
 
