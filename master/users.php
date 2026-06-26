@@ -47,41 +47,11 @@ if (isset($_GET['delete'])) {
     }
 }
 
-// Handle Add/Edit Form submission
+// Handle Edit Form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $action = $_POST['action'] ?? '';
     
-    if ($action === 'add') {
-        $username = sanitize_input($_POST['username'] ?? '');
-        $password = $_POST['password'] ?? '';
-        $role = sanitize_input($_POST['role'] ?? '');
-        
-        if (empty($username) || empty($password) || empty($role)) {
-            $error = "All fields are required!";
-        } elseif (!in_array($role, ['master', 'finance', 'admission'])) {
-            $error = "Invalid role selected!";
-        } else {
-            // Check if username already exists
-            $stmt = $conn->prepare("SELECT id FROM users WHERE username = ?");
-            $stmt->bind_param("s", $username);
-            $stmt->execute();
-            $res = $stmt->get_result();
-            if ($res->num_rows > 0) {
-                $error = "Username already exists! Please choose a different one.";
-            } else {
-                // Insert new user
-                $ins_stmt = $conn->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
-                $ins_stmt->bind_param("sss", $username, $password, $role);
-                if ($ins_stmt->execute()) {
-                    $success = "User '" . htmlspecialchars($username) . "' created successfully!";
-                } else {
-                    $error = "Error creating user: " . $conn->error;
-                }
-                $ins_stmt->close();
-            }
-            $stmt->close();
-        }
-    } elseif ($action === 'edit') {
+    if ($action === 'edit') {
         $user_id = intval($_POST['user_id'] ?? 0);
         $username = sanitize_input($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
@@ -170,7 +140,6 @@ if ($users_result) {
 <body>
     <div class="wrapper feature-shell">
         <main class="main-content">
-            <!-- Top Bar -->
             <div class="topbar">
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
@@ -190,7 +159,6 @@ if ($users_result) {
             </div>
             
             <div class="content">
-                <!-- Navigation panel -->
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
                         <a href="dashboard.php" class="module-nav-btn">
@@ -223,7 +191,6 @@ if ($users_result) {
                     </div>
                 </div>
 
-                <!-- Alert Messages -->
                 <?php if (!empty($success)): ?>
                     <div class="alert alert-success alert-dismissible fade show">
                         <i class="fas fa-check-circle"></i> <?php echo $success; ?>
@@ -239,79 +206,6 @@ if ($users_result) {
                 <?php endif; ?>
 
                 <div class="row g-4">
-                    <!-- Left Form Section: Add or Edit User -->
-                    <div class="col-lg-4">
-                        <div class="form-section">
-                            <?php if ($edit_user): ?>
-                                <h4 class="mb-3"><i class="fas fa-user-edit text-success"></i> Edit User Details</h4>
-                                <p class="text-muted small">Update login details for <strong><?php echo htmlspecialchars($edit_user['username']); ?></strong>.</p>
-                                <form method="POST" action="users.php">
-                                    <input type="hidden" name="action" value="edit">
-                                    <input type="hidden" name="user_id" value="<?php echo $edit_user['id']; ?>">
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label" for="username">Username *</label>
-                                        <input type="text" id="username" name="username" class="form-control" 
-                                               value="<?php echo htmlspecialchars($edit_user['username']); ?>" required>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label" for="password">Password</label>
-                                        <input type="text" id="password" name="password" class="form-control" 
-                                               placeholder="Enter password" value="<?php echo htmlspecialchars($edit_user['password']); ?>" required>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label" for="role">Role *</label>
-                                        <select id="role" name="role" class="form-select" required>
-                                            <option value="admission" <?php echo $edit_user['role'] === 'admission' ? 'selected' : ''; ?>>Admission User</option>
-                                            <option value="finance" <?php echo $edit_user['role'] === 'finance' ? 'selected' : ''; ?>>Finance User</option>
-                                            <option value="master" <?php echo $edit_user['role'] === 'master' ? 'selected' : ''; ?>>Master Admin</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <div class="d-flex gap-2">
-                                        <button type="submit" class="btn-primary w-100" style="padding: 10px;">
-                                            <i class="fas fa-save"></i> Update
-                                        </button>
-                                        <a href="users.php" class="btn-secondary w-100 text-center" style="padding: 10px; text-decoration: none;">Cancel</a>
-                                    </div>
-                                </form>
-                            <?php else: ?>
-                                <h4 class="mb-3"><i class="fas fa-user-plus text-primary"></i> Add New User</h4>
-                                <p class="text-muted small">Create login accounts for Admission and Finance staff.</p>
-                                <form method="POST" action="users.php">
-                                    <input type="hidden" name="action" value="add">
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label" for="username">Username *</label>
-                                        <input type="text" id="username" name="username" class="form-control" required placeholder="e.g. finance_clerk">
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label" for="password">Password *</label>
-                                        <input type="text" id="password" name="password" class="form-control" required placeholder="Enter password">
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label" for="role">Role *</label>
-                                        <select id="role" name="role" class="form-select" required>
-                                            <option value="">Select Role</option>
-                                            <option value="admission">Admission User</option>
-                                            <option value="finance">Finance User</option>
-                                            <option value="master">Master Admin</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <button type="submit" class="btn-primary w-100" style="padding: 10px;">
-                                        <i class="fas fa-plus"></i> Create User Account
-                                    </button>
-                                </form>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <!-- Right Column: User list table -->
                     <div class="col-lg-8">
                         <div class="table-section">
                             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -360,18 +254,7 @@ if ($users_result) {
                                                         <a href="users.php?edit=<?php echo $u['id']; ?>" class="btn-action" style="text-decoration: none; padding: 4px 10px; font-size: 0.85rem; border-radius: 4px; display: inline-block; margin-right: 5px;">
                                                             <i class="fas fa-edit"></i> Edit
                                                         </a>
-                                                        <?php if ($u['id'] != get_user_id()): ?>
-                                                            <a href="users.php?delete=<?php echo $u['id']; ?>" 
-                                                               class="btn-action btn-action-delete" 
-                                                               style="text-decoration: none; padding: 4px 10px; font-size: 0.85rem; border-radius: 4px; display: inline-block; background: #e74c3c; color: white;"
-                                                               onclick="return confirm('Are you sure you want to delete user \'<?php echo htmlspecialchars($u['username']); ?>\'? This action cannot be undone.');">
-                                                                <i class="fas fa-trash-alt"></i> Delete
-                                                            </a>
-                                                        <?php else: ?>
-                                                            <button class="btn-action" disabled title="Cannot delete yourself" style="padding: 4px 10px; font-size: 0.85rem; border-radius: 4px; opacity: 0.5;">
-                                                                <i class="fas fa-trash-alt"></i> Delete
-                                                            </button>
-                                                        <?php endif; ?>
+                                                       
                                                     </td>
                                                 </tr>
                                             <?php endforeach; ?>
@@ -384,6 +267,54 @@ if ($users_result) {
                                 </table>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <?php if ($edit_user): ?>
+                            <div class="form-section">
+                                <h4 class="mb-3"><i class="fas fa-user-edit text-success"></i> Edit User Details</h4>
+                                <p class="text-muted small">Update login details for <strong><?php echo htmlspecialchars($edit_user['username']); ?></strong>.</p>
+                                <form method="POST" action="users.php">
+                                    <input type="hidden" name="action" value="edit">
+                                    <input type="hidden" name="user_id" value="<?php echo $edit_user['id']; ?>">
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label" for="username">Username *</label>
+                                        <input type="text" id="username" name="username" class="form-control" 
+                                               value="<?php echo htmlspecialchars($edit_user['username']); ?>" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label" for="password">Password *</label>
+                                        <input type="text" id="password" name="password" class="form-control" 
+                                               placeholder="Enter password" value="<?php echo htmlspecialchars($edit_user['password']); ?>" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label" for="role">Role *</label>
+                                        <select id="role" name="role" class="form-select" required>
+                                            <option value="admission" <?php echo $edit_user['role'] === 'admission' ? 'selected' : ''; ?>>Admission User</option>
+                                            <option value="finance" <?php echo $edit_user['role'] === 'finance' ? 'selected' : ''; ?>>Finance User</option>
+                                            <option value="master" <?php echo $edit_user['role'] === 'master' ? 'selected' : ''; ?>>Master Admin</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="d-flex gap-2">
+                                        <button type="submit" class="btn-primary w-100" style="padding: 10px;">
+                                            <i class="fas fa-save"></i> Update
+                                        </button>
+                                        <a href="users.php" class="btn-secondary w-100 text-center" style="padding: 10px; text-decoration: none;">Cancel</a>
+                                    </div>
+                                </form>
+                            </div>
+                        <?php else: ?>
+                            <div class="card h-100 border-0 shadow-sm d-flex align-items-center justify-content-center text-center p-4" style="background: #fafafa; border-radius: 8px; min-height: 250px;">
+                                <div>
+                                    <i class="fas fa-user-cog fa-2x text-muted mb-3" style="opacity: 0.5;"></i>
+                                    <p class="text-muted mb-0">Select any user's <strong>Edit</strong> button from the table to modify their details here.</p>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
