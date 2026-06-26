@@ -198,68 +198,7 @@ $today_collection = get_daily_collection(date('Y-m-d'));
         </div>
     </div>
 </div>
-                <!-- Quick Actions -->
-                <div class="row g-4 mt-2">
-                    <div class="col-12">
-                        <div class="table-section">
-                            <h4 class="mb-4"><i class="fas fa-bolt text-warning me-2"></i>Quick Management Actions</h4>
-                            <div class="row g-3">
-                                <div class="col-md-4">
-                                    <div class="p-3 border rounded bg-light h-100 d-flex flex-column justify-content-between">
-                                        <div class="d-flex align-items-center gap-3 mb-3">
-                                            <div class="btn btn-primary btn-lg rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%); border: none;">
-                                                <i class="fas fa-users-cog"></i>
-                                            </div>
-                                            <div>
-                                                <h6 class="mb-1 fw-bold" style="color: var(--dark-text);">User Management</h6>
-                                                <small class="text-muted">Manage Admission & Finance logins</small>
-                                            </div>
-                                        </div>
-                                        <p class="text-muted small mb-3">View user profiles, edit login credentials, and reset usernames/passwords for admission and finance staff.</p>
-                                        <a href="users.php" class="btn btn-sm text-white w-100" style="background-color: var(--primary-color); border: none;">
-                                            <i class="fas fa-cog me-1"></i> Manage Users
-                                        </a>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="p-3 border rounded bg-light h-100 d-flex flex-column justify-content-between">
-                                        <div class="d-flex align-items-center gap-3 mb-3">
-                                            <div class="btn btn-success btn-lg rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%); border: none;">
-                                                <i class="fas fa-arrow-up"></i>
-                                            </div>
-                                            <div>
-                                                <h6 class="mb-1 fw-bold" style="color: var(--dark-text);">Promote Students</h6>
-                                                <small class="text-muted">Batch promote students</small>
-                                            </div>
-                                        </div>
-                                        <p class="text-muted small mb-3">Batch update class/section assignments for students when they transition to the next academic year.</p>
-                                        <a href="promotion.php" class="btn btn-sm text-white w-100" style="background-color: #27ae60; border: none;">
-                                            <i class="fas fa-arrow-circle-up me-1"></i> Promote Class
-                                        </a>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="p-3 border rounded bg-light h-100 d-flex flex-column justify-content-between">
-                                        <div class="d-flex align-items-center gap-3 mb-3">
-                                            <div class="btn btn-info btn-lg rounded-circle text-white d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; background: linear-gradient(135deg, #2980b9 0%, #3498db 100%); border: none;">
-                                                <i class="fas fa-database"></i>
-                                            </div>
-                                            <div>
-                                                <h6 class="mb-1 fw-bold" style="color: var(--dark-text);">Backup Database</h6>
-                                                <small class="text-muted">Export system database</small>
-                                            </div>
-                                        </div>
-                                        <p class="text-muted small mb-3">Generate a secure database SQL backup file to keep financial records and student data safe from data loss.</p>
-                                        <a href="backup.php" class="btn btn-sm text-white w-100" style="background-color: #2980b9; border: none;">
-                                            <i class="fas fa-download me-1"></i> Download Backup
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+               
         </main>
     </div>
     
