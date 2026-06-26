@@ -18,7 +18,11 @@ $remaining_students = max(0, $total_students - $paid_students);
 $paid_percentage = $total_students > 0 ? round(($paid_students / $total_students) * 100) : 0;
 $remaining_percentage = 100 - $paid_percentage;
 $total_unpaid = $conn->query("SELECT SUM(amount) as total FROM fee_records WHERE status = 'unpaid'")->fetch_assoc()['total'] ?? 0;
-$total_paid = $conn->query("SELECT SUM(amount) as total FROM fee_records WHERE status = 'paid'")->fetch_assoc()['total'] ?? 0;
+
+// NEW QUERIES: Fetch count for Section B (Boys) and Section G (Girls) for active students
+$total_boys = $conn->query("SELECT COUNT(*) as count FROM students WHERE section = 'B' AND status = 'active'")->fetch_assoc()['count'] ?? 0;
+$total_girls = $conn->query("SELECT COUNT(*) as count FROM students WHERE section = 'G' AND status = 'active'")->fetch_assoc()['count'] ?? 0;
+
 $today_collection = get_daily_collection(date('Y-m-d'));
 ?>
 <!DOCTYPE html>
@@ -139,50 +143,60 @@ $today_collection = get_daily_collection(date('Y-m-d'));
                 </div>
 
                 <!-- Statistics Cards -->
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: #e3f1ea;">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3><?php echo $total_students; ?></h3>
-                            <p>Active Students</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: #edf4f0;">
-                            <i class="fas fa-circle-exclamation"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3><?php echo format_currency($total_unpaid); ?></h3>
-                            <p>Total Unpaid</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: #dbe9e2;">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3><?php echo format_currency($total_paid); ?></h3>
-                            <p>Total Collected</p>
-                        </div>
-                    </div>
-                    
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: #f0f4ef;">
-                            <i class="fas fa-calendar-day"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3><?php echo format_currency($today_collection); ?></h3>
-                            <p>Today's Collection</p>
-                        </div>
-                    </div>
-                </div>
+                <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+    <div class="stat-card">
+        <div class="stat-icon" style="background: #e3f1ea;">
+            <i class="fas fa-users"></i>
+        </div>
+        <div class="stat-content">
+            <h3><?php echo $total_students; ?></h3>
+            <p>Active Students</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
+            <i class="fas fa-mars"></i>
+        </div>
+        <div class="stat-content">
+            <h3><?php echo $total_boys; ?></h3>
+            <p>Boys (Sec B)</p>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
+            <i class="fas fa-venus"></i>
+        </div>
+        <div class="stat-content">
+            <h3><?php echo $total_girls; ?></h3>
+            <p>Girls (Sec G)</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon" style="background: #edf4f0;">
+            <i class="fas fa-circle-exclamation"></i>
+        </div>
+        <div class="stat-content">
+    <h3><?php echo str_replace('.00', '', format_currency($total_unpaid)); ?></h3>
+    <p>Total Unpaid</p>
+</div>
+    </div>
+
+    
+    
+    <div class="stat-card">
+        <div class="stat-icon" style="background: #f0f4ef;">
+            <i class="fas fa-calendar-day"></i>
+        </div>
+        <div class="stat-content">
+            <h3><?php echo format_currency($today_collection); ?></h3>
+            <p>Today's Collection</p>
+        </div>
+    </div>
+</div>
                 
                 <!-- Quick Actions -->
-                
                 
             </div>
         </main>
