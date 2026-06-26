@@ -28,7 +28,7 @@ $clerk_filter = isset($_GET['clerk']) ? sanitize_input($_GET['clerk']) : 'all';
 // Fetch list of unique clerks/users who exist in the database or have transactions
 $clerk_list = [];
 $clerk_query = $conn->query("
-    SELECT DISTINCT username FROM users 
+    SELECT DISTINCT username FROM users WHERE role IN ('finance', 'master')
     UNION 
     SELECT DISTINCT received_by AS username FROM payments 
     UNION 
