@@ -202,6 +202,9 @@ if (isset($_GET['id'])) {
                             <a href="drop_student.php" class="module-nav-btn">
                                 <i class="fas fa-trash"></i> Drop Student
                             </a>
+                            <a href="users.php" class="module-nav-btn">
+                                <i class="fas fa-users-cog"></i> Users
+                            </a>
                         <?php else: ?>
                             <a href="dashboard.php" class="module-nav-btn">
                                 <i class="fas fa-chart-bar"></i> Dashboard

@@ -167,6 +167,13 @@ Finance_System/
 - View dropped history
 - Status management
 
+✅ **8. User Management**
+- Manage staff login accounts (Master, Finance, Admission)
+- List all system users with their roles & plain-text passwords
+- Add new staff accounts with custom usernames and passwords
+- Edit existing user details, including updating usernames and passwords
+- Delete staff accounts safely (preventing self-deletion)
+
 ---
 
 ## 👨‍💻 Finance Role Features (2 COMPLETE)

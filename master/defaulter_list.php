@@ -114,6 +114,9 @@ if ($defaulters) {
                         <a href="drop_student.php" class="module-nav-btn">
                             <i class="fas fa-trash"></i> Drop Student
                         </a>
+                        <a href="users.php" class="module-nav-btn">
+                            <i class="fas fa-users-cog"></i> Users
+                        </a>
                     </div>
                 </div>
 

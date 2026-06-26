@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `id` INT PRIMARY KEY AUTO_INCREMENT,
   `username` VARCHAR(50) UNIQUE NOT NULL,
   `password` VARCHAR(255) NOT NULL,
-  `role` ENUM('master', 'finance') NOT NULL,
+  `role` ENUM('master', 'finance', 'admission') NOT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -73,7 +73,8 @@ CREATE TABLE IF NOT EXISTS `expenses` (
 -- Insert Default Admin Users
 INSERT INTO `users` (`username`, `password`, `role`) VALUES 
 ('master', '1234', 'master'),
-('finance', '1234', 'finance');
+('finance', '1234', 'finance'),
+('admission', '1234', 'admission');
 
 -- Create Indexes for Performance
 CREATE INDEX `idx_student_status` ON `students`(`status`);
