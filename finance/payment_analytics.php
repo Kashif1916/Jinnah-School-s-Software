@@ -411,6 +411,9 @@ $cash_remaining = $total_cash - $total_expenses;
                         <a href="dashboard.php" class="module-nav-btn">
                             <i class="fas fa-chart-bar"></i> Dashboard
                         </a>
+                        <a href="add_student.php" class="module-nav-btn ">
+                            <i class="fas fa-list"></i> Add Student
+                        </a>
                         <a href="student_record.php" class="module-nav-btn">
                             <i class="fas fa-address-book"></i> Student Record
                         </a>
