@@ -87,7 +87,7 @@ $cash_remaining = $total_cash - $total_expenses;
             border-left: 5px solid var(--primary-color);
             border-radius: 12px;
             box-shadow: var(--shadow-medium);
-            padding: 30px;
+            padding: 25px;
             margin-bottom: 20px;
             position: relative;
             overflow: hidden;
@@ -109,9 +109,9 @@ $cash_remaining = $total_cash - $total_expenses;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 0;
+            padding: 10px 0;
             border-bottom: 1px dashed rgba(0,0,0,0.08);
-            font-size: 1.05rem;
+            font-size: 1.02rem;
         }
 
         .math-line.subtraction {
@@ -126,13 +126,13 @@ $cash_remaining = $total_cash - $total_expenses;
 
         .math-line.final-total {
             border-bottom: none;
-            padding-top: 20px;
-            margin-top: 10px;
+            padding-top: 15px;
+            margin-top: 5px;
         }
 
         .net-cash-large-box {
             text-align: right;
-            padding: 15px 25px;
+            padding: 12px 20px;
             background: linear-gradient(135deg, #1f5f46 0%, #10161b 100%);
             color: #ffffff;
             border-radius: 8px;
@@ -141,14 +141,14 @@ $cash_remaining = $total_cash - $total_expenses;
         }
 
         .net-cash-large-box h2 {
-            font-size: 2.2rem;
+            font-size: 2rem;
             font-weight: 700;
             margin: 0;
             letter-spacing: 0.5px;
         }
 
         .net-cash-large-box span {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             text-transform: uppercase;
             letter-spacing: 1px;
             opacity: 0.9;
@@ -167,65 +167,79 @@ $cash_remaining = $total_cash - $total_expenses;
             gap: 8px;
         }
 
-        /* WORKING UI CALCULATOR STYLING (SCREEN ONLY) */
-        .clerk-calc-block {
-            background: #22252a;
+        /* NEW NEW DENOMINATION AUDIT BLOCK STYLING */
+        .denomination-card {
+            background: #ffffff;
+            border: 1px solid rgba(0,0,0,0.1);
             border-radius: 12px;
-            padding: 15px;
-            margin-top: 20px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-            max-width: 100%;
+            box-shadow: var(--shadow-medium);
+            padding: 20px;
+            margin-top: 10px;
         }
-        .calc-screen {
-            background: #111316;
-            border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 15px;
-            text-align: right;
-        }
-        .calc-history {
-            font-size: 0.8rem;
-            color: #7d848f;
-            min-height: 18px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            font-family: monospace;
-        }
-        .calc-display {
-            font-size: 1.8rem;
-            color: #ffffff;
-            font-weight: bold;
-            font-family: monospace;
-            word-wrap: break-word;
-            line-height: 1.2;
-        }
-        .calc-buttons {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-        }
-        .calc-btn {
-            background: #2e343d;
-            border: none;
-            color: white;
-            padding: 12px;
+        .denomination-heading {
             font-size: 1.1rem;
             font-weight: 600;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.1s ease;
+            color: #1f5f46;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            padding-bottom: 8px;
         }
-        .calc-btn:hover { background: #3d4550; }
-        .calc-btn.operator { background: #1f5f46; color: white; }
-        .calc-btn.operator:hover { background: #2a7e5d; }
-        .calc-btn.clear { background: #d90429; color: white; }
-        .calc-btn.clear:hover { background: #ef233c; }
-        .calc-btn.equal { grid-column: span 2; background: #e67e22; color: white; }
-        .calc-btn.equal:hover { background: #f39c12; }
+        .denom-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+        .denom-label {
+            width: 70px;
+            font-weight: 600;
+            color: #333;
+        }
+        .denom-multiply {
+            width: 25px;
+            color: #777;
+            text-align: center;
+        }
+        .denom-input-col {
+            width: 90px;
+        }
+        .denom-input {
+            width: 100%;
+            padding: 3px 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .denom-input:focus {
+            border-color: #1f5f46;
+            outline: none;
+        }
+        .denom-equal {
+            width: 30px;
+            text-align: center;
+            color: #555;
+        }
+        .denom-total-output {
+            flex-grow: 1;
+            text-align: right;
+            font-weight: 600;
+            color: #444;
+        }
+        .denom-grand-total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding-top: 12px;
+            border-top: 2px solid #1f5f46;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #1f5f46;
+        }
 
         /* Print elements layout preset */
-        .print-only-header, .print-calc-output-wrapper {
+        .print-only-header {
             display: none;
         }
 
@@ -233,16 +247,16 @@ $cash_remaining = $total_cash - $total_expenses;
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 0.5cm !important;
+                margin: 0.2cm 0.3cm !important; /* Extremely small margins to save left/right space */
             }
 
             body {
-                background: #f8fbf8 !important;
-                color: var(--dark-text) !important;
+                background: #ffffff !important;
+                color: #000000 !important;
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-                font-size: 9.5px !important;
+                font-size: 9px !important;
                 margin: 0 !important;
-                padding: 10px !important;
+                padding: 5px !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
@@ -254,29 +268,29 @@ $cash_remaining = $total_cash - $total_expenses;
             .print-only-header {
                 display: block !important;
                 border-bottom: 2px solid var(--primary-color) !important;
-                padding-bottom: 8px !important;
-                margin-bottom: 15px !important;
+                padding-bottom: 5px !important;
+                margin-bottom: 10px !important;
             }
 
             .print-only-header h1 {
-                font-size: 18px !important;
+                font-size: 16px !important;
                 color: var(--primary-color) !important;
                 font-weight: 700 !important;
                 margin: 0 0 2px 0 !important;
             }
 
             .print-only-header h3 {
-                font-size: 11px !important;
+                font-size: 10px !important;
                 color: #444 !important;
-                margin: 0 0 8px 0 !important;
+                margin: 0 0 5px 0 !important;
             }
 
             .print-meta-grid {
                 display: flex !important;
                 justify-content: space-between !important;
-                font-size: 9.5px !important;
+                font-size: 9px !important;
                 color: #333 !important;
-                margin-bottom: 10px !important;
+                margin-bottom: 5px !important;
             }
 
             .row {
@@ -284,27 +298,20 @@ $cash_remaining = $total_cash - $total_expenses;
                 flex-direction: row !important;
                 flex-wrap: nowrap !important;
                 align-items: flex-start !important; 
-                gap: 15px !important;
+                gap: 10px !important;
                 width: 100% !important;
             }
 
             .col-lg-7 {
-                width: 58% !important;
-                flex: 0 0 58% !important;
-                max-width: 58% !important;
+                width: 60% !important;
+                flex: 0 0 60% !important;
+                max-width: 60% !important;
             }
 
             .col-lg-5 {
-                width: 40% !important;
-                flex: 0 0 40% !important;
-                max-width: 40% !important;
-            }
-
-            .stats-grid {
-                display: grid !important;
-                grid-template-columns: repeat(3, 1fr) !important;
-                gap: 15px !important;
-                margin-bottom: 20px !important;
+                width: 38% !important;
+                flex: 0 0 38% !important;
+                max-width: 38% !important;
             }
 
             .table-responsive {
@@ -313,35 +320,72 @@ $cash_remaining = $total_cash - $total_expenses;
 
             table {
                 width: 100% !important;
-                margin-bottom: 15px !important;
-                font-size: 9px !important;
+                margin-bottom: 10px !important;
+                font-size: 8.5px !important;
             }
 
             table th, table td {
-                padding: 4px 6px !important;
+                padding: 3px 4px !important;
             }
 
-            * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-
-            .stat-card, .reconciliation-math-card, .net-cash-large-box, .badge {
+            .stat-card, .reconciliation-math-card, .net-cash-large-box, .badge, .denomination-card {
                 box-shadow: none !important;
-                border: 1px solid rgba(0,0,0,0.08) !important;
+                border: 1px solid rgba(0,0,0,0.15) !important;
             }
 
+            /* FIX FOR CASH DRAWER RECONCILIATION BLOCK IN PRINT */
             .reconciliation-math-card {
-                border-left: 5px solid var(--primary-color) !important;
+                border-left: 4px solid var(--primary-color) !important;
+                padding: 10px !important; /* Reduced padding */
+                margin-bottom: 10px !important;
+            }
+            .reconciliation-math-card h5 {
+                font-size: 11px !important;
+                margin-bottom: 8px !important;
+                padding-bottom: 4px !important;
+            }
+            .math-line {
+                padding: 4px 0 !important; /* Compact line spacing to prevent stretching */
+                font-size: 9px !important;
+            }
+            .net-cash-large-box {
+                padding: 6px 12px !important;
+            }
+            .net-cash-large-box h2 {
+                font-size: 1.3px !important; /* Adaptive smaller text to fit beautifully */
+                font-size: 14px !important;
+            }
+            .net-cash-large-box span {
+                font-size: 7.5px !important;
             }
 
-            .print-calc-output-wrapper {
-                display: block !important;
-                margin-top: 15px !important;
-                page-break-inside: avoid !important;
+            /* DENOMINATION CARD PRINT STYLING */
+            .denomination-card {
+                padding: 10px !important;
+                margin-top: 5px !important;
+            }
+            .denomination-heading {
+                font-size: 11px !important;
+                margin-bottom: 8px !important;
+                padding-bottom: 4px !important;
+            }
+            .denom-row {
+                margin-bottom: 4px !important;
+                font-size: 9px !important;
+            }
+            .denom-input {
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+                font-size: 9px !important;
+            }
+            .denom-grand-total-row {
+                margin-top: 8px !important;
+                padding-top: 6px !important;
+                font-size: 11px !important;
             }
 
-            tr, .stat-card, .reconciliation-math-card {
+            tr, .stat-card, .reconciliation-math-card, .denomination-card {
                 page-break-inside: avoid !important;
             }
         }
@@ -593,7 +637,7 @@ $cash_remaining = $total_cash - $total_expenses;
                     <div class="col-lg-5">
                         <div class="reconciliation-math-card">
                             <h5 class="border-bottom pb-2 mb-3">
-                                <i class="fas fa-calculator me-2"></i>
+                                <i class="fas fa-wallet me-2"></i>
                                 Cash Drawer Reconciliation
                             </h5>
                             
@@ -627,43 +671,97 @@ $cash_remaining = $total_cash - $total_expenses;
                             </div>
                         </div>
 
-                        <div class="clerk-calc-block no-print">
-                            <div class="calc-screen">
-                                <div id="calcHistory" class="calc-history"></div>
-                                <div id="calcDisplay" class="calc-display">0</div>
+                        <div class="denomination-card">
+                            <div class="denomination-heading">
+                                <i class="fas fa-calculator me-1"></i> Clerk Calculator Audit Log
                             </div>
-                            <div class="calc-buttons">
-                                <button type="button" class="calc-btn clear" onclick="clearCalc()">C</button>
-                                <button type="button" class="calc-btn operator" onclick="appendOp('/')">÷</button>
-                                <button type="button" class="calc-btn operator" onclick="appendOp('*')">×</button>
-                                <button type="button" class="calc-btn operator" onclick="appendOp('-')">-</button>
-                                
-                                <button type="button" class="calc-btn" onclick="appendNum('7')">7</button>
-                                <button type="button" class="calc-btn" onclick="appendNum('8')">8</button>
-                                <button type="button" class="calc-btn" onclick="appendNum('9')">9</button>
-                                <button type="button" class="calc-btn operator" onclick="appendOp('+')">+</button>
-                                
-                                <button type="button" class="calc-btn" onclick="appendNum('4')">4</button>
-                                <button type="button" class="calc-btn" onclick="appendNum('5')">5</button>
-                                <button type="button" class="calc-btn" onclick="appendNum('6')">6</button>
-                                <button type="button" class="calc-btn" onclick="deleteLast()"><i class="fas fa-backspace"></i></button>
-                                
-                                <button type="button" class="calc-btn" onclick="appendNum('1')">1</button>
-                                <button type="button" class="calc-btn" onclick="appendNum('2')">2</button>
-                                <button type="button" class="calc-btn" onclick="appendNum('3')">3</button>
-                                <button type="button" class="calc-btn" onclick="appendNum('.')">.</button>
-                                
-                                <button type="button" class="calc-btn" onclick="appendNum('0')">0</button>
-                                <button type="button" class="calc-btn equal" style="grid-column: span 3;" onclick="calculateResult()">=</button>
+                            
+                            <div class="denom-row">
+                                <span class="denom-label">5,000</span>
+                                <span class="denom-multiply">×</span>
+                                <div class="denom-input-col">
+                                    <input type="number" min="0" class="denom-input" data-value="5000" oninput="calcDenom(this)" placeholder="0">
+                                </div>
+                                <span class="denom-equal">=</span>
+                                <span class="denom-total-output" id="total-5000">0.00</span>
+                            </div>
+
+                            <div class="denom-row">
+                                <span class="denom-label">1,000</span>
+                                <span class="denom-multiply">×</span>
+                                <div class="denom-input-col">
+                                    <input type="number" min="0" class="denom-input" data-value="1000" oninput="calcDenom(this)" placeholder="0">
+                                </div>
+                                <span class="denom-equal">=</span>
+                                <span class="denom-total-output" id="total-1000">0.00</span>
+                            </div>
+
+                            <div class="denom-row">
+                                <span class="denom-label">500</span>
+                                <span class="denom-multiply">×</span>
+                                <div class="denom-input-col">
+                                    <input type="number" min="0" class="denom-input" data-value="500" oninput="calcDenom(this)" placeholder="0">
+                                </div>
+                                <span class="denom-equal">=</span>
+                                <span class="denom-total-output" id="total-500">0.00</span>
+                            </div>
+
+                            <div class="denom-row">
+                                <span class="denom-label">100</span>
+                                <span class="denom-multiply">×</span>
+                                <div class="denom-input-col">
+                                    <input type="number" min="0" class="denom-input" data-value="100" oninput="calcDenom(this)" placeholder="0">
+                                </div>
+                                <span class="denom-equal">=</span>
+                                <span class="denom-total-output" id="total-100">0.00</span>
+                            </div>
+
+                            <div class="denom-row">
+                                <span class="denom-label">75</span>
+                                <span class="denom-multiply">×</span>
+                                <div class="denom-input-col">
+                                    <input type="number" min="0" class="denom-input" data-value="75" oninput="calcDenom(this)" placeholder="0">
+                                </div>
+                                <span class="denom-equal">=</span>
+                                <span class="denom-total-output" id="total-75">0.00</span>
+                            </div>
+
+                            <div class="denom-row">
+                                <span class="denom-label">50</span>
+                                <span class="denom-multiply">×</span>
+                                <div class="denom-input-col">
+                                    <input type="number" min="0" class="denom-input" data-value="50" oninput="calcDenom(this)" placeholder="0">
+                                </div>
+                                <span class="denom-equal">=</span>
+                                <span class="denom-total-output" id="total-50">0.00</span>
+                            </div>
+
+                            <div class="denom-row">
+                                <span class="denom-label">20</span>
+                                <span class="denom-multiply">×</span>
+                                <div class="denom-input-col">
+                                    <input type="number" min="0" class="denom-input" data-value="20" oninput="calcDenom(this)" placeholder="0">
+                                </div>
+                                <span class="denom-equal">=</span>
+                                <span class="denom-total-output" id="total-20">0.00</span>
+                            </div>
+
+                            <div class="denom-row">
+                                <span class="denom-label">10</span>
+                                <span class="denom-multiply">×</span>
+                                <div class="denom-input-col">
+                                    <input type="number" min="0" class="denom-input" data-value="10" oninput="calcDenom(this)" placeholder="0">
+                                </div>
+                                <span class="denom-equal">=</span>
+                                <span class="denom-total-output" id="total-10">0.00</span>
+                            </div>
+
+                            <div class="denom-grand-total-row">
+                                <span>Grand Total:</span>
+                                <span id="denom-grand-total">0.00</span>
                             </div>
                         </div>
 
-                        <div class="print-calc-output-wrapper">
-                            <div class="print-calc-heading">
-                                <i class="fas fa-calculator"></i> Clerk Calculator Audit Log
-                            </div>
-                            <div id="printCalcHistoryBox" class="print-calc-history-box">No calculator operations performed.</div>
-                        </div>
                     </div>
                 </div> </div>
         </main>
@@ -672,78 +770,25 @@ $cash_remaining = $total_cash - $total_expenses;
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/script.js"></script>
     <script>
-        // JS Logic for Live Working Calculator with Print Audit Trail
-        let currentInput = "0";
-        let fullHistoryStr = "";
-        let sessionCalculations = [];
-
-        const display = document.getElementById("calcDisplay");
-        const historyView = document.getElementById("calcHistory");
-        const printBox = document.getElementById("printCalcHistoryBox");
-
-        function updateScreen() {
-            display.innerText = currentInput;
-            historyView.innerText = fullHistoryStr;
-        }
-
-        function appendNum(num) {
-            if (currentInput === "0" && num !== ".") {
-                currentInput = num;
-            } else {
-                if (num === "." && currentInput.includes(".")) return;
-                currentInput += num;
-            }
-            updateScreen();
-        }
-
-        function appendOp(op) {
-            let lastChar = fullHistoryStr.trim().slice(-1);
-            if (currentInput === "0" && fullHistoryStr !== "") {
-                if (["+", "-", "*", "/"].includes(lastChar)) {
-                    fullHistoryStr = fullHistoryStr.trim().slice(0, -1) + " " + op + " ";
-                    updateScreen();
-                    return;
-                }
-            }
+        // Real-time currency denomination calculation logic
+        function calcDenom(inputElement) {
+            const noteValue = parseInt(inputElement.getAttribute('data-value'));
+            const count = parseInt(inputElement.value) || 0;
+            const lineTotal = noteValue * count;
             
-            fullHistoryStr += currentInput + " " + op + " ";
-            currentInput = "0";
-            updateScreen();
-        }
-
-        // Fix logic errors
-        function clearCalc() {
-            currentInput = "0";
-            fullHistoryStr = "";
-            updateScreen();
-        }
-
-        function deleteLast() {
-            if (currentInput.length > 1) {
-                currentInput = currentInput.slice(0, -1);
-            } else {
-                currentInput = "0";
-            }
-            updateScreen();
-        }
-
-        function calculateResult() {
-            if (fullHistoryStr === "") return;
-            let expression = fullHistoryStr + currentInput;
-            try {
-                let result = eval(expression.replace(/×/g, '*').replace(/÷/g, '/'));
-                let auditLine = expression + " = " + result;
-                sessionCalculations.push(auditLine);
-                
-                printBox.innerHTML = sessionCalculations.join("\n");
-                
-                currentInput = result.toString();
-                fullHistoryStr = "";
-                updateScreen();
-            } catch (e) {
-                display.innerText = "Error";
-                setTimeout(clearCalc, 1000);
-            }
+            // Update individual note type total row
+            document.getElementById('total-' + noteValue).innerText = lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            
+            // Calculate Grand Total of all notes
+            let grandTotal = 0;
+            const allInputs = document.querySelectorAll('.denom-input');
+            allInputs.forEach(input => {
+                const val = parseInt(input.getAttribute('data-value'));
+                const qty = parseInt(input.value) || 0;
+                grandTotal += (val * qty);
+            });
+            
+            document.getElementById('denom-grand-total').innerText = grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
     </script>
 </body>
