@@ -85,6 +85,19 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
     if ($colCheckFrozenUntil && $colCheckFrozenUntil->num_rows == 0) {
         $conn->query("ALTER TABLE `users` ADD COLUMN `frozen_until` DATETIME DEFAULT NULL");
     }
+
+    // Dynamically ensure dropped_students table exists
+    $tableCheckDrops = $conn->query("SHOW TABLES LIKE 'dropped_students'");
+    if ($tableCheckDrops && $tableCheckDrops->num_rows == 0) {
+        $conn->query("CREATE TABLE `dropped_students` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `student_id` INT NOT NULL,
+            `dropped_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `dropped_by` VARCHAR(50) NOT NULL,
+            `drop_reason` VARCHAR(255) NOT NULL,
+            FOREIGN KEY (`student_id`) REFERENCES `students`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
 }
 
 /**

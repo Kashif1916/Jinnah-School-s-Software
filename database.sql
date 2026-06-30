@@ -81,6 +81,15 @@ CREATE TABLE IF NOT EXISTS `fee_schedule` (
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Table 7: Dropped Students Log
+CREATE TABLE IF NOT EXISTS `dropped_students` (
+  `id` INT PRIMARY KEY AUTO_INCREMENT,
+  `student_id` INT NOT NULL,
+  `dropped_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `dropped_by` VARCHAR(50) NOT NULL,
+  `drop_reason` VARCHAR(255) NOT NULL,
+  FOREIGN KEY (`student_id`) REFERENCES `students`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insert Default Admin Users
 INSERT INTO `users` (`username`, `password`, `role`) VALUES 

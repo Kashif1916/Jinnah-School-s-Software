@@ -20,21 +20,31 @@ $search_name = sanitize_input($_GET['search_name'] ?? '');
 $search_class = sanitize_input($_GET['search_class'] ?? '');
 $search_section = sanitize_input($_GET['search_section'] ?? '');
 
-// Handle Drop Action (POST Method)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'drop') {
     $student_id = intval($_POST['student_id'] ?? 0);
     $drop_reason = sanitize_input($_POST['drop_reason'] ?? '');
+    $dropped_by = get_username();
     
-    $query = "UPDATE students SET status = 'dropped', drop_reason = ? WHERE id = ?";
-    $stmt = $conn->prepare($query);
-    $stmt->bind_param('si', $drop_reason, $student_id);
-    
-    if ($stmt->execute()) {
+    $conn->begin_transaction();
+    try {
+        $query = "UPDATE students SET status = 'dropped', drop_reason = ? WHERE id = ?";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param('si', $drop_reason, $student_id);
+        $stmt->execute();
+        $stmt->close();
+        
+        $log_query = "INSERT INTO dropped_students (student_id, dropped_by, drop_reason) VALUES (?, ?, ?)";
+        $log_stmt = $conn->prepare($log_query);
+        $log_stmt->bind_param('iss', $student_id, $dropped_by, $drop_reason);
+        $log_stmt->execute();
+        $log_stmt->close();
+        
+        $conn->commit();
         $success = 'Student marked as dropped successfully!';
-    } else {
-        $error = 'Error dropping student: ' . $stmt->error;
+    } catch (Exception $e) {
+        $conn->rollback();
+        $error = 'Error dropping student: ' . $e->getMessage();
     }
-    $stmt->close();
 }
 
 // Fetch Active Students based on Advanced Filters
@@ -238,9 +248,12 @@ $stmt->close();
                     <div class="dropped-section" style="margin-top: 50px;">
                         <h4>Dropped Students History</h4>
                         <?php
-                        $query = "SELECT * FROM students WHERE status = 'dropped' ORDER BY name";
+                        $query = "SELECT ds.*, s.name, s.class, s.section 
+                                  FROM dropped_students ds 
+                                  JOIN students s ON ds.student_id = s.id 
+                                  ORDER BY ds.dropped_at DESC";
                         $result = $conn->query($query);
-                        $dropped_students = $result->fetch_all(MYSQLI_ASSOC);
+                        $dropped_students = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
                         
                         if (count($dropped_students) > 0):
                         ?>
@@ -251,24 +264,26 @@ $stmt->close();
                                         <th>Class</th>
                                         <th>Section</th>
                                         <th>Dropped Date</th>
+                                        <th>Dropped By</th>
                                         <th>Reason</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($dropped_students as $dropped): ?>
                                         <tr>
-                                            <td><?php echo $dropped['name']; ?></td>
-                                            <td><?php echo $dropped['class']; ?></td>
-                                            <td><?php echo $dropped['section']; ?></td>
-                                            <td><?php echo format_datetime($dropped['updated_at']); ?></td>
-                                            <td><?php echo htmlspecialchars($dropped['drop_reason'] ?? ''); ?></td>
+                                            <td><?php echo htmlspecialchars($dropped['name']); ?></td>
+                                            <td><?php echo htmlspecialchars($dropped['class']); ?></td>
+                                            <td><?php echo htmlspecialchars($dropped['section']); ?></td>
+                                            <td><?php echo format_datetime($dropped['dropped_at']); ?></td>
+                                            <td><span class="badge bg-secondary"><?php echo htmlspecialchars($dropped['dropped_by']); ?></span></td>
+                                            <td><?php echo htmlspecialchars($dropped['drop_reason']); ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
                         <?php else: ?>
                             <div class="alert alert-info">
-                                <i class="fas fa-info-circle"></i> No dropped students
+                                <i class="fas fa-info-circle"></i> No dropped students log found.
                             </div>
                         <?php endif; ?>
                     </div>
