@@ -22,6 +22,9 @@ if (isset($_SESSION['user_id'])) {
 }
 
 $error = '';
+if (isset($_GET['error']) && $_GET['error'] === 'closed') {
+    $error = 'Your account is closed/frozen for today. It will activate automatically at 12:00 AM.';
+}
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = isset($_POST['username']) ? trim($_POST['username']) : '';
@@ -32,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $error = 'Username and password are required!';
     } else {
         // Query user
-        $query = "SELECT id, username, password, role FROM users WHERE username = ?";
+        $query = "SELECT id, username, password, role, is_frozen, frozen_until FROM users WHERE username = ?";
         $stmt = $conn->prepare($query);
         $stmt->bind_param('s', $username);
         $stmt->execute();
@@ -41,17 +44,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if ($result->num_rows > 0) {
             $user = $result->fetch_assoc();
             
-            // Direct password comparison (as requested, no hashing)
-            if ($password === $user['password']) {
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['role'] = $user['role'];
-                $_SESSION['login_time'] = time();
-                
-                header('Location: ' . BASE_URL . 'index.php');
-                exit();
-            } else {
-                $error = 'Invalid username or password!';
+            // Check freeze status
+            $is_frozen = intval($user['is_frozen'] ?? 0);
+            $frozen_until = $user['frozen_until'] ?? null;
+            
+            if ($is_frozen === 1) {
+                if (!empty($frozen_until) && strtotime('now') >= strtotime($frozen_until)) {
+                    // Auto-unfreeze
+                    $unfreeze_query = "UPDATE users SET is_frozen = 0, frozen_until = NULL WHERE id = ?";
+                    $u_stmt = $conn->prepare($unfreeze_query);
+                    $u_stmt->bind_param('i', $user['id']);
+                    $u_stmt->execute();
+                    $u_stmt->close();
+                    
+                    $is_frozen = 0; // Unfrozen
+                } else {
+                    $error = 'Your account is closed/frozen for today. It will activate automatically at 12:00 AM.';
+                }
+            }
+            
+            if ($is_frozen === 0) {
+                // Direct password comparison (as requested, no hashing)
+                if ($password === $user['password']) {
+                    $_SESSION['user_id'] = $user['id'];
+                    $_SESSION['username'] = $user['username'];
+                    $_SESSION['role'] = $user['role'];
+                    $_SESSION['login_time'] = time();
+                    
+                    header('Location: ' . BASE_URL . 'index.php');
+                    exit();
+                } else {
+                    $error = 'Invalid username or password!';
+                }
             }
         } else {
             $error = 'Invalid username or password!';

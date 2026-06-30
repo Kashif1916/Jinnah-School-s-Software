@@ -91,6 +91,9 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
                         </a>
+                        <a href="account_close.php" class="module-nav-btn">
+                            <i class="fas fa-lock"></i> Close Account
+                        </a>
                     </div>
                 </div>
                 <div class="dashboard-stage dashboard-stage--single">

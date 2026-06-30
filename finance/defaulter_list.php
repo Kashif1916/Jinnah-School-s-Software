@@ -112,6 +112,9 @@ if ($defaulters) {
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
                         </a>
+                        <a href="account_close.php" class="module-nav-btn">
+                            <i class="fas fa-lock"></i> Close Account
+                        </a>
                     </div>
                 </div>
 

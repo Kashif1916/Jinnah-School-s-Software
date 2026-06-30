@@ -80,6 +80,40 @@ function require_login() {
         header('Location: ' . BASE_URL . 'login.php');
         exit();
     }
+
+    // Check if the logged-in user is frozen in DB
+    global $conn;
+    if (isset($conn) && isset($_SESSION['user_id'])) {
+        $user_id = intval($_SESSION['user_id']);
+        $query = "SELECT is_frozen, frozen_until FROM users WHERE id = ?";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param('i', $user_id);
+        $stmt->execute();
+        $user = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        
+        if ($user) {
+            $is_frozen = intval($user['is_frozen'] ?? 0);
+            $frozen_until = $user['frozen_until'] ?? null;
+            
+            if ($is_frozen === 1) {
+                // Check if current time is >= frozen_until
+                if (!empty($frozen_until) && strtotime('now') >= strtotime($frozen_until)) {
+                    // Automatically unfreeze!
+                    $unfreeze_query = "UPDATE users SET is_frozen = 0, frozen_until = NULL WHERE id = ?";
+                    $u_stmt = $conn->prepare($unfreeze_query);
+                    $u_stmt->bind_param('i', $user_id);
+                    $u_stmt->execute();
+                    $u_stmt->close();
+                } else {
+                    // Still frozen! Terminate session and redirect
+                    session_destroy();
+                    header('Location: ' . BASE_URL . 'login.php?error=closed');
+                    exit();
+                }
+            }
+        }
+    }
 }
 
 /**

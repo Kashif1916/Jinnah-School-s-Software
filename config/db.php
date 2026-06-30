@@ -75,6 +75,16 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
+
+    // Dynamically ensure is_frozen and frozen_until columns exist in users table
+    $colCheckFrozen = $conn->query("SHOW COLUMNS FROM `users` LIKE 'is_frozen'");
+    if ($colCheckFrozen && $colCheckFrozen->num_rows == 0) {
+        $conn->query("ALTER TABLE `users` ADD COLUMN `is_frozen` TINYINT DEFAULT 0");
+    }
+    $colCheckFrozenUntil = $conn->query("SHOW COLUMNS FROM `users` LIKE 'frozen_until'");
+    if ($colCheckFrozenUntil && $colCheckFrozenUntil->num_rows == 0) {
+        $conn->query("ALTER TABLE `users` ADD COLUMN `frozen_until` DATETIME DEFAULT NULL");
+    }
 }
 
 /**

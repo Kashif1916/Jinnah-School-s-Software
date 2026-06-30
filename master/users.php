@@ -104,6 +104,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
+// Handle Freeze/Unfreeze Toggle Action
+if (isset($_GET['toggle_freeze'])) {
+    $toggle_id = intval($_GET['toggle_freeze']);
+    $current_user_id = get_user_id();
+    
+    if ($toggle_id === $current_user_id) {
+        $error = "You cannot freeze your own account!";
+    } else {
+        // Get current frozen status
+        $stmt = $conn->prepare("SELECT is_frozen, username FROM users WHERE id = ?");
+        $stmt->bind_param("i", $toggle_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        
+        if ($res->num_rows > 0) {
+            $user_row = $res->fetch_assoc();
+            $new_frozen_status = intval($user_row['is_frozen']) === 1 ? 0 : 1;
+            $new_frozen_until = $new_frozen_status === 1 ? date('Y-m-d 00:00:00', strtotime('tomorrow')) : null;
+            
+            $update_stmt = $conn->prepare("UPDATE users SET is_frozen = ?, frozen_until = ? WHERE id = ?");
+            $update_stmt->bind_param("isi", $new_frozen_status, $new_frozen_until, $toggle_id);
+            if ($update_stmt->execute()) {
+                $status_txt = $new_frozen_status === 1 ? 'frozen' : 'unfrozen';
+                $success = "User '" . htmlspecialchars($user_row['username']) . "' has been " . $status_txt . " successfully!";
+            } else {
+                $error = "Error updating user freeze status: " . $conn->error;
+            }
+            $update_stmt->close();
+        } else {
+            $error = "User not found!";
+        }
+        $stmt->close();
+    }
+}
+
 // Fetch user if editing
 $edit_user = null;
 if (isset($_GET['edit'])) {
@@ -119,7 +154,7 @@ if (isset($_GET['edit'])) {
 }
 
 // Fetch all users for listing
-$users_result = $conn->query("SELECT id, username, password, role, created_at FROM users ORDER BY id ASC");
+$users_result = $conn->query("SELECT id, username, password, role, is_frozen, frozen_until, created_at FROM users ORDER BY id ASC");
 $users = [];
 if ($users_result) {
     while ($row = $users_result->fetch_assoc()) {
@@ -226,6 +261,7 @@ if ($users_result) {
                                             <th>Username</th>
                                             <th>Role</th>
                                             <th>Password (Plain)</th>
+                                            <th>Status</th>
                                             <th>Created At</th>
                                             <th class="text-end">Actions</th>
                                         </tr>
@@ -253,20 +289,45 @@ if ($users_result) {
                                                     <td>
                                                         <code><?php echo htmlspecialchars($u['password']); ?></code>
                                                     </td>
+                                                    <td>
+                                                        <?php 
+                                                        $is_f = intval($u['is_frozen'] ?? 0);
+                                                        $f_until = $u['frozen_until'] ?? null;
+                                                        if ($is_f === 1 && !empty($f_until) && strtotime('now') >= strtotime($f_until)) {
+                                                            $is_f = 0; // Display active
+                                                        }
+                                                        
+                                                        if ($is_f === 1): 
+                                                        ?>
+                                                            <span class="badge bg-danger" style="font-size: 0.8rem;" title="Frozen until: <?php echo $f_until; ?>"><i class="fas fa-lock"></i> Frozen</span>
+                                                        <?php else: ?>
+                                                            <span class="badge bg-success" style="font-size: 0.8rem;"><i class="fas fa-check-circle"></i> Active</span>
+                                                        <?php endif; ?>
+                                                    </td>
                                                     <td class="text-muted small">
                                                         <?php echo date('d-M-Y h:i A', strtotime($u['created_at'])); ?>
                                                     </td>
                                                     <td class="text-end">
+                                                        <?php if ($u['id'] != get_user_id()): ?>
+                                                            <?php if ($is_f === 1): ?>
+                                                                <a href="users.php?toggle_freeze=<?php echo $u['id']; ?>" class="btn btn-sm btn-outline-success me-1" style="padding: 4px 10px; font-size: 0.85rem;" title="Unfreeze Account">
+                                                                    <i class="fas fa-unlock"></i> Unfreeze
+                                                                </a>
+                                                            <?php else: ?>
+                                                                <a href="users.php?toggle_freeze=<?php echo $u['id']; ?>" class="btn btn-sm btn-outline-warning me-1" style="padding: 4px 10px; font-size: 0.85rem;" title="Freeze Account">
+                                                                    <i class="fas fa-ban"></i> Freeze
+                                                                </a>
+                                                            <?php endif; ?>
+                                                        <?php endif; ?>
                                                         <a href="users.php?edit=<?php echo $u['id']; ?>" class="btn-action" style="text-decoration: none; padding: 4px 10px; font-size: 0.85rem; border-radius: 4px; display: inline-block; margin-right: 5px;">
                                                             <i class="fas fa-edit"></i> Edit
                                                         </a>
-                                                       
                                                     </td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         <?php else: ?>
                                             <tr>
-                                                <td colspan="6" class="text-center text-muted">No users found.</td>
+                                                <td colspan="7" class="text-center text-muted">No users found.</td>
                                             </tr>
                                         <?php endif; ?>
                                     </tbody>

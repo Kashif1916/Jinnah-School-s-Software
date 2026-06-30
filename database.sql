@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS `users` (
   `username` VARCHAR(50) UNIQUE NOT NULL,
   `password` VARCHAR(255) NOT NULL,
   `role` ENUM('master', 'finance', 'admission') NOT NULL,
+  `is_frozen` TINYINT DEFAULT 0,
+  `frozen_until` DATETIME DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
