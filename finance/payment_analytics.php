@@ -167,7 +167,7 @@ $cash_remaining = $total_cash - $total_expenses;
             gap: 8px;
         }
 
-        /* NEW NEW DENOMINATION AUDIT BLOCK STYLING */
+        /* LIVE AUDIT DENOMINATION CARD STYLING */
         .denomination-card {
             background: #ffffff;
             border: 1px solid rgba(0,0,0,0.1);
@@ -191,21 +191,21 @@ $cash_remaining = $total_cash - $total_expenses;
             font-size: 0.95rem;
         }
         .denom-label {
-            width: 70px;
+            width: 60px;
             font-weight: 600;
             color: #333;
         }
         .denom-multiply {
-            width: 25px;
-            color: #777;
+            width: 30px;
+            color: #888;
             text-align: center;
         }
         .denom-input-col {
-            width: 90px;
+            width: 80px;
         }
         .denom-input {
             width: 100%;
-            padding: 3px 8px;
+            padding: 3px 6px;
             border: 1px solid #ccc;
             border-radius: 4px;
             text-align: center;
@@ -218,13 +218,13 @@ $cash_remaining = $total_cash - $total_expenses;
         .denom-equal {
             width: 30px;
             text-align: center;
-            color: #555;
+            color: #888;
         }
         .denom-total-output {
             flex-grow: 1;
             text-align: right;
             font-weight: 600;
-            color: #444;
+            color: #333;
         }
         .denom-grand-total-row {
             display: flex;
@@ -238,25 +238,26 @@ $cash_remaining = $total_cash - $total_expenses;
             color: #1f5f46;
         }
 
-        /* Print elements layout preset */
         .print-only-header {
             display: none;
         }
 
-        /* PREMIUM PRINT STYLING */
+        /* -------------------------------------------------------------
+           OPTIMIZED HIGH-QUALITY PRINT STYLING
+           ------------------------------------------------------------- */
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 0.2cm 0.3cm !important; /* Extremely small margins to save left/right space */
+                margin: 0cm !important; /* Maximizes printing canvas, zero margin waste */
             }
 
             body {
                 background: #ffffff !important;
                 color: #000000 !important;
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-                font-size: 9px !important;
+                font-size: 11.5px !important; /* Fixed print text size */
                 margin: 0 !important;
-                padding: 5px !important;
+                padding: 15px 20px !important; /* Safe padding away from extreme edges */
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
@@ -269,18 +270,18 @@ $cash_remaining = $total_cash - $total_expenses;
                 display: block !important;
                 border-bottom: 2px solid var(--primary-color) !important;
                 padding-bottom: 5px !important;
-                margin-bottom: 10px !important;
+                margin-bottom: 12px !important;
             }
 
             .print-only-header h1 {
-                font-size: 16px !important;
+                font-size: 18px !important;
                 color: var(--primary-color) !important;
                 font-weight: 700 !important;
                 margin: 0 0 2px 0 !important;
             }
 
             .print-only-header h3 {
-                font-size: 10px !important;
+                font-size: 12px !important;
                 color: #444 !important;
                 margin: 0 0 5px 0 !important;
             }
@@ -288,7 +289,7 @@ $cash_remaining = $total_cash - $total_expenses;
             .print-meta-grid {
                 display: flex !important;
                 justify-content: space-between !important;
-                font-size: 9px !important;
+                font-size: 11px !important;
                 color: #333 !important;
                 margin-bottom: 5px !important;
             }
@@ -298,20 +299,22 @@ $cash_remaining = $total_cash - $total_expenses;
                 flex-direction: row !important;
                 flex-wrap: nowrap !important;
                 align-items: flex-start !important; 
-                gap: 10px !important;
+                gap: 0px !important; /* ELIMINATED GAP BETWEEN COLUMNS COMPLETELY */
                 width: 100% !important;
             }
 
             .col-lg-7 {
-                width: 60% !important;
-                flex: 0 0 60% !important;
-                max-width: 60% !important;
+                width: 59% !important;
+                flex: 0 0 59% !important;
+                max-width: 59% !important;
+                padding-right: 10px !important;
             }
 
             .col-lg-5 {
-                width: 38% !important;
-                flex: 0 0 38% !important;
-                max-width: 38% !important;
+                width: 41% !important;
+                flex: 0 0 41% !important;
+                max-width: 41% !important;
+                padding-left: 0px !important;
             }
 
             .table-responsive {
@@ -320,12 +323,12 @@ $cash_remaining = $total_cash - $total_expenses;
 
             table {
                 width: 100% !important;
-                margin-bottom: 10px !important;
-                font-size: 8.5px !important;
+                margin-bottom: 12px !important;
+                font-size: 10.5px !important;
             }
 
             table th, table td {
-                padding: 3px 4px !important;
+                padding: 4px 5px !important;
             }
 
             .stat-card, .reconciliation-math-card, .net-cash-large-box, .badge, .denomination-card {
@@ -333,56 +336,84 @@ $cash_remaining = $total_cash - $total_expenses;
                 border: 1px solid rgba(0,0,0,0.15) !important;
             }
 
-            /* FIX FOR CASH DRAWER RECONCILIATION BLOCK IN PRINT */
+            /* CASH DRAWER RECONCILIATION BLOCK PRINT CORRECTION */
             .reconciliation-math-card {
                 border-left: 4px solid var(--primary-color) !important;
-                padding: 10px !important; /* Reduced padding */
-                margin-bottom: 10px !important;
+                padding: 12px !important; 
+                margin-bottom: 12px !important;
             }
             .reconciliation-math-card h5 {
-                font-size: 11px !important;
+                font-size: 12px !important;
                 margin-bottom: 8px !important;
                 padding-bottom: 4px !important;
             }
             .math-line {
-                padding: 4px 0 !important; /* Compact line spacing to prevent stretching */
-                font-size: 9px !important;
+                padding: 5px 0 !important;
+                font-size: 11px !important;
             }
             .net-cash-large-box {
-                padding: 6px 12px !important;
+                padding: 8px 15px !important;
             }
             .net-cash-large-box h2 {
-                font-size: 1.3px !important; /* Adaptive smaller text to fit beautifully */
-                font-size: 14px !important;
+                font-size: 16px !important;
             }
             .net-cash-large-box span {
-                font-size: 7.5px !important;
+                font-size: 8.5px !important;
             }
 
-            /* DENOMINATION CARD PRINT STYLING */
+            /* AUDIT LOG SINGLE LINE ALIGNMENT FIX */
             .denomination-card {
-                padding: 10px !important;
-                margin-top: 5px !important;
+                padding: 15px !important;
+                margin-top: 10px !important;
             }
             .denomination-heading {
-                font-size: 11px !important;
-                margin-bottom: 8px !important;
+                font-size: 12px !important;
+                margin-bottom: 10px !important;
                 padding-bottom: 4px !important;
             }
             .denom-row {
-                margin-bottom: 4px !important;
-                font-size: 9px !important;
+                margin-bottom: 6px !important;
+                font-size: 11px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+            }
+            .denom-label {
+                width: 50px !important;
+                display: inline-block !important;
+            }
+            .denom-multiply {
+                width: 25px !important;
+                display: inline-block !important;
+                text-align: center !important;
+            }
+            .denom-input-col {
+                width: 60px !important;
+                display: inline-block !important;
+                text-align: center !important;
             }
             .denom-input {
                 border: none !important;
                 background: transparent !important;
                 padding: 0 !important;
-                font-size: 9px !important;
+                width: 100% !important;
+                text-align: center !important;
+                font-size: 11px !important;
+            }
+            .denom-equal {
+                width: 25px !important;
+                display: inline-block !important;
+                text-align: center !important;
+            }
+            .denom-total-output {
+                text-align: right !important;
+                flex-grow: 1 !important;
+                display: inline-block !important;
             }
             .denom-grand-total-row {
-                margin-top: 8px !important;
-                padding-top: 6px !important;
-                font-size: 11px !important;
+                margin-top: 10px !important;
+                padding-top: 8px !important;
+                font-size: 12px !important;
             }
 
             tr, .stat-card, .reconciliation-math-card, .denomination-card {
@@ -637,7 +668,7 @@ $cash_remaining = $total_cash - $total_expenses;
                     <div class="col-lg-5">
                         <div class="reconciliation-math-card">
                             <h5 class="border-bottom pb-2 mb-3">
-                                <i class="fas fa-wallet me-2"></i>
+                                <i class="fas fa-calculator me-2"></i>
                                 Cash Drawer Reconciliation
                             </h5>
                             
@@ -761,7 +792,6 @@ $cash_remaining = $total_cash - $total_expenses;
                                 <span id="denom-grand-total">0.00</span>
                             </div>
                         </div>
-
                     </div>
                 </div> </div>
         </main>
@@ -776,10 +806,10 @@ $cash_remaining = $total_cash - $total_expenses;
             const count = parseInt(inputElement.value) || 0;
             const lineTotal = noteValue * count;
             
-            // Update individual note type total row
+            // Update individual note total
             document.getElementById('total-' + noteValue).innerText = lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             
-            // Calculate Grand Total of all notes
+            // Calculate Grand Total
             let grandTotal = 0;
             const allInputs = document.querySelectorAll('.denom-input');
             allInputs.forEach(input => {
