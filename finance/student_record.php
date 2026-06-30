@@ -66,7 +66,7 @@ $stmt->close();
                     <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
                     <div class="panel-brand">
                         <h2>Student Records</h2>
-                        <span>Finance Panel</span>
+                        <span>Finance / Clerk Panel</span>
                     </div>
                 </div>
                 <div class="topbar-right">

@@ -1,6 +1,6 @@
 <?php
 /**
- * Expenses Management - Finance Module
+ * Expenses Management - Master Panel
  * School Finance Management System
  */
 
@@ -9,7 +9,7 @@ require_once '../config/db.php';
 require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
-require_finance();
+require_master();
 
 $success = '';
 $error = '';
@@ -38,15 +38,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Fetch expenses for logged in user with optional date range filter
+// Fetch all expenses with optional date range filter
 $expenses = [];
-$my_user_id = get_user_id();
 $start_date = sanitize_input($_GET['start_date'] ?? '');
 $end_date = sanitize_input($_GET['end_date'] ?? '');
 
-$query = "SELECT * FROM expenses WHERE user_id = ?";
-$params = [$my_user_id];
-$param_types = "i";
+$query = "SELECT * FROM expenses WHERE 1=1";
+$params = [];
+$param_types = "";
 
 if (!empty($start_date)) {
     $query .= " AND DATE(created_at) >= ?";
@@ -90,7 +89,7 @@ $stmt->close();
                     <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
                     <div class="panel-brand">
                         <h2>Expenses</h2>
-                        <span>Finance / Clerk Panel</span>
+                        <span>Principal Panel</span>
                     </div>
                 </div>
                 <div class="topbar-right">
@@ -109,14 +108,17 @@ $stmt->close();
                         <a href="dashboard.php" class="module-nav-btn">
                             <i class="fas fa-chart-bar"></i> Dashboard
                         </a>
-                        <a href="add_student.php" class="module-nav-btn ">
-                            <i class="fas fa-list"></i> Add Student
+                        <a href="add_student.php" class="module-nav-btn">
+                            <i class="fas fa-user-plus"></i> Add Student
                         </a>
                         <a href="student_record.php" class="module-nav-btn">
                             <i class="fas fa-address-book"></i> Student Record
                         </a>
-                        <a href="fee_payment.php" class="module-nav-btn">
-                            <i class="fas fa-money-bill-wave"></i> Fee Payment
+                        <a href="fee_schedule.php" class="module-nav-btn">
+                            <i class="fas fa-calendar-alt"></i> Fee Schedule
+                        </a>
+                        <a href="fee_management.php" class="module-nav-btn">
+                            <i class="fas fa-money-bill-wave"></i> Fee Management
                         </a>
                         <a href="defaulter_list.php" class="module-nav-btn">
                             <i class="fas fa-list"></i> Pending List
@@ -126,6 +128,15 @@ $stmt->close();
                         </a>
                         <a href="expenses.php" class="module-nav-btn active">
                             <i class="fas fa-wallet"></i> Expenses
+                        </a>
+                        <a href="promotion.php" class="module-nav-btn">
+                            <i class="fas fa-arrow-up"></i> Promotion
+                        </a>
+                        <a href="drop_student.php" class="module-nav-btn">
+                            <i class="fas fa-trash"></i> Drop Student
+                        </a>
+                        <a href="users.php" class="module-nav-btn">
+                            <i class="fas fa-users-cog"></i> Users
                         </a>
                     </div>
                 </div>
@@ -175,7 +186,7 @@ $stmt->close();
                     <!-- List Section -->
                     <div class="col-lg-8">
                         <div class="analytics-section">
-                            <h4>Recent Expenses Record</h4>
+                            <h4>Recent Expenses Record (All Users)</h4>
                             
                             <!-- Search Form -->
                             <form method="GET" class="row g-2 mb-3 align-items-end mt-2">
@@ -198,7 +209,7 @@ $stmt->close();
                                     <?php endif; ?>
                                 </div>
                             </form>
-                            
+
                             <div class="table-responsive mt-3">
                                 <?php if (count($expenses) > 0): ?>
                                     <table class="table table-hover align-middle">

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS `students` (
   `concession_amount` DECIMAL(10,2) DEFAULT 0,
   `concession_reason` VARCHAR(255),
   `status` ENUM('active', 'dropped') DEFAULT 'active',
+  `drop_reason` VARCHAR(255) DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -67,6 +68,15 @@ CREATE TABLE IF NOT EXISTS `expenses` (
   `username` VARCHAR(50) NOT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Table 6: Fee Schedule
+CREATE TABLE IF NOT EXISTS `fee_schedule` (
+  `id` INT PRIMARY KEY AUTO_INCREMENT,
+  `class` VARCHAR(50) UNIQUE NOT NULL,
+  `fixed_monthly_fee` DECIMAL(10, 2) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

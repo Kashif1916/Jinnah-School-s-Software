@@ -151,12 +151,14 @@ if ($defaulters) {
                                     <div class="months-checkbox-container">
                                         <?php
                                         // Current month se pichle 11 mahine loop me generate karne ka dynamic logic
-                                        for ($i = 0; $i < 12; $i++) {
-                                            $date = new DateTime("-$i months");
-                                            
-                                            $month_name = $date->format('M'); // E.g., 'Jan'
-                                            $year_val   = $date->format('Y'); // E.g., '2026'
-                                            $month_str  = $month_name . '-' . $year_val;
+                                         $start_date = new DateTime('first day of this month');
+                                         for ($i = 0; $i < 12; $i++) {
+                                             $date = clone $start_date;
+                                             $date->modify("-$i month");
+                                             
+                                             $month_name = $date->format('M'); // E.g., 'Jan'
+                                             $year_val   = $date->format('Y'); // E.g., '2026'
+                                             $month_str  = $month_name . '-' . $year_val;
 
                                             $checked = (in_array($month_str, (array)$months_filter)) ? 'checked' : '';
                                             ?>

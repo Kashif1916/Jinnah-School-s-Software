@@ -138,8 +138,32 @@ if (isset($_GET['id'])) {
         $stmt = $conn->prepare($query);
         $stmt->bind_param('i', $student_id);
         $stmt->execute();
-        $student_fees = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $all_fees = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
+
+        // Filter: Show all unpaid, and only the latest 2 paid months to keep the page short
+        $paid_fees = [];
+        $unpaid_fees = [];
+        foreach ($all_fees as $fee) {
+            if ($fee['status'] === 'paid') {
+                $paid_fees[] = $fee;
+            } else {
+                $unpaid_fees[] = $fee;
+            }
+        }
+        
+        // Take only the last 2 paid records
+        if (count($paid_fees) > 2) {
+            $paid_fees = array_slice($paid_fees, -2);
+        }
+        
+        // Merge and sort chronologically
+        $student_fees = array_merge($paid_fees, $unpaid_fees);
+        usort($student_fees, function($a, $b) {
+            $t1 = strtotime("01-" . $a['month']);
+            $t2 = strtotime("01-" . $b['month']);
+            return $t1 - $t2;
+        });
     }
 }
 ?>
@@ -187,6 +211,9 @@ if (isset($_GET['id'])) {
                             <a href="student_record.php" class="module-nav-btn">
                                 <i class="fas fa-address-book"></i> Student Record
                             </a>
+                            <a href="fee_schedule.php" class="module-nav-btn">
+                                <i class="fas fa-calendar-alt"></i> Fee Schedule
+                            </a>
                             <a href="fee_management.php" class="module-nav-btn active">
                                 <i class="fas fa-money-bill-wave"></i> Fee Management
                             </a>
@@ -195,6 +222,9 @@ if (isset($_GET['id'])) {
                             </a>
                             <a href="payment_analytics.php" class="module-nav-btn">
                                 <i class="fas fa-chart-line"></i> Analytics
+                            </a>
+                            <a href="expenses.php" class="module-nav-btn">
+                                <i class="fas fa-wallet"></i> Expenses
                             </a>
                             <a href="promotion.php" class="module-nav-btn">
                                 <i class="fas fa-arrow-up"></i> Promotion
@@ -545,11 +575,11 @@ if (isset($_GET['id'])) {
                     const remaining = maxVal - val;
                     if (remainingSpan) {
                         if (remaining > 0 && val > 0) {
-                            remainingSpan.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i> Rem: Rs. ' + remaining.toFixed(0);
+                            remainingSpan.innerHTML = '<i ></i> <span style="color: #f50f0f; font-size: 25px; font-weight: bold;">   Remaining: Rs. ' + remaining.toFixed(0) + '</span>';
                         } else if (remaining === 0) {
                             remainingSpan.textContent = '';
                         } else if (val === 0) {
-                            remainingSpan.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle"></i> Must be > 0</span>';
+                            remainingSpan.innerHTML = '<span style="color: #f50f0f; font-size: 25px; font-weight: bold;"> Must be > 0</span>';
                         }
                     }
                 });

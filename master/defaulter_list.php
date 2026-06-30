@@ -99,6 +99,9 @@ if ($defaulters) {
                         <a href="student_record.php" class="module-nav-btn">
                             <i class="fas fa-address-book"></i> Student Record
                         </a>
+                        <a href="fee_schedule.php" class="module-nav-btn">
+                            <i class="fas fa-calendar-alt"></i> Fee Schedule
+                        </a>
                         <a href="fee_management.php" class="module-nav-btn">
                             <i class="fas fa-money-bill-wave"></i> Fee Management
                         </a>
@@ -107,6 +110,9 @@ if ($defaulters) {
                         </a>
                         <a href="payment_analytics.php" class="module-nav-btn">
                             <i class="fas fa-chart-line"></i> Analytics
+                        </a>
+                        <a href="expenses.php" class="module-nav-btn">
+                            <i class="fas fa-wallet"></i> Expenses
                         </a>
                         <a href="promotion.php" class="module-nav-btn">
                             <i class="fas fa-arrow-up"></i> Promotion
@@ -150,14 +156,15 @@ if ($defaulters) {
                                     <div class="months-checkbox-container">
                                         <?php
                                         // Current month se shuru karke pichle 11 mahine (Total 12) generate karne ka naya logic
-                                        for ($i = 0; $i < 12; $i++) {
-                                            // Har loop me 1 mahina peeche le kar jayega
-                                            $date = new DateTime("-$i months");
-                                            
-                                            // Aapke system format ke mutabiq (e.g., 'Jan-2026') string banayega
-                                            $month_name = $date->format('M'); // 'Jan', 'Feb' etc.
-                                            $year_val   = $date->format('Y'); // '2026' etc.
-                                            $month_str  = $month_name . '-' . $year_val;
+                                         $start_date = new DateTime('first day of this month');
+                                         for ($i = 0; $i < 12; $i++) {
+                                             $date = clone $start_date;
+                                             $date->modify("-$i month");
+                                             
+                                             // Aapke system format ke mutabiq (e.g., 'Jan-2026') string banayega
+                                             $month_name = $date->format('M'); // 'Jan', 'Feb' etc.
+                                             $year_val   = $date->format('Y'); // '2026' etc.
+                                             $month_str  = $month_name . '-' . $year_val;
 
                                             $checked = (in_array($month_str, (array)$months_filter)) ? 'checked' : '';
                                             ?>

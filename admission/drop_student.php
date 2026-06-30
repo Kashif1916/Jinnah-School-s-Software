@@ -23,10 +23,11 @@ $search_section = sanitize_input($_GET['search_section'] ?? '');
 // Handle Drop Action (POST Method)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'drop') {
     $student_id = intval($_POST['student_id'] ?? 0);
+    $drop_reason = sanitize_input($_POST['drop_reason'] ?? '');
     
-    $query = "UPDATE students SET status = 'dropped' WHERE id = ?";
+    $query = "UPDATE students SET status = 'dropped', drop_reason = ? WHERE id = ?";
     $stmt = $conn->prepare($query);
-    $stmt->bind_param('i', $student_id);
+    $stmt->bind_param('si', $drop_reason, $student_id);
     
     if ($stmt->execute()) {
         $success = 'Student marked as dropped successfully!';
@@ -87,7 +88,7 @@ $stmt->close();
                     <?php echo render_system_logo('topbar-logo'); ?>
                     <div class="panel-brand">
                         <h2>Drop Student</h2>
-                        <span>Principal Panel</span>
+                        <span>Admission Panel</span>
                     </div>
                 </div>
                 <div class="topbar-right">
@@ -196,11 +197,11 @@ $stmt->close();
                                                 <span class="badge bg-success">Active</span>
                                             </td>
                                             <td>
-                                                <form method="POST" style="display:inline;">
+                                                <form method="POST" style="display:inline;" onsubmit="return handleDropSubmit(this, '<?php echo htmlspecialchars($res['name'], ENT_QUOTES); ?>')">
                                                     <input type="hidden" name="action" value="drop">
                                                     <input type="hidden" name="student_id" value="<?php echo $res['id']; ?>">
-                                                    <button type="submit" class="btn-danger-small" 
-                                                            onclick="return confirm('Are you sure you want to drop <?php echo $res['name']; ?>?\n\nThis action will mark the student as dropped.')">
+                                                    <input type="hidden" name="drop_reason" class="drop-reason-input" value="">
+                                                    <button type="submit" class="btn-danger-small">
                                                         <i class="fas fa-trash"></i> Drop
                                                     </button>
                                                 </form>
@@ -230,6 +231,7 @@ $stmt->close();
                                         <th>Class</th>
                                         <th>Section</th>
                                         <th>Dropped Date</th>
+                                        <th>Reason</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -239,6 +241,7 @@ $stmt->close();
                                             <td><?php echo $dropped['class']; ?></td>
                                             <td><?php echo $dropped['section']; ?></td>
                                             <td><?php echo format_datetime($dropped['updated_at']); ?></td>
+                                            <td><?php echo htmlspecialchars($dropped['drop_reason'] ?? ''); ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -275,5 +278,19 @@ $stmt->close();
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/script.js"></script>
+    <script>
+        function handleDropSubmit(form, studentName) {
+            const reason = prompt("Are you sure you want to drop " + studentName + "?\nPlease enter the reason for dropping this student:");
+            if (reason === null) {
+                return false; // User cancelled
+            }
+            if (reason.trim() === '') {
+                alert("Drop reason is required!");
+                return false;
+            }
+            form.querySelector('.drop-reason-input').value = reason.trim();
+            return true;
+        }
+    </script>
 </body>
 </html>

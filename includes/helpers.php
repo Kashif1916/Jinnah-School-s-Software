@@ -85,8 +85,9 @@ function create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount 
     $monthly_fee = floatval($fixed_monthly_fee) - floatval($concession_amount);
     if ($monthly_fee < 0) $monthly_fee = 0;
 
+    $start_date = strtotime(date('Y-m-01'));
     for ($i = 0; $i < 12; $i++) {
-        $month = date('M-Y', strtotime("+$i months"));
+        $month = date('M-Y', strtotime("+$i months", $start_date));
         $query = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')";
         $stmt = $conn->prepare($query);
         $stmt->bind_param('isd', $student_id, $month, $monthly_fee);
@@ -118,7 +119,7 @@ function auto_generate_fee_buffer($student_id, $monthly_fee) {
         $last_month_row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
-        $start_date = $last_month_row ? strtotime("01-" . $last_month_row['month']) : time();
+        $start_date = $last_month_row ? strtotime("01-" . $last_month_row['month']) : strtotime(date('Y-m-01'));
         
         for ($i = 1; $i <= 5; $i++) {
             $next_month = date('M-Y', strtotime("+$i month", $start_date));
@@ -178,6 +179,15 @@ function get_total_paid_fees($student_id) {
  */
 function get_defaulters($class = '', $section = '', $months = []) {
     global $conn;
+    
+    // If no months are specified, default to previous 12 months (inclusive of current month)
+    if (empty($months)) {
+        $months = [];
+        $start_date = strtotime(date('Y-m-01'));
+        for ($i = 0; $i < 12; $i++) {
+            $months[] = date('M-Y', strtotime("-$i months", $start_date));
+        }
+    }
     
     $query = "SELECT s.id, s.name, s.father_name, s.class, s.section, s.fixed_monthly_fee, s.monthly_fee, 
                      s.contact_number, s.contact_number2, s.whatsapp_number,

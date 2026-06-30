@@ -18,6 +18,15 @@ if (!is_master() && !is_admission()) {
 $error = '';
 $success = '';
 
+// Fetch class fee schedule
+$class_fees = [];
+$fee_res = $conn->query("SELECT class, fixed_monthly_fee FROM fee_schedule");
+if ($fee_res) {
+    while ($row = $fee_res->fetch_assoc()) {
+        $class_fees[$row['class']] = floatval($row['fixed_monthly_fee']);
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $name = sanitize_input($_POST['name'] ?? '');
     $father_name = sanitize_input($_POST['father_name'] ?? '');
@@ -157,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="fixed_monthly_fee">Fixed Monthly Fee *</label>
-                                <input type="number" id="fixed_monthly_fee" name="fixed_monthly_fee" class="form-control" required step="0.01" min="0">
+                                <input type="number" id="fixed_monthly_fee" name="fixed_monthly_fee" class="form-control" required step="0.01" min="0" readonly>
                             </div>
                         </div>
                         <div class="row mb-3">
@@ -209,6 +218,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/script.js"></script>
     <script>
+        const classFees = <?php echo json_encode($class_fees); ?>;
+        document.getElementById('class').addEventListener('change', function() {
+            const selectedClass = this.value;
+            const feeInput = document.getElementById('fixed_monthly_fee');
+            if (classFees[selectedClass] !== undefined) {
+                feeInput.value = classFees[selectedClass];
+            } else {
+                feeInput.value = '';
+            }
+        });
+
         document.getElementById('addStudentForm').addEventListener('submit', function(e) {
             const name = document.getElementById('name').value.trim();
             const fatherName = document.getElementById('father_name').value.trim();

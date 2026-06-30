@@ -22,6 +22,15 @@ $to_section_selected = '';
 $show_student_list = false;
 $students_to_promote = [];
 
+// --- CHANGE 1: Fetch class fee schedule from database ---
+$class_fees = [];
+$fee_res = $conn->query("SELECT class, fixed_monthly_fee FROM fee_schedule");
+if ($fee_res) {
+    while ($row = $fee_res->fetch_assoc()) {
+        $class_fees[$row['class']] = floatval($row['fixed_monthly_fee']);
+    }
+}
+
 // फर्ज करें $CLASSES aur $SECTIONS arrays config.php mai hain, agar nahi hain to hum default set kar dete hain
 if (!isset($CLASSES)) { $CLASSES = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']; }
 if (!isset($SECTIONS)) { $SECTIONS = ['A', 'B', 'C', 'D']; }
@@ -35,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $from_section_selected = sanitize_input($_POST['from_section'] ?? '');
 
         if (!empty($from_class_selected) && !empty($from_section_selected)) {
-            $query = "SELECT id, name, father_name, monthly_fee FROM students WHERE class = ? AND section = ? AND status = 'active'";
+            $query = "SELECT id, name, father_name, fixed_monthly_fee FROM students WHERE class = ? AND section = ? AND status = 'active'";
             $stmt = $conn->prepare($query);
             $stmt->bind_param('ss', $from_class_selected, $from_section_selected);
             $stmt->execute();
@@ -59,10 +68,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         $to_class = sanitize_input($_POST['to_class'] ?? '');
         $to_section = sanitize_input($_POST['to_section'] ?? '');
-        $new_fee = sanitize_input($_POST['new_fixed_monthly_fee'] ?? '');
+        $new_fee = floatval($_POST['new_fixed_monthly_fee'] ?? 0);
         $student_ids = $_POST['student_ids'] ?? [];
 
-        if (!empty($to_class) && !empty($to_section) && $new_fee !== '' && !empty($student_ids)) {
+        if (!empty($to_class) && !empty($to_section) && $new_fee > 0 && !empty($student_ids)) {
             $conn->begin_transaction(); // Transaction start taake data secure rahe
             try {
                 $promoted_count = 0;
@@ -77,6 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $stmt->execute();
                     if ($stmt->affected_rows > 0) {
                         $promoted_count++;
+                        // Sync upcoming unpaid fees to the new class fee structure
+                        sync_unpaid_fee_amounts($student_id, $new_fee);
                     }
                 }
                 $stmt->close();
@@ -118,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <?php echo render_system_logo('topbar-logo'); ?>
                     <div class="panel-brand">
                         <h2>Student Promotion</h2>
-                        <span>Principal Panel</span>
+                        <span>Admission Panel</span>
                     </div>
                 </div>
                 <div class="topbar-right">
@@ -227,8 +238,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         </select>
                                     </div>
                                     <div class="col-md-4">
-                                        <label for="new_fixed_monthly_fee" class="form-label">New Fixed Monthly Fee </label>
-                                        <input type="number" id="new_fixed_monthly_fee" name="new_fixed_monthly_fee" class="form-control" step="0.01" min="0" >
+                                        <label for="new_fixed_monthly_fee" class="form-label">New Fixed Monthly Fee *</label>
+                                        <input type="number" id="new_fixed_monthly_fee" name="new_fixed_monthly_fee" class="form-control" step="0.01" min="0" required readonly>
                                     </div>
                                 </div>
 
@@ -239,7 +250,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                             <tr>
                                                 <th style="width: 50px;">
                                                     <input type="checkbox" id="selectAllStudents" class="form-check-input" checked>
-                                                </th>
+                                                </td>
                                                 <th>ID</th>
                                                 <th>Name</th>
                                                 <th>Father Name</th>
@@ -255,7 +266,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                                     <td><?php echo $student['id']; ?></td>
                                                     <td><?php echo $student['name']; ?></td>
                                                     <td><?php echo $student['father_name']; ?></td>
-                                                    <td><?php echo format_currency($student['monthly_fee']); ?></td>
+                                                    <td><?php echo format_currency($student['fixed_monthly_fee']); ?></td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
@@ -342,15 +353,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </style>
     
     <script>
+        // --- CHANGE 3: Injecting PHP array into JavaScript Object & Event Listener ---
+        const classFees = <?php echo json_encode($class_fees); ?>;
+
         document.addEventListener('DOMContentLoaded', function() {
             const selectAllCheckbox = document.getElementById('selectAllStudents');
             const studentCheckboxes = document.querySelectorAll('.student-checkbox');
+            const toClassSelect = document.getElementById('to_class');
+            const newFeeInput = document.getElementById('new_fixed_monthly_fee');
 
             if (selectAllCheckbox) {
                 selectAllCheckbox.addEventListener('change', function() {
                     studentCheckboxes.forEach(checkbox => {
                         checkbox.checked = this.checked;
                     });
+                });
+            }
+
+            // Target Class change event listener
+            if (toClassSelect && newFeeInput) {
+                toClassSelect.addEventListener('change', function() {
+                    const selectedClass = this.value;
+                    if (selectedClass && classFees[selectedClass] !== undefined) {
+                        newFeeInput.value = classFees[selectedClass];
+                    } else {
+                        newFeeInput.value = '';
+                    }
                 });
             }
         });
