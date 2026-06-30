@@ -11,9 +11,9 @@ require_once '../includes/helpers.php';
 
 require_finance();
 
-// Get date filters. Default to today's date if not set.
-$start_date = isset($_GET['start_date']) && !empty($_GET['start_date']) ? sanitize_input($_GET['start_date']) : date('Y-m-d');
-$end_date = isset($_GET['end_date']) && !empty($_GET['end_date']) ? sanitize_input($_GET['end_date']) : $start_date;
+// Get date and time filters. Default to today's start and end if not set.
+$start_date = isset($_GET['start_date']) && !empty($_GET['start_date']) ? sanitize_input($_GET['start_date']) : date('Y-m-d\T00:00');
+$end_date = isset($_GET['end_date']) && !empty($_GET['end_date']) ? sanitize_input($_GET['end_date']) : date('Y-m-d\T23:59');
 
 // Ensure start_date is not after end_date
 if (strtotime($start_date) > strtotime($end_date)) {
@@ -25,10 +25,10 @@ if (strtotime($start_date) > strtotime($end_date)) {
 $username = get_username();
 $user_id = get_user_id();
 
-// Fetch payments received by this user in the date range
+// Fetch payments received by this user in the date range (Using full datetime comparison)
 $query_payments = "SELECT p.*, s.name, s.father_name, s.class, s.section FROM payments p 
                    JOIN students s ON p.student_id = s.id 
-                   WHERE p.received_by = ? AND DATE(p.payment_date) BETWEEN ? AND ? 
+                   WHERE p.received_by = ? AND p.payment_date BETWEEN ? AND ? 
                    ORDER BY p.payment_date ASC";
 $stmt = $conn->prepare($query_payments);
 $stmt->bind_param('sss', $username, $start_date, $end_date);
@@ -36,9 +36,9 @@ $stmt->execute();
 $payments = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// Fetch expenses logged by this user in the date range
+// Fetch expenses logged by this user in the date range (Using full datetime comparison)
 $query_expenses = "SELECT * FROM expenses 
-                   WHERE username = ? AND DATE(created_at) BETWEEN ? AND ? 
+                   WHERE username = ? AND created_at BETWEEN ? AND ? 
                    ORDER BY created_at ASC, id ASC";
 $stmt_exp = $conn->prepare($query_expenses);
 $stmt_exp->bind_param('sss', $username, $start_date, $end_date);
@@ -167,9 +167,7 @@ $cash_remaining = $total_cash - $total_expenses;
             gap: 8px;
         }
 
-        /* -------------------------------------------------------------
-           WORKING UI CALCULATOR STYLING (SCREEN ONLY)
-           ------------------------------------------------------------- */
+        /* WORKING UI CALCULATOR STYLING (SCREEN ONLY) */
         .clerk-calc-block {
             background: #22252a;
             border-radius: 12px;
@@ -231,9 +229,7 @@ $cash_remaining = $total_cash - $total_expenses;
             display: none;
         }
 
-        /* -------------------------------------------------------------
-           PREMIUM PRINT STYLING - KEEPS EXACT WEB LOOK & SIDE-BY-SIDE
-           ------------------------------------------------------------- */
+        /* PREMIUM PRINT STYLING */
         @media print {
             @page {
                 size: A4 portrait;
@@ -251,12 +247,10 @@ $cash_remaining = $total_cash - $total_expenses;
                 print-color-adjust: exact !important;
             }
 
-            /* Hide screen navigation, controls and stats cards in print */
             .topbar, .module-nav-panel, .no-print, button, form, .form-text, .alert-success, .stats-grid {
                 display: none !important;
             }
 
-            /* Show print header */
             .print-only-header {
                 display: block !important;
                 border-bottom: 2px solid var(--primary-color) !important;
@@ -285,12 +279,11 @@ $cash_remaining = $total_cash - $total_expenses;
                 margin-bottom: 10px !important;
             }
 
-            /* Side-by-Side exact web layout replication */
             .row {
                 display: flex !important;
                 flex-direction: row !important;
                 flex-wrap: nowrap !important;
-                align-items: flex-start !important; /* Prevents vertical stretching of columns */
+                align-items: flex-start !important; 
                 gap: 15px !important;
                 width: 100% !important;
             }
@@ -307,7 +300,6 @@ $cash_remaining = $total_cash - $total_expenses;
                 max-width: 40% !important;
             }
 
-            /* Force 3 stats cards to sit side-by-side in print */
             .stats-grid {
                 display: grid !important;
                 grid-template-columns: repeat(3, 1fr) !important;
@@ -315,7 +307,6 @@ $cash_remaining = $total_cash - $total_expenses;
                 margin-bottom: 20px !important;
             }
 
-            /* Keep standard sizing for print tables */
             .table-responsive {
                 overflow: visible !important;
             }
@@ -330,7 +321,6 @@ $cash_remaining = $total_cash - $total_expenses;
                 padding: 4px 6px !important;
             }
 
-            /* Force browser to print all colored gradients, shadows and borders */
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
@@ -345,7 +335,6 @@ $cash_remaining = $total_cash - $total_expenses;
                 border-left: 5px solid var(--primary-color) !important;
             }
 
-            /* Calculator audit log output wrapper */
             .print-calc-output-wrapper {
                 display: block !important;
                 margin-top: 15px !important;
@@ -361,7 +350,6 @@ $cash_remaining = $total_cash - $total_expenses;
 <body>
     <div class="wrapper feature-shell">
         <main class="main-content">
-            <!-- Screen Top Bar -->
             <div class="topbar no-print">
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
@@ -380,7 +368,6 @@ $cash_remaining = $total_cash - $total_expenses;
                 </div>
             </div>
 
-            <!-- Print Only Spreadsheet Header -->
             <div class="print-only-header">
                 <h1><?php echo SITE_NAME; ?></h1>
                 <h3>Clerk Cash Reconciliation & Reconciliation Statement</h3>
@@ -392,9 +379,9 @@ $cash_remaining = $total_cash - $total_expenses;
                         <strong>Reconciliation Period:</strong> 
                         <?php 
                         if ($start_date === $end_date) {
-                            echo date('d-m-Y', strtotime($start_date)) . ' (Single Day)';
+                            echo date('d-m-Y h:i A', strtotime($start_date)) . ' (Single Point)';
                         } else {
-                            echo date('d-m-Y', strtotime($start_date)) . ' to ' . date('d-m-Y', strtotime($end_date));
+                            echo date('d-m-Y h:i A', strtotime($start_date)) . ' to ' . date('d-m-Y h:i A', strtotime($end_date));
                         }
                         ?>
                     </div>
@@ -405,48 +392,28 @@ $cash_remaining = $total_cash - $total_expenses;
             </div>
 
             <div class="content">
-                <!-- Navigation Tab Bar -->
                 <div class="module-nav-panel no-print">
                     <div class="module-nav-row">
-                        <a href="dashboard.php" class="module-nav-btn">
-                            <i class="fas fa-chart-bar"></i> Dashboard
-                        </a>
-                        <a href="add_student.php" class="module-nav-btn ">
-                            <i class="fas fa-list"></i> Add Student
-                        </a>
-                        <a href="student_record.php" class="module-nav-btn">
-                            <i class="fas fa-address-book"></i> Student Record
-                        </a>
-                        <a href="fee_payment.php" class="module-nav-btn">
-                            <i class="fas fa-money-bill-wave"></i> Fee Payment
-                        </a>
-                        <a href="defaulter_list.php" class="module-nav-btn">
-                            <i class="fas fa-list"></i> Pending List
-                        </a>
-                        <a href="payment_analytics.php" class="module-nav-btn active">
-                            <i class="fas fa-chart-line"></i> Analytics
-                        </a>
-                        <a href="expenses.php" class="module-nav-btn">
-                            <i class="fas fa-wallet"></i> Expenses
-                        </a>
+                        <a href="dashboard.php" class="module-nav-btn"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                        <a href="add_student.php" class="module-nav-btn"><i class="fas fa-list"></i> Add Student</a>
+                        <a href="student_record.php" class="module-nav-btn"><i class="fas fa-address-book"></i> Student Record</a>
+                        <a href="fee_payment.php" class="module-nav-btn"><i class="fas fa-money-bill-wave"></i> Fee Payment</a>
+                        <a href="defaulter_list.php" class="module-nav-btn"><i class="fas fa-list"></i> Pending List</a>
+                        <a href="payment_analytics.php" class="module-nav-btn active"><i class="fas fa-chart-line"></i> Analytics</a>
+                        <a href="expenses.php" class="module-nav-btn"><i class="fas fa-wallet"></i> Expenses</a>
                     </div>
                 </div>
 
-                <!-- Active Date Heading Alert -->
                 <div class="alert alert-success d-flex align-items-center justify-content-between mb-4 no-print">
                     <div>
                         <i class="fas fa-calendar-day me-2"></i>
-                        Showing reconciliations for: 
+                        Showing reconciliations from: 
                         <strong>
                             <?php 
                             if ($start_date === $end_date) {
-                                if ($start_date === date('Y-m-d')) {
-                                    echo "Today (" . date('d-m-Y', strtotime($start_date)) . ")";
-                                } else {
-                                    echo date('d-m-Y', strtotime($start_date));
-                                }
+                                echo date('d-m-Y h:i A', strtotime($start_date));
                             } else {
-                                echo date('d-m-Y', strtotime($start_date)) . " to " . date('d-m-Y', strtotime($end_date));
+                                echo date('d-m-Y h:i A', strtotime($start_date)) . " to " . date('d-m-Y h:i A', strtotime($end_date));
                             }
                             ?>
                         </strong>
@@ -456,17 +423,15 @@ $cash_remaining = $total_cash - $total_expenses;
                     </span>
                 </div>
 
-                <!-- Date Filter Form (Screen Only) -->
                 <div class="search-section mb-4 no-print">
                     <form method="GET" class="row g-3 align-items-end">
                         <div class="col-md-4">
-                            <label class="form-label fw-bold text-dark">Starting Date</label>
-                            <input type="date" name="start_date" value="<?php echo $start_date; ?>" class="form-control" required>
+                            <label class="form-label fw-bold text-dark">Starting Date & Time</label>
+                            <input type="datetime-local" name="start_date" value="<?php echo date('Y-m-d\TH:i', strtotime($start_date)); ?>" class="form-control" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold text-dark">Ending Date (Optional)</label>
-                            <input type="date" name="end_date" value="<?php echo isset($_GET['end_date']) ? htmlspecialchars($_GET['end_date']) : ''; ?>" class="form-control" placeholder="Select end date...">
-                            <div class="form-text">Leave blank to view a single day's analytics.</div>
+                            <label class="form-label fw-bold text-dark">Ending Date & Time</label>
+                            <input type="datetime-local" name="end_date" value="<?php echo date('Y-m-d\TH:i', strtotime($end_date)); ?>" class="form-control" required>
                         </div>
                         <div class="col-md-4 d-flex gap-2">
                             <button type="submit" class="btn-primary flex-grow-1">
@@ -479,7 +444,6 @@ $cash_remaining = $total_cash - $total_expenses;
                     </form>
                 </div>
 
-                <!-- Reconciliation Summary Cards (Screen Only) -->
                 <div class="stats-grid mb-4 no-print">
                     <div class="stat-card">
                         <div class="stat-icon" style="background: #e3f1ea;">
@@ -511,9 +475,7 @@ $cash_remaining = $total_cash - $total_expenses;
                 </div>
 
                 <div class="row">
-                    <!-- Detailed Lists (Left Side in Print) -->
                     <div class="col-lg-7">
-                        <!-- Fee Payments Table -->
                         <div class="mb-4">
                             <h5 class="section-sub-title">
                                 <i class="fas fa-receipt"></i>
@@ -574,13 +536,12 @@ $cash_remaining = $total_cash - $total_expenses;
                                     </table>
                                 <?php else: ?>
                                     <div class="alert alert-info py-3 mb-0">
-                                        <i class="fas fa-info-circle me-2"></i> No fee payments found for this date.
+                                        <i class="fas fa-info-circle me-2"></i> No fee payments found for this criteria.
                                     </div>
                                 <?php endif; ?>
                             </div>
                         </div>
 
-                        <!-- Expenses Table -->
                         <div>
                             <h5 class="section-sub-title">
                                 <i class="fas fa-wallet"></i>
@@ -622,14 +583,13 @@ $cash_remaining = $total_cash - $total_expenses;
                                     </table>
                                 <?php else: ?>
                                     <div class="alert alert-info py-3 mb-0">
-                                        <i class="fas fa-info-circle me-2"></i> No expenses found for this date.
+                                        <i class="fas fa-info-circle me-2"></i> No expenses found for this criteria.
                                     </div>
                                 <?php endif; ?>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Reconciliation Calculations Card (Right Side in Print) -->
                     <div class="col-lg-5">
                         <div class="reconciliation-math-card">
                             <h5 class="border-bottom pb-2 mb-3">
@@ -667,7 +627,6 @@ $cash_remaining = $total_cash - $total_expenses;
                             </div>
                         </div>
 
-                        <!-- LIVE UI WORKING POCKET CALCULATOR -->
                         <div class="clerk-calc-block no-print">
                             <div class="calc-screen">
                                 <div id="calcHistory" class="calc-history"></div>
@@ -699,7 +658,6 @@ $cash_remaining = $total_cash - $total_expenses;
                             </div>
                         </div>
 
-                        <!-- PRINT LAYOUT AUTOMATIC CALCULATOR TAPE -->
                         <div class="print-calc-output-wrapper">
                             <div class="print-calc-heading">
                                 <i class="fas fa-calculator"></i> Clerk Calculator Audit Log
@@ -707,8 +665,7 @@ $cash_remaining = $total_cash - $total_expenses;
                             <div id="printCalcHistoryBox" class="print-calc-history-box">No calculator operations performed.</div>
                         </div>
                     </div>
-                </div> <!-- Row End -->
-            </div>
+                </div> </div>
         </main>
     </div>
 
@@ -754,6 +711,7 @@ $cash_remaining = $total_cash - $total_expenses;
             updateScreen();
         }
 
+        // Fix logic errors
         function clearCalc() {
             currentInput = "0";
             fullHistoryStr = "";
@@ -771,11 +729,9 @@ $cash_remaining = $total_cash - $total_expenses;
 
         function calculateResult() {
             if (fullHistoryStr === "") return;
-            
             let expression = fullHistoryStr + currentInput;
             try {
                 let result = eval(expression.replace(/×/g, '*').replace(/÷/g, '/'));
-                
                 let auditLine = expression + " = " + result;
                 sessionCalculations.push(auditLine);
                 

@@ -11,9 +11,9 @@ require_once '../includes/helpers.php';
 
 require_master();
 
-// Get date filters. Default to today's date if not set.
-$start_date = isset($_GET['start_date']) && !empty($_GET['start_date']) ? sanitize_input($_GET['start_date']) : date('Y-m-d');
-$end_date = isset($_GET['end_date']) && !empty($_GET['end_date']) ? sanitize_input($_GET['end_date']) : $start_date;
+// Get date and time filters. Default to today's start and end if not set.
+$start_date = isset($_GET['start_date']) && !empty($_GET['start_date']) ? sanitize_input($_GET['start_date']) : date('Y-m-d\T00:00');
+$end_date = isset($_GET['end_date']) && !empty($_GET['end_date']) ? sanitize_input($_GET['end_date']) : date('Y-m-d\T23:59');
 
 // Ensure start_date is not after end_date
 if (strtotime($start_date) > strtotime($end_date)) {
@@ -43,18 +43,18 @@ if ($clerk_query) {
     }
 }
 
-// Fetch payments based on clerk filter
+// Fetch payments based on clerk filter (Using full datetime comparison)
 if ($clerk_filter === 'all') {
     $query_payments = "SELECT p.*, s.name, s.father_name, s.class, s.section FROM payments p 
                        JOIN students s ON p.student_id = s.id 
-                       WHERE DATE(p.payment_date) BETWEEN ? AND ? 
+                       WHERE p.payment_date BETWEEN ? AND ? 
                        ORDER BY p.payment_date ASC";
     $stmt = $conn->prepare($query_payments);
     $stmt->bind_param('ss', $start_date, $end_date);
 } else {
     $query_payments = "SELECT p.*, s.name, s.father_name, s.class, s.section FROM payments p 
                        JOIN students s ON p.student_id = s.id 
-                       WHERE p.received_by = ? AND DATE(p.payment_date) BETWEEN ? AND ? 
+                       WHERE p.received_by = ? AND p.payment_date BETWEEN ? AND ? 
                        ORDER BY p.payment_date ASC";
     $stmt = $conn->prepare($query_payments);
     $stmt->bind_param('sss', $clerk_filter, $start_date, $end_date);
@@ -63,16 +63,16 @@ $stmt->execute();
 $payments = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// Fetch expenses based on clerk filter
+// Fetch expenses based on clerk filter (Using full datetime comparison)
 if ($clerk_filter === 'all') {
     $query_expenses = "SELECT * FROM expenses 
-                       WHERE DATE(created_at) BETWEEN ? AND ? 
+                       WHERE created_at BETWEEN ? AND ? 
                        ORDER BY created_at ASC, id ASC";
     $stmt_exp = $conn->prepare($query_expenses);
     $stmt_exp->bind_param('ss', $start_date, $end_date);
 } else {
     $query_expenses = "SELECT * FROM expenses 
-                       WHERE username = ? AND DATE(created_at) BETWEEN ? AND ? 
+                       WHERE username = ? AND created_at BETWEEN ? AND ? 
                        ORDER BY created_at ASC, id ASC";
     $stmt_exp = $conn->prepare($query_expenses);
     $stmt_exp->bind_param('sss', $clerk_filter, $start_date, $end_date);
@@ -206,39 +206,28 @@ $cash_remaining = $total_cash - $total_expenses;
             display: none;
         }
 
-        /* -------------------------------------------------------------
-           PREMIUM PRINT STYLING - KEEPS EXACT WEB LOOK & SIDE-BY-SIDE
-           ------------------------------------------------------------- */
-        /* -------------------------------------------------------------
-           PREMIUM PRINT STYLING - FIXED FOR DRAWER STATEMENT
-           ------------------------------------------------------------- */
-        /* -------------------------------------------------------------
-           PREMIUM PRINT STYLING - EXTRA COMPACT & FITTED
-           ------------------------------------------------------------- */
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 0.3cm !important; /* Margin kam kar diya taaki zyada jagah mile */
+                margin: 0.3cm !important;
             }
 
             body {
                 background: #ffffff !important;
                 color: #000000 !important;
                 font-family: 'Segoe UI', Arial, sans-serif !important;
-                font-size: 9.5px !important; /* Default font size chota kiya */
+                font-size: 9.5px !important;
                 margin: 0 !important;
                 padding: 0 !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
 
-            /* 1. Hiding ALL unnecessary components (Including Stats Cards) */
             .topbar, .module-nav-panel, .no-print, button, form, 
             .form-text, .alert-success, .stats-grid, .stat-card {
                 display: none !important;
             }
 
-            /* 2. Show print header cleanly */
             .print-only-header {
                 display: block !important;
                 border-bottom: 2px solid #1f5f46 !important;
@@ -266,7 +255,6 @@ $cash_remaining = $total_cash - $total_expenses;
                 margin-top: 3px !important;
             }
 
-            /* 3. Columns Layout Structure */
             .row {
                 display: flex !important;
                 flex-direction: row !important;
@@ -275,21 +263,18 @@ $cash_remaining = $total_cash - $total_expenses;
                 width: 100% !important;
             }
 
-            /* Left side: Tables (Payments & Expenses) */
             .col-lg-7 {
                 width: 60% !important;
                 flex: 0 0 60% !important;
                 max-width: 60% !important;
             }
 
-            /* Right side: Math Sheet Box */
             .col-lg-5 {
                 width: 38% !important;
                 flex: 0 0 38% !important;
                 max-width: 38% !important;
             }
 
-            /* 4. Table Formatting for Print */
             .table-responsive {
                 overflow: visible !important;
             }
@@ -298,31 +283,28 @@ $cash_remaining = $total_cash - $total_expenses;
                 width: 100% !important;
                 border-collapse: collapse !important;
                 margin-bottom: 10px !important;
-                font-size: 9px !important; /* Table data text chota kiya */
+                font-size: 9px !important;
             }
 
             table th, table td {
-                padding: 4px 5px !important; /* Tables ki spacing tight ki */
+                padding: 4px 5px !important;
                 border: 1px solid #ddd !important;
             }
 
-            /* 5. Drawer Math Card - Extra Compact & Small Text */
             .reconciliation-math-card {
                 border: 1px solid #ccc !important;
                 border-left: 4px solid #1f5f46 !important;
-                padding: 10px !important; /* Card ke andar ka gap kam kiya */
+                padding: 10px !important;
                 background: #fdfdfd !important;
                 box-shadow: none !important;
             }
 
-            /* Har line ki spacing aur font size ko chota kiya */
             .math-line, .reconciliation-math-card div, .reconciliation-math-card p {
-                padding: 4px 0 !important; 
-                font-size: 8.5px !important; /* Text chota kiya taaki lamba na ho */
+                padding: 4px 0 !important;
+                font-size: 8.5px !important;
                 line-height: 1.2 !important;
             }
 
-            /* Net Cash Large Box ko compact kiya */
             .net-cash-large-box {
                 background: #1f5f46 !important;
                 color: #ffffff !important;
@@ -332,7 +314,7 @@ $cash_remaining = $total_cash - $total_expenses;
             }
 
             .net-cash-large-box h2, .net-cash-large-box .h2 {
-                font-size: 13px !important; /* Main amount ka size chota kiya */
+                font-size: 13px !important;
                 font-weight: 700 !important;
                 margin: 0 !important;
             }
@@ -350,7 +332,6 @@ $cash_remaining = $total_cash - $total_expenses;
 <body>
     <div class="wrapper feature-shell">
         <main class="main-content">
-            <!-- Screen Top Bar -->
             <div class="topbar no-print">
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
@@ -370,7 +351,6 @@ $cash_remaining = $total_cash - $total_expenses;
                 </div>
             </div>
 
-            <!-- Print Only Spreadsheet Header -->
             <div class="print-only-header">
                 <h1><?php echo SITE_NAME; ?></h1>
                 <h3>
@@ -390,9 +370,9 @@ $cash_remaining = $total_cash - $total_expenses;
                         <strong>Reconciliation Period:</strong> 
                         <?php 
                         if ($start_date === $end_date) {
-                            echo date('d-m-Y', strtotime($start_date)) . ' (Single Day)';
+                            echo date('d-m-Y h:i A', strtotime($start_date)) . ' (Single Point)';
                         } else {
-                            echo date('d-m-Y', strtotime($start_date)) . ' to ' . date('d-m-Y', strtotime($end_date));
+                            echo date('d-m-Y h:i A', strtotime($start_date)) . ' to ' . date('d-m-Y h:i A', strtotime($end_date));
                         }
                         ?>
                     </div>
@@ -403,46 +383,22 @@ $cash_remaining = $total_cash - $total_expenses;
             </div>
 
             <div class="content">
-                <!-- Navigation Tab Bar -->
                 <div class="module-nav-panel no-print">
                     <div class="module-nav-row">
-                        <a href="dashboard.php" class="module-nav-btn">
-                            <i class="fas fa-chart-bar"></i> Dashboard
-                        </a>
-                        <a href="add_student.php" class="module-nav-btn">
-                            <i class="fas fa-user-plus"></i> Add Student
-                        </a>
-                        <a href="student_record.php" class="module-nav-btn">
-                            <i class="fas fa-address-book"></i> Student Record
-                        </a>
-                        <a href="fee_schedule.php" class="module-nav-btn">
-                            <i class="fas fa-calendar-alt"></i> Fee Schedule
-                        </a>
-                        <a href="fee_management.php" class="module-nav-btn">
-                            <i class="fas fa-money-bill-wave"></i> Fee Management
-                        </a>
-                        <a href="defaulter_list.php" class="module-nav-btn">
-                            <i class="fas fa-list"></i> Pending List
-                        </a>
-                        <a href="payment_analytics.php" class="module-nav-btn active">
-                            <i class="fas fa-chart-line"></i> Analytics
-                        </a>
-                        <a href="expenses.php" class="module-nav-btn">
-                            <i class="fas fa-wallet"></i> Expenses
-                        </a>
-                        <a href="promotion.php" class="module-nav-btn">
-                            <i class="fas fa-arrow-up"></i> Promotion
-                        </a>
-                        <a href="drop_student.php" class="module-nav-btn">
-                            <i class="fas fa-trash"></i> Drop Student
-                        </a>
-                        <a href="users.php" class="module-nav-btn">
-                            <i class="fas fa-users-cog"></i> Users
-                        </a>
+                        <a href="dashboard.php" class="module-nav-btn"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                        <a href="add_student.php" class="module-nav-btn"><i class="fas fa-user-plus"></i> Add Student</a>
+                        <a href="student_record.php" class="module-nav-btn"><i class="fas fa-address-book"></i> Student Record</a>
+                        <a href="fee_schedule.php" class="module-nav-btn"><i class="fas fa-calendar-alt"></i> Fee Schedule</a>
+                        <a href="fee_management.php" class="module-nav-btn"><i class="fas fa-money-bill-wave"></i> Fee Management</a>
+                        <a href="defaulter_list.php" class="module-nav-btn"><i class="fas fa-list"></i> Pending List</a>
+                        <a href="payment_analytics.php" class="module-nav-btn active"><i class="fas fa-chart-line"></i> Analytics</a>
+                        <a href="expenses.php" class="module-nav-btn"><i class="fas fa-wallet"></i> Expenses</a>
+                        <a href="promotion.php" class="module-nav-btn"><i class="fas fa-arrow-up"></i> Promotion</a>
+                        <a href="drop_student.php" class="module-nav-btn"><i class="fas fa-trash"></i> Drop Student</a>
+                        <a href="users.php" class="module-nav-btn"><i class="fas fa-users-cog"></i> Users</a>
                     </div>
                 </div>
 
-                <!-- Active Date & Clerk Heading Alert -->
                 <div class="alert alert-success d-flex align-items-center justify-content-between mb-4 no-print">
                     <div>
                         <i class="fas fa-calendar-day me-2"></i>
@@ -454,13 +410,9 @@ $cash_remaining = $total_cash - $total_expenses;
                         <strong>
                             <?php 
                             if ($start_date === $end_date) {
-                                if ($start_date === date('Y-m-d')) {
-                                    echo "Today (" . date('d-m-Y', strtotime($start_date)) . ")";
-                                } else {
-                                    echo date('d-m-Y', strtotime($start_date));
-                                }
+                                echo date('d-m-Y h:i A', strtotime($start_date));
                             } else {
-                                echo date('d-m-Y', strtotime($start_date)) . " to " . date('d-m-Y', strtotime($end_date));
+                                echo date('d-m-Y h:i A', strtotime($start_date)) . " to " . date('d-m-Y h:i A', strtotime($end_date));
                             }
                             ?>
                         </strong>
@@ -470,16 +422,15 @@ $cash_remaining = $total_cash - $total_expenses;
                     </span>
                 </div>
 
-                <!-- Date & Clerk Filter Form (Screen Only) -->
                 <div class="search-section mb-4 no-print">
                     <form method="GET" class="row g-3 align-items-end">
                         <div class="col-md-3">
-                            <label class="form-label fw-bold text-dark">Starting Date</label>
-                            <input type="date" name="start_date" value="<?php echo $start_date; ?>" class="form-control" required>
+                            <label class="form-label fw-bold text-dark">Starting Date & Time</label>
+                            <input type="datetime-local" name="start_date" value="<?php echo date('Y-m-d\TH:i', strtotime($start_date)); ?>" class="form-control" required>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold text-dark">Ending Date (Optional)</label>
-                            <input type="date" name="end_date" value="<?php echo isset($_GET['end_date']) ? htmlspecialchars($_GET['end_date']) : ''; ?>" class="form-control" placeholder="Select end date...">
+                            <label class="form-label fw-bold text-dark">Ending Date & Time</label>
+                            <input type="datetime-local" name="end_date" value="<?php echo date('Y-m-d\TH:i', strtotime($end_date)); ?>" class="form-control" required>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-bold text-dark">Select Clerk / User</label>
@@ -503,7 +454,6 @@ $cash_remaining = $total_cash - $total_expenses;
                     </form>
                 </div>
 
-                <!-- Reconciliation Summary Cards (Screen Only) -->
                 <div class="stats-grid mb-4 no-print">
                     <div class="stat-card">
                         <div class="stat-icon" style="background: #e3f1ea;">
@@ -535,9 +485,7 @@ $cash_remaining = $total_cash - $total_expenses;
                 </div>
 
                 <div class="row g-4">
-                    <!-- Detailed Lists -->
                     <div class="col-lg-7">
-                        <!-- Fee Payments Table -->
                         <div class="mb-4">
                             <h5 class="section-sub-title">
                                 <i class="fas fa-receipt"></i>
@@ -617,7 +565,6 @@ $cash_remaining = $total_cash - $total_expenses;
                             </div>
                         </div>
 
-                        <!-- Expenses Table -->
                         <div>
                             <h5 class="section-sub-title">
                                 <i class="fas fa-wallet"></i>
@@ -679,7 +626,6 @@ $cash_remaining = $total_cash - $total_expenses;
                         </div>
                     </div>
 
-                    <!-- Reconciliation Calculations Card -->
                     <div class="col-lg-5">
                         <div class="reconciliation-math-card">
                             <h5 class="border-bottom pb-2 mb-3">
