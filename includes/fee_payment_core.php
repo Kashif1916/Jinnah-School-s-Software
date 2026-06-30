@@ -425,7 +425,10 @@ if (isset($_GET['id'])) {
                                     <p>Father: <?php echo $student['father_name']; ?> | Contact: <?php echo $student['contact_number']; ?></p>
                                 </div>
                                 <div class="fee-summary">
-                                   
+                                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#statementModal">
+                                        <i class="fas fa-print"></i> Print Statement
+                                    </button>
+                                </div>
                             </div>
                             <form method="POST" id="multiPaymentForm" action="<?php echo $self_url; ?>?id=<?php echo $student['id']; ?>">
                             <input type="hidden" name="student_id" value="<?php echo $student['id']; ?>">
@@ -493,6 +496,49 @@ if (isset($_GET['id'])) {
                                 </div>
                             <?php endif; ?>
                             </form>
+                        </div>
+
+                        <!-- Print Statement Modal -->
+                        <div class="modal fade" id="statementModal" tabindex="-1" aria-labelledby="statementModalLabel" aria-hidden="true">
+                          <div class="modal-dialog">
+                            <div class="modal-content">
+                              <div class="modal-header">
+                                <h5 class="modal-title" id="statementModalLabel" style="color: #1f5f46; font-weight: bold;"><i class="fas fa-print"></i> Generate Student Statement</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                              </div>
+                              <div class="modal-body text-start">
+                                <form id="statementForm" action="../master/student_statement.php" method="GET" target="_blank">
+                                  <input type="hidden" name="id" value="<?php echo $student['id']; ?>">
+                                  
+                                  <div class="mb-3">
+                                    <label for="from_month" class="form-label" style="font-weight: 600; font-size: 13px;">From Month</label>
+                                    <select class="form-select" id="from_month" name="from_month" required>
+                                      <?php foreach ($all_fees as $fee): ?>
+                                        <option value="<?php echo $fee['month']; ?>"><?php echo $fee['month']; ?></option>
+                                      <?php endforeach; ?>
+                                    </select>
+                                  </div>
+                                  
+                                  <div class="mb-3">
+                                    <label for="to_month" class="form-label" style="font-weight: 600; font-size: 13px;">To Month</label>
+                                    <select class="form-select" id="to_month" name="to_month" required>
+                                      <?php 
+                                      $last_idx = count($all_fees) - 1;
+                                      foreach ($all_fees as $idx => $fee): 
+                                      ?>
+                                        <option value="<?php echo $fee['month']; ?>" <?php echo ($idx === $last_idx) ? 'selected' : ''; ?>><?php echo $fee['month']; ?></option>
+                                      <?php endforeach; ?>
+                                    </select>
+                                  </div>
+                                  
+                                  <div class="modal-footer px-0 pb-0">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    <button type="submit" class="btn btn-primary"><i class="fas fa-print"></i> Print Statement</button>
+                                  </div>
+                                </form>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                     <?php endif; ?>
 

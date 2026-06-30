@@ -48,13 +48,16 @@ $query = "SELECT * FROM expenses WHERE user_id = ?";
 $params = [$my_user_id];
 $param_types = "i";
 
-if (!empty($start_date)) {
-    $query .= " AND DATE(created_at) >= ?";
+if (!empty($start_date) && empty($end_date)) {
+    $query .= " AND DATE(created_at) = ?";
     $params[] = $start_date;
     $param_types .= "s";
-}
-
-if (!empty($end_date)) {
+} elseif (!empty($start_date) && !empty($end_date)) {
+    $query .= " AND DATE(created_at) BETWEEN ? AND ?";
+    $params[] = $start_date;
+    $params[] = $end_date;
+    $param_types .= "ss";
+} elseif (empty($start_date) && !empty($end_date)) {
     $query .= " AND DATE(created_at) <= ?";
     $params[] = $end_date;
     $param_types .= "s";
@@ -179,18 +182,21 @@ $stmt->close();
                             
                             <!-- Search Form -->
                             <form method="GET" class="row g-2 mb-3 align-items-end mt-2">
-                                <div class="col-sm-5">
+                                <div class="col-sm-4">
                                     <label for="start_date" class="form-label small mb-1" style="font-size: 12px; color: #555;">From Date</label>
                                     <input type="date" class="form-control form-control-sm" id="start_date" name="start_date" value="<?php echo htmlspecialchars($start_date); ?>">
                                 </div>
-                                <div class="col-sm-5">
+                                <div class="col-sm-4">
                                     <label for="end_date" class="form-label small mb-1" style="font-size: 12px; color: #555;">To Date</label>
                                     <input type="date" class="form-control form-control-sm" id="end_date" name="end_date" value="<?php echo htmlspecialchars($end_date); ?>">
                                 </div>
-                                <div class="col-sm-2 d-flex gap-1">
-                                    <button type="submit" class="btn btn-sm btn-primary w-100" style="padding: 7px 10px;">
+                                <div class="col-sm-4 d-flex gap-1">
+                                    <button type="submit" class="btn btn-sm btn-primary flex-grow-1" style="padding: 7px 10px;">
                                         <i class="fas fa-search"></i> Search
                                     </button>
+                                    <a href="../master/expenses_report.php?start_date=<?php echo urlencode($start_date); ?>&end_date=<?php echo urlencode($end_date); ?>" target="_blank" class="btn btn-sm btn-success" style="padding: 7px 10px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
+                                        <i class="fas fa-print"></i> Print
+                                    </a>
                                     <?php if (!empty($start_date) || !empty($end_date)): ?>
                                         <a href="expenses.php" class="btn btn-sm btn-secondary" style="padding: 7px 10px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
                                             <i class="fas fa-undo"></i> Clear
