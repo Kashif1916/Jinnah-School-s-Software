@@ -159,7 +159,7 @@ if ($view_mode === 'see_mode') {
         }
         /* Color matching exactly with btn-primary / search button styling */
         .mode-btn.active-mode {
-            background-color: #3498db !important;
+            background-color: #24493a !important;
             color: #fff !important;
             box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
         }
