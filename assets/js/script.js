@@ -69,11 +69,15 @@ function setupDeleteConfirmation() {
  * Setup global loading state on form submissions to prevent double submit
  */
 function setupFormLoaders() {
+    console.log('setupFormLoaders initialized on page');
     const forms = document.querySelectorAll('form');
     forms.forEach(form => {
         form.addEventListener('submit', function(e) {
+            console.log('Form submit event intercepted', form);
+            
             // Check if form is valid (for HTML5 validation) before triggering loader
             if (form.checkValidity && !form.checkValidity()) {
+                console.log('Form failed HTML5 validation, skipping loader');
                 return;
             }
             
@@ -82,9 +86,17 @@ function setupFormLoaders() {
                 // Prevent duplicate submit by disabling the button
                 // Use setTimeout to ensure the submit event is processed before disabling
                 setTimeout(() => {
+                    // If another script called e.preventDefault(), don't disable/show loader
+                    if (e.defaultPrevented) {
+                        console.log('Submission was prevented by another script, cancelling loader');
+                        return;
+                    }
+                    console.log('Applying loading state to button:', submitBtn);
                     submitBtn.disabled = true;
                     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Loading...';
                 }, 10);
+            } else {
+                console.log('No submit button found in form');
             }
         });
     });
