@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeDatatable();
     setupFormValidation();
     setupDeleteConfirmation();
+    setupFormLoaders();
 });
 
 /**
@@ -59,6 +60,31 @@ function setupDeleteConfirmation() {
             const message = this.getAttribute('data-confirm');
             if (!confirm(message)) {
                 e.preventDefault();
+            }
+        });
+    });
+}
+
+/**
+ * Setup global loading state on form submissions to prevent double submit
+ */
+function setupFormLoaders() {
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            // Check if form is valid (for HTML5 validation) before triggering loader
+            if (form.checkValidity && !form.checkValidity()) {
+                return;
+            }
+            
+            const submitBtn = form.querySelector('[type="submit"]');
+            if (submitBtn) {
+                // Prevent duplicate submit by disabling the button
+                // Use setTimeout to ensure the submit event is processed before disabling
+                setTimeout(() => {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Loading...';
+                }, 10);
             }
         });
     });
