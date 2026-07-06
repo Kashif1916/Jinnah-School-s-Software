@@ -23,7 +23,7 @@ define('TIME_FORMAT', 'H:i:s');
 define('DATETIME_FORMAT', 'd-m-Y H:i:s');
 
 // Classes available in school
-$CLASSES = ['P.G','Nursury', 'Pre' , '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+$CLASSES = ['P.G','Nursury', 'Prep' , '1', '2', '3', '4', '5', '6', '7', '8', 'Pre-9', '9', '10', 'Passed-10', '11', '12'];
 
 // Sections available
 $SECTIONS = ['B', 'G'];

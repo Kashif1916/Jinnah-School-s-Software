@@ -305,13 +305,6 @@ ob_start();
             <?php endif; ?>
         </div>
     </div>
-        
-    <script>
-        window.onload = function() {
-            window.print();
-        };
-    </script>
-
     <div class="signature-section">
         <div class="signature-line">
             <span>Receiver Signature</span>
@@ -324,6 +317,14 @@ ob_start();
     </div>
     
     <div style="height: 10mm;"></div>
+        
+    <script>
+        window.onload = function() {
+            window.print();
+        };
+    </script>
+
+    
 </body>
 </html>
 <?php
