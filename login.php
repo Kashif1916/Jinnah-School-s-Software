@@ -22,8 +22,12 @@ if (isset($_SESSION['user_id'])) {
 }
 
 $error = '';
-if (isset($_GET['error']) && $_GET['error'] === 'closed') {
-    $error = 'Your account is closed/frozen for today. It will activate automatically at 12:00 AM.';
+if (isset($_GET['error'])) {
+    if ($_GET['error'] === 'closed') {
+        $error = 'Your account is closed/frozen for today. It will activate automatically at 12:00 AM.';
+    } elseif ($_GET['error'] === 'timeout') {
+        $error = 'Your session has expired due to 30 minutes of inactivity. Please login again.';
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {

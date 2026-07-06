@@ -4,6 +4,10 @@
  * School Finance Management System
  */
 
+// Force session cookie to expire on browser close
+ini_set('session.cookie_lifetime', 0);
+ini_set('session.use_only_cookies', 1);
+
 session_start();
 
 /**
@@ -63,6 +67,7 @@ function login_user($user_id, $username, $role) {
     $_SESSION['username'] = $username;
     $_SESSION['role'] = $role;
     $_SESSION['login_time'] = time();
+    $_SESSION['last_activity'] = time(); // Set initial activity time
 }
 
 /**
@@ -80,6 +85,16 @@ function require_login() {
         header('Location: ' . BASE_URL . 'login.php');
         exit();
     }
+
+    // 30 Minutes Inactivity Timeout (30 * 60 = 1800 seconds)
+    $timeout_duration = 1800;
+    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > $timeout_duration)) {
+        session_unset();
+        session_destroy();
+        header('Location: ' . BASE_URL . 'login.php?error=timeout');
+        exit();
+    }
+    $_SESSION['last_activity'] = time(); // Update activity time
 
     // Check if the logged-in user is frozen in DB
     global $conn;
