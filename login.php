@@ -74,6 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $_SESSION['username'] = $user['username'];
                     $_SESSION['role'] = $user['role'];
                     $_SESSION['login_time'] = time();
+                    $_SESSION['last_activity'] = time(); // Set initial activity time
                     
                     header('Location: ' . BASE_URL . 'index.php');
                     exit();

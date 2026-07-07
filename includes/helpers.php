@@ -85,7 +85,15 @@ function create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount 
     $monthly_fee = floatval($fixed_monthly_fee) - floatval($concession_amount);
     if ($monthly_fee < 0) $monthly_fee = 0;
 
-    $start_date = strtotime(date('Y-m-01'));
+    // Task 1: If current day is 20 or greater (>= 20), start scheduling from NEXT month.
+    // Otherwise, start scheduling from CURRENT month.
+    $day = intval(date('d'));
+    if ($day >= 20) {
+        $start_date = strtotime(date('Y-m-01', strtotime('+1 month')));
+    } else {
+        $start_date = strtotime(date('Y-m-01'));
+    }
+
     for ($i = 0; $i < 12; $i++) {
         $month = date('M-Y', strtotime("+$i months", $start_date));
         $query = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')";

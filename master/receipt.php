@@ -9,6 +9,8 @@ require_once '../config/db.php';
 require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
+require_login();
+
 $payment_ids_str = isset($_GET['payment_ids']) ? $_GET['payment_ids'] : '';
 $fee_id = isset($_GET['fee_id']) ? intval($_GET['fee_id']) : 0; // Keep for backward compatibility or single fee receipt
 

@@ -10,6 +10,7 @@ require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
 // Allow both Master and Finance roles to access this report
+require_login();
 if (!is_master() && !is_finance()) {
     header('Location: ' . BASE_URL . 'index.php');
     exit();

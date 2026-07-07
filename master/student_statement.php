@@ -10,10 +10,7 @@ require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
 // Allow Master, Finance, and Admission roles
-if (!is_logged_in()) {
-    header('Location: ../login.php');
-    exit();
-}
+require_login();
 
 $student_id = intval($_GET['id'] ?? 0);
 $from_month = sanitize_input($_GET['from_month'] ?? '');
@@ -46,28 +43,34 @@ $total_paid_amount = 0;
 $total_unpaid_amount = 0;
 
 foreach ($records as $key => $r) {
+    // Get total paid for this month
+    $pay_query = "SELECT SUM(amount) as paid_sum FROM payments WHERE student_id = ? AND paid_for_month = ?";
+    $p_stmt = $conn->prepare($pay_query);
+    $p_stmt->bind_param('is', $student_id, $r['month']);
+    $p_stmt->execute();
+    $pay_res = $p_stmt->get_result()->fetch_assoc();
+    $p_stmt->close();
+    
+    $paid_for_this_month = floatval($pay_res['paid_sum'] ?? 0);
+    $remaining_for_this_month = floatval($r['amount']);
+    
+    // The historical monthly fee that was set for this month
+    $original_fee_for_this_month = $paid_for_this_month + $remaining_for_this_month;
+    
+    // Fallback if both are 0
+    if ($original_fee_for_this_month == 0) {
+        $original_fee_for_this_month = floatval($student['monthly_fee']);
+    }
+    
+    $records[$key]['display_amount'] = $original_fee_for_this_month;
+    $records[$key]['paid_amount'] = $paid_for_this_month;
+    
     if ($r['status'] == 'paid') {
         $paid_count++;
-        $pay_query = "SELECT SUM(amount) as paid_sum FROM payments WHERE student_id = ? AND paid_for_month = ?";
-        $p_stmt = $conn->prepare($pay_query);
-        $p_stmt->bind_param('is', $student_id, $r['month']);
-        $p_stmt->execute();
-        $pay_res = $p_stmt->get_result()->fetch_assoc();
-        $p_stmt->close();
-        
-        $paid_calculated = floatval($pay_res['paid_sum'] ?? ($student['fixed_monthly_fee'] - $student['concession_amount']));
-        $total_paid_amount += $paid_calculated;
-        
-        // FIX: Agar database mai fee_record ka amount 0 ho chuka hai, to display ke liye hum standard fee assign kar rahe hain
-        if (floatval($r['amount']) == 0) {
-            $records[$key]['display_amount'] = !empty($student['monthly_fee']) ? $student['monthly_fee'] : $paid_calculated;
-        } else {
-            $records[$key]['display_amount'] = $r['amount'];
-        }
+        $total_paid_amount += $paid_for_this_month;
     } else {
         $unpaid_count++;
-        $total_unpaid_amount += floatval($r['amount']);
-        $records[$key]['display_amount'] = $r['amount'];
+        $total_unpaid_amount += $remaining_for_this_month;
     }
 }
 ?>
@@ -247,6 +250,7 @@ foreach ($records as $key => $r) {
                 <tr>
                     <th>Month</th>
                     <th>Monthly Fee</th>
+                    <th>Amount Paid</th>
                     <th>Status</th>
                     <th>Payment Date / Status Details</th>
                 </tr>
@@ -257,6 +261,7 @@ foreach ($records as $key => $r) {
                         <tr>
                             <td><strong><?php echo $r['month']; ?></strong></td>
                             <td><?php echo format_currency($r['display_amount']); ?></td>
+                            <td><?php echo format_currency($r['paid_amount']); ?></td>
                             <td>
                                 <?php if ($r['status'] == 'paid'): ?>
                                     <span class="badge badge-success">Paid</span>
@@ -277,7 +282,7 @@ foreach ($records as $key => $r) {
                     <?php endforeach; ?>
                 <?php else: ?>
                     <tr>
-                        <td colspan="4" style="text-align: center; color: #666;">No fee records found for the selected range.</td>
+                        <td colspan="5" style="text-align: center; color: #666;">No fee records found for the selected range.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>

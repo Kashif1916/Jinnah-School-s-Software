@@ -10,6 +10,7 @@ require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
 // Allow both Master and Admission roles
+require_login();
 if (!is_master() && !is_admission()) {
     header('Location: ../login.php');
     exit();
