@@ -80,8 +80,18 @@ function get_fee_record($student_id, $month) {
 /**
  * Create fee records for new student for 12 months
  */
-function create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount = 0) {
+function create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount = 0, $admission_fee = 0) {
     global $conn;
+    
+    // First, schedule the admission fee if it is greater than 0
+    if ($admission_fee > 0) {
+        $query = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, 'Admission', ?, 'unpaid')";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param('id', $student_id, $admission_fee);
+        $stmt->execute();
+        $stmt->close();
+    }
+
     $monthly_fee = floatval($fixed_monthly_fee) - floatval($concession_amount);
     if ($monthly_fee < 0) $monthly_fee = 0;
 
@@ -119,8 +129,8 @@ function auto_generate_fee_buffer($student_id, $monthly_fee) {
     $stmt->close();
 
     if ($count <= 5) {
-        // Find the last generated month for this student
-        $query = "SELECT month FROM fee_records WHERE student_id = ? ORDER BY STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y') DESC LIMIT 1";
+        // Find the last generated month for this student (exclude 'Admission')
+        $query = "SELECT month FROM fee_records WHERE student_id = ? AND month != 'Admission' ORDER BY STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y') DESC LIMIT 1";
         $stmt = $conn->prepare($query);
         $stmt->bind_param('i', $student_id);
         $stmt->execute();
@@ -148,7 +158,7 @@ function sync_unpaid_fee_amounts($student_id, $new_monthly_fee) {
     $current_month_start = date('Y-m-01');
     
     $query = "UPDATE fee_records SET amount = ? 
-              WHERE student_id = ? AND status = 'unpaid' 
+              WHERE student_id = ? AND status = 'unpaid' AND month != 'Admission'
               AND STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y') >= ?";
     $stmt = $conn->prepare($query);
     $stmt->bind_param('dis', $new_monthly_fee, $student_id, $current_month_start);
@@ -199,7 +209,7 @@ function get_defaulters($class = '', $section = '', $months = []) {
     
     $query = "SELECT s.id, s.name, s.father_name, s.class, s.section, s.fixed_monthly_fee, s.monthly_fee, 
                      s.contact_number, s.contact_number2, s.whatsapp_number,
-                     GROUP_CONCAT(f.month ORDER BY STR_TO_DATE(CONCAT('01-', f.month), '%d-%b-%Y')) as pending_months,
+                     GROUP_CONCAT(f.month ORDER BY CASE WHEN f.month = 'Admission' THEN 1 ELSE 2 END, STR_TO_DATE(CONCAT('01-', f.month), '%d-%b-%Y')) as pending_months,
                      COUNT(f.id) as pending_count,
                      SUM(f.amount) as filtered_unpaid_amount
               FROM students s 

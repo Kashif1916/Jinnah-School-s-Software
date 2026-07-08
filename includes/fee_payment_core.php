@@ -134,7 +134,7 @@ if (isset($_GET['id'])) {
     $student = get_student($student_id);
     
     if ($student) {
-        $query = "SELECT * FROM fee_records WHERE student_id = ? ORDER BY STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y')";
+        $query = "SELECT * FROM fee_records WHERE student_id = ? ORDER BY CASE WHEN month = 'Admission' THEN 1 ELSE 2 END, STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y')";
         $stmt = $conn->prepare($query);
         $stmt->bind_param('i', $student_id);
         $stmt->execute();
@@ -160,6 +160,8 @@ if (isset($_GET['id'])) {
         // Merge and sort chronologically
         $student_fees = array_merge($paid_fees, $unpaid_fees);
         usort($student_fees, function($a, $b) {
+            if ($a['month'] === 'Admission') return -1;
+            if ($b['month'] === 'Admission') return 1;
             $t1 = strtotime("01-" . $a['month']);
             $t2 = strtotime("01-" . $b['month']);
             return $t1 - $t2;
@@ -510,13 +512,14 @@ if (isset($_GET['id'])) {
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                               </div>
                               <div class="modal-body text-start">
-                                <form id="statementForm" action="../master/student_statement.php" method="GET" target="_blank">
+                                <form id="statementForm" action="../master/student_statement.php" method="GET" target="_blank" onsubmit="setTimeout(function() { const modalEl = document.getElementById('statementModal'); if (modalEl) { const modalInstance = bootstrap.Modal.getInstance(modalEl); if (modalInstance) { modalInstance.hide(); } } }, 100);">
                                   <input type="hidden" name="id" value="<?php echo $student['id']; ?>">
                                   
                                   <div class="mb-3">
                                     <label for="from_month" class="form-label" style="font-weight: 600; font-size: 13px;">From Month</label>
                                     <select class="form-select" id="from_month" name="from_month" required>
                                       <?php foreach ($all_fees as $fee): ?>
+                                        <?php if ($fee['month'] === 'Admission') continue; ?>
                                         <option value="<?php echo $fee['month']; ?>"><?php echo $fee['month']; ?></option>
                                       <?php endforeach; ?>
                                     </select>
@@ -528,6 +531,7 @@ if (isset($_GET['id'])) {
                                       <?php 
                                       $last_idx = count($all_fees) - 1;
                                       foreach ($all_fees as $idx => $fee): 
+                                        if ($fee['month'] === 'Admission') continue;
                                       ?>
                                         <option value="<?php echo $fee['month']; ?>" <?php echo ($idx === $last_idx) ? 'selected' : ''; ?>><?php echo $fee['month']; ?></option>
                                       <?php endforeach; ?>

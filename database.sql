@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS `students` (
   `class` VARCHAR(50) NOT NULL,
   `section` VARCHAR(10) NOT NULL,
   `monthly_fee` DECIMAL(10, 2) NOT NULL,
+  `admission_fee` DECIMAL(10, 2) DEFAULT 0.00,
   `contact_number` VARCHAR(15),
   `contact_number2` VARCHAR(15),
   `whatsapp_number` VARCHAR(15),
@@ -96,6 +97,16 @@ INSERT INTO `users` (`username`, `password`, `role`) VALUES
 ('master', '1234', 'master'),
 ('finance', '1234', 'finance'),
 ('admission', '1234', 'admission');
+
+-- Table 8: Settings (Receipt Note, etc.)
+CREATE TABLE IF NOT EXISTS `settings` (
+  `setting_key` VARCHAR(50) PRIMARY KEY,
+  `setting_value` TEXT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Insert Default Settings
+INSERT INTO `settings` (`setting_key`, `setting_value`) VALUES 
+('receipt_note', '');
 
 -- Create Indexes for Performance
 CREATE INDEX `idx_student_status` ON `students`(`status`);

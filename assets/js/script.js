@@ -75,6 +75,12 @@ function setupFormLoaders() {
         form.addEventListener('submit', function(e) {
             console.log('Form submit event intercepted', form);
             
+            // Skip loader for target="_blank" forms (e.g. print statements) to prevent permanent loading spinner
+            if (form.getAttribute('target') === '_blank') {
+                console.log('Form has target="_blank", skipping loader');
+                return;
+            }
+            
             // Check if form is valid (for HTML5 validation) before triggering loader
             if (form.checkValidity && !form.checkValidity()) {
                 console.log('Form failed HTML5 validation, skipping loader');

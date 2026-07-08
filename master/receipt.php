@@ -196,7 +196,6 @@ ob_start();
             font-size: 10px;
         }
         .signature-line {
-            border-top: 1px dashed #333;
             text-align: center;
             padding-top: 2mm;
             margin-top: 10mm;
@@ -205,7 +204,6 @@ ob_start();
             text-align: center;
             font-size: 9px;
             color: #999;
-            border-top: 1px dashed #ddd;
             padding-top: 5mm;
             margin-top: 5mm;
         }
@@ -312,6 +310,20 @@ ob_start();
             <span>Receiver Signature</span>
         </div>
     </div>
+    
+    <?php
+    // Fetch Receipt Note from settings
+    $receipt_note = '';
+    $res = $conn->query("SELECT setting_value FROM settings WHERE setting_key = 'receipt_note'");
+    if ($res && $row = $res->fetch_assoc()) {
+        $receipt_note = $row['setting_value'];
+    }
+    ?>
+    <?php if (!empty($receipt_note)): ?>
+        <div class="receipt-note" style="margin: 4mm auto 0 auto; padding-top: 2mm; font-size: 11px; text-align: center; line-height: 1.4; font-weight: bold; white-space: pre-line; max-width: 72mm; word-wrap: break-word; box-sizing: border-box; display: block;">
+            <?php echo htmlspecialchars($receipt_note); ?>
+        </div>
+    <?php endif; ?>
     
     <div class="footer">
         <p>Thank you for your payment!</p>

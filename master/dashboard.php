@@ -96,6 +96,9 @@ $today_collection = get_daily_collection(date('Y-m-d'));
                         <a href="users.php" class="module-nav-btn">
                             <i class="fas fa-users-cog"></i> Users
                         </a>
+                        <a href="receipt_note.php" class="module-nav-btn">
+                            <i class="fas fa-sticky-note"></i> Receipt Note
+                        </a>
                     </div>
                 </div>
 
@@ -202,7 +205,7 @@ $today_collection = get_daily_collection(date('Y-m-d'));
             <p>Today's Collection</p>
         </div>
     </div>
-</div>
+</div></div>
                
         </main>
     </div>

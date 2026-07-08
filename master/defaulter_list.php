@@ -123,6 +123,9 @@ if ($defaulters) {
                         <a href="users.php" class="module-nav-btn">
                             <i class="fas fa-users-cog"></i> Users
                         </a>
+                        <a href="receipt_note.php" class="module-nav-btn">
+                            <i class="fas fa-sticky-note"></i> Receipt Note
+                        </a>
                     </div>
                 </div>
 

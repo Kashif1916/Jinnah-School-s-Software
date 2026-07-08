@@ -34,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $class = sanitize_input($_POST['class'] ?? '');
     $section = sanitize_input($_POST['section'] ?? '');
     $fixed_monthly_fee = floatval($_POST['fixed_monthly_fee'] ?? 0);
+    $admission_fee = floatval($_POST['admission_fee'] ?? 0);
     //$description = sanitize_input($_POST['description'] ?? '');
     $contact_number = sanitize_input($_POST['contact_number'] ?? '');
     $contact_number2 = sanitize_input($_POST['contact_number2'] ?? '');
@@ -46,16 +47,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $error = 'All required fields must be filled correctly!';
     } else {
         // Insert student
-        $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')";
+        $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')";
         $stmt = $conn->prepare($query);
-        $stmt->bind_param('ssssdsssds', $name, $father_name, $class, $section, $fixed_monthly_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason);
+        $stmt->bind_param('ssssddsssds', $name, $father_name, $class, $section, $fixed_monthly_fee, $admission_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason);
         
         if ($stmt->execute()) {
             $student_id = $conn->insert_id;
             
-            // Create annual fee records (apply concession if any)
-            create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount);
+            // Create annual fee records (apply concession if any) and include admission fee
+            create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount, $admission_fee);
             
             $success = 'Student added successfully! Annual fees created.';
         } else {
@@ -193,6 +194,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <div class="col-md-4">
                                 <label class="form-label" for="whatsapp_number">WhatsApp Number</label>
                                 <input type="tel" id="whatsapp_number" name="whatsapp_number" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="admission_fee">Admission Fee</label>
+                                <input type="number" id="admission_fee" name="admission_fee" class="form-control" value="0" step="0.01" min="0">
                             </div>
                         </div>
                         <div class="row mb-3">

@@ -81,6 +81,9 @@ if (isset($_GET['id'])) {
                          <a href="add_student.php" class="module-nav-btn">
                             <i class="fas fa-user-plus"></i> Add Student
                         </a>
+                        <a href="data_entry.php" class="module-nav-btn">
+                            <i class="fas fa-keyboard"></i> Data Entry
+                        </a>
                         <a href="student_record.php" class="module-nav-btn active">
                             <i class="fas fa-address-book"></i> Student Record
                         </a>

@@ -64,6 +64,23 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
         $conn->query("ALTER TABLE `students` ADD COLUMN `drop_reason` VARCHAR(255) DEFAULT NULL");
     }
 
+    // Dynamically ensure admission_fee column exists in students table
+    $colCheckAdmission = $conn->query("SHOW COLUMNS FROM `students` LIKE 'admission_fee'");
+    if ($colCheckAdmission && $colCheckAdmission->num_rows == 0) {
+        $conn->query("ALTER TABLE `students` ADD COLUMN `admission_fee` DECIMAL(10, 2) DEFAULT 0.00 AFTER fixed_monthly_fee");
+    }
+
+    // Dynamically ensure settings table exists
+    $tableCheckSettings = $conn->query("SHOW TABLES LIKE 'settings'");
+    if ($tableCheckSettings && $tableCheckSettings->num_rows == 0) {
+        $conn->query("CREATE TABLE `settings` (
+            `setting_key` VARCHAR(50) PRIMARY KEY,
+            `setting_value` TEXT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        
+        $conn->query("INSERT IGNORE INTO `settings` (`setting_key`, `setting_value`) VALUES ('receipt_note', '')");
+    }
+
     // Dynamically ensure fee_schedule table exists
     $tableCheckFS = $conn->query("SHOW TABLES LIKE 'fee_schedule'");
     if ($tableCheckFS && $tableCheckFS->num_rows == 0) {

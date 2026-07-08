@@ -93,7 +93,7 @@ if (isset($_GET['id'])) {
     $student = get_student($student_id);
 
     if ($student) {
-        $query = "SELECT * FROM fee_records WHERE student_id = ? ORDER BY STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y')";
+        $query = "SELECT * FROM fee_records WHERE student_id = ? ORDER BY CASE WHEN month = 'Admission' THEN 1 ELSE 2 END, STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y')";
         $stmt = $conn->prepare($query);
         $stmt->bind_param('i', $student_id);
         $stmt->execute();
@@ -164,6 +164,9 @@ if (isset($_GET['id'])) {
                         </a>
                         <a href="users.php" class="module-nav-btn">
                             <i class="fas fa-users-cog"></i> Users
+                        </a>
+                        <a href="receipt_note.php" class="module-nav-btn">
+                            <i class="fas fa-sticky-note"></i> Receipt Note
                         </a>
                     </div>
                 </div>

@@ -145,8 +145,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <div class="content">
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
-                         <a href="add_student.php" class="module-nav-btn">
+                        <a href="add_student.php" class="module-nav-btn">
                             <i class="fas fa-user-plus"></i> Add Student
+                        </a>
+                        <a href="data_entry.php" class="module-nav-btn">
+                            <i class="fas fa-keyboard"></i> Data Entry
                         </a>
                         <a href="student_record.php" class="module-nav-btn ">
                             <i class="fas fa-address-book"></i> Student Record
