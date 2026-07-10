@@ -126,7 +126,7 @@ if ($defaulters) {
         <div class="header">
             <?php echo render_system_logo('report-logo'); ?>
             <p>Pending Fees Students Report</p>
-            <p>Generated on <?php echo date('d-m-Y H:i'); ?></p>
+            <p>Generated on <?php echo date('d-m-Y h:i A'); ?></p>
         </div>
         
         <div class="report-info">

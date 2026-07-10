@@ -201,7 +201,7 @@ $current_role = $_SESSION['role'] ?? 'User';
                 <p><strong>Scope:</strong> <?php echo is_finance() ? 'Personal Recorded Expenses' : 'All Users Expenses'; ?></p>
             </div>
             <div>
-                <p><strong>Print Date:</strong> <?php echo date('d-m-Y H:i'); ?></p>
+                <p><strong>Print Date:</strong> <?php echo date('d-m-Y h:i A'); ?></p>
                 <p><strong>Total Recorded Items:</strong> <?php echo count($expenses); ?></p>
             </div>
         </div>

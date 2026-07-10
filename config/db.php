@@ -4,6 +4,9 @@
  * School Finance Management System
  */
 
+// Set default timezone to Pakistan (Islamabad)
+date_default_timezone_set('Asia/Karachi');
+
 define('DB_HOST', 'localhost');
 define('DB_USER', 'root');
 define('DB_PASS', '');
@@ -37,6 +40,7 @@ if ($conn->connect_error) {
 
 if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
     $conn->set_charset("utf8mb4");
+    $conn->query("SET time_zone = '+05:00'");
     
     // Dynamically ensure payment_mode column exists
     $colCheck = $conn->query("SHOW COLUMNS FROM `payments` LIKE 'payment_mode'");

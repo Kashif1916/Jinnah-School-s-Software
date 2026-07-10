@@ -513,7 +513,7 @@ $cash_remaining = $total_cash - $total_expenses;
                                                     <td>
                                                         <strong><?php echo htmlspecialchars($p['name']); ?></strong>
                                                         <div class="text-muted small">F/Name: <?php echo htmlspecialchars($p['father_name']); ?></div>
-                                                        <div class="text-muted small print-only"><?php echo date('d-m-Y H:i', strtotime($p['payment_date'])); ?></div>
+                                                        <div class="text-muted small print-only"><?php echo date('d-m-Y h:i A', strtotime($p['payment_date'])); ?></div>
                                                     </td>
                                                     <td><?php echo htmlspecialchars($p['class'] . '-' . $p['section']); ?></td>
                                                     <td><?php echo htmlspecialchars($p['paid_for_month']); ?></td>
@@ -594,7 +594,7 @@ $cash_remaining = $total_cash - $total_expenses;
                                                     </td>
                                                     <td>
                                                         <span class="text-muted small">
-                                                            <?php echo date('d-m-Y H:i', strtotime($e['created_at'])); ?>
+                                                            <?php echo date('d-m-Y h:i A', strtotime($e['created_at'])); ?>
                                                         </span>
                                                     </td>
                                                     <?php if ($clerk_filter === 'all'): ?>

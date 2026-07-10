@@ -50,7 +50,7 @@ function format_date($datetime) {
  */
 function format_datetime($datetime) {
     if (empty($datetime)) return '-';
-    return date('d-m-Y H:i', strtotime($datetime));
+    return date('d-m-Y h:i A', strtotime($datetime));
 }
 
 /**

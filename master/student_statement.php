@@ -240,7 +240,7 @@ foreach ($records as $key => $r) {
             <div>
                 <p><strong>Class - Section:</strong> <?php echo htmlspecialchars($student['class'] . '-' . $student['section']); ?></p>
                 <p><strong>Monthly Fee:</strong> <?php echo format_currency($student['monthly_fee']); ?></p>
-                <p><strong>Statement Date:</strong> <?php echo date('d-m-Y H:i'); ?></p>
+                <p><strong>Statement Date:</strong> <?php echo date('d-m-Y h:i A'); ?></p>
             </div>
         </div>
 

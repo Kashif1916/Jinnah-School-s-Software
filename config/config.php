@@ -4,6 +4,9 @@
  * School Finance Management System
  */
 
+// Set default timezone to Pakistan (Islamabad)
+date_default_timezone_set('Asia/Karachi');
+
 define('BASE_URL', 'http://localhost/Finance_System/');
 define('SITE_NAME', 'School Finance Management System');
 define('SYSTEM_NAME', 'SFMS');
@@ -19,8 +22,8 @@ $MONTHS = [
 
 // Date & Time Format
 define('DATE_FORMAT', 'd-m-Y');
-define('TIME_FORMAT', 'H:i:s');
-define('DATETIME_FORMAT', 'd-m-Y H:i:s');
+define('TIME_FORMAT', 'h:i:s A');
+define('DATETIME_FORMAT', 'd-m-Y h:i:s A');
 
 // Classes available in school
 $CLASSES = ['P.G','Nursury', 'Prep' , '1', '2', '3', '4', '5', '6', '7', '8', 'Pre-9', '9', '10', 'Passed-10', '11', '12'];

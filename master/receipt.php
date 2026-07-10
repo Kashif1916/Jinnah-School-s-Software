@@ -192,20 +192,37 @@ ob_start();
             white-space: nowrap;
         }
         .signature-section {
-            margin-top: 10mm;
+            margin-top: 5mm;
             font-size: 10px;
         }
         .signature-line {
+            border-top: 1px dashed #333;
             text-align: center;
-            padding-top: 2mm;
-            margin-top: 10mm;
+            padding-top: 1.5mm;
+            margin-top: 5mm;
+            width: 60%;
+            margin-left: auto;
+            margin-right: auto;
         }
         .footer {
             text-align: center;
             font-size: 9px;
             color: #999;
-            padding-top: 5mm;
-            margin-top: 5mm;
+            padding-top: 1.5mm;
+            margin-top: 3mm;
+        }
+        .receipt-note {
+            margin: 2mm auto;
+            padding-top: 1mm;
+            font-size: 11px;
+            text-align: center;
+            line-height: 1.4;
+            font-weight: bold;
+            white-space: pre-line;
+            max-width: 72mm;
+            word-wrap: break-word;
+            box-sizing: border-box;
+            display: block;
         }
         .paid-stamp {
             text-align: center;
@@ -257,7 +274,7 @@ ob_start();
         <div style="position: relative; z-index: 2;">
             <div class="receipt-number">
                 <p><strong>Receipt #:</strong> <?php echo str_pad($payments_to_display[0]['id'], 6, '0', STR_PAD_LEFT); ?></p>
-                <p><strong>Date:</strong> <?php echo date('d-m-Y H:i'); ?></p>
+                <p><strong>Date:</strong> <?php echo date('d-m-Y h:i A'); ?></p>
                 <p><strong>Method:</strong> <?php echo strtoupper(str_replace('_', ' ', $payments_to_display[0]['payment_mode'] ?? 'cash')); ?></p>
             </div>
             
@@ -319,18 +336,19 @@ ob_start();
         $receipt_note = $row['setting_value'];
     }
     ?>
+    
     <?php if (!empty($receipt_note)): ?>
-        <div class="receipt-note" style="margin: 4mm auto 0 auto; padding-top: 2mm; font-size: 11px; text-align: center; line-height: 1.4; font-weight: bold; white-space: pre-line; max-width: 72mm; word-wrap: break-word; box-sizing: border-box; display: block;">
+        <div class="receipt-note">
             <?php echo htmlspecialchars($receipt_note); ?>
         </div>
     <?php endif; ?>
     
     <div class="footer">
         <p>Thank you for your payment!</p>
-        <p><?php echo date('d-m-Y H:i:s'); ?></p>
+        <p><?php echo date('d-m-Y h:i:s A'); ?></p>
     </div>
     
-    <div style="height: 10mm;"></div>
+    <div style="height: 5mm;"></div>
         
     <script>
         window.onload = function() {
