@@ -393,11 +393,11 @@ if (isset($_GET['id'])) {
                                     <table class="table table-hover">
                                         <thead>
                                             <tr>
+                                                <th>ID</th>
                                                 <th>Name</th>
                                                 <th>Father Name</th>
                                                 <th>Class</th>
                                                 <th>Section</th>
-                                                
                                                 <th>Action</th>
                                             </tr>
                                         </thead>
@@ -406,6 +406,7 @@ if (isset($_GET['id'])) {
                                                 $unpaid = get_total_unpaid_fees($res['id']);
                                             ?>
                                                 <tr>
+                                                    <td><strong><?php echo $res['id']; ?></strong></td>
                                                     <td><?php echo $res['name']; ?></td>
                                                     <td><?php echo $res['father_name']; ?></td>
                                                     <td><?php echo $res['class']; ?></td>
