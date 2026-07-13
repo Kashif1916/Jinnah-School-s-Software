@@ -47,10 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $error = 'All required fields must be filled correctly!';
     } else {
         // Insert student
-        $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')";
+        $created_by = get_username();
+        $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
         $stmt = $conn->prepare($query);
-        $stmt->bind_param('ssssddsssds', $name, $father_name, $class, $section, $fixed_monthly_fee, $admission_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason);
+        $stmt->bind_param('ssssddsssdss', $name, $father_name, $class, $section, $fixed_monthly_fee, $admission_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
         
         if ($stmt->execute()) {
             $student_id = $conn->insert_id;
@@ -113,6 +114,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <a href="student_record.php" class="module-nav-btn">
                             <i class="fas fa-address-book"></i> Student Record
                         </a>
+                        <a href="student_add_details.php" class="module-nav-btn">
+                            <i class="fas fa-history"></i> Add Log
+                        </a>
                         <a href="fee_schedule.php" class="module-nav-btn">
                             <i class="fas fa-calendar-alt"></i> Fee Schedule
                         </a>
@@ -127,6 +131,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         </a>
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
+                        </a>
+                        <a href="data_correction.php" class="module-nav-btn">
+                            <i class="fas fa-edit"></i> Data Correction
                         </a>
                         <a href="promotion.php" class="module-nav-btn">
                             <i class="fas fa-arrow-up"></i> Promotion
@@ -211,6 +218,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <div class="col-md-6">
                                 <label class="form-label" for="admission_fee">Admission Fee</label>
                                 <input type="number" id="admission_fee" name="admission_fee" class="form-control" value="0" step="0.01" min="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="admission_date">Admission Date</label>
+                                <input type="text" id="admission_date" name="admission_date" class="form-control" value="<?php echo date('d-m-Y'); ?>" readonly>
                             </div>
                         </div>
                         <div class="row mb-3">

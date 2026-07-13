@@ -139,6 +139,40 @@ if (isset($_GET['toggle_freeze'])) {
     }
 }
 
+// Handle Edit Access Toggle Action
+if (isset($_GET['toggle_edit_access'])) {
+    $toggle_id = intval($_GET['toggle_edit_access']);
+    $current_user_id = get_user_id();
+    
+    if ($toggle_id === $current_user_id) {
+        $error = "You cannot change your own edit access!";
+    } else {
+        // Get current edit access status
+        $stmt = $conn->prepare("SELECT edit_access, username FROM users WHERE id = ?");
+        $stmt->bind_param("i", $toggle_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        
+        if ($res->num_rows > 0) {
+            $user_row = $res->fetch_assoc();
+            $new_edit_access = intval($user_row['edit_access']) === 1 ? 0 : 1;
+            
+            $update_stmt = $conn->prepare("UPDATE users SET edit_access = ? WHERE id = ?");
+            $update_stmt->bind_param("ii", $new_edit_access, $toggle_id);
+            if ($update_stmt->execute()) {
+                $status_txt = $new_edit_access === 1 ? 'granted' : 'revoked';
+                $success = "Edit access has been " . $status_txt . " for user '" . htmlspecialchars($user_row['username']) . "' successfully!";
+            } else {
+                $error = "Error updating user edit access: " . $conn->error;
+            }
+            $update_stmt->close();
+        } else {
+            $error = "User not found!";
+        }
+        $stmt->close();
+    }
+}
+
 // Fetch user if editing
 $edit_user = null;
 if (isset($_GET['edit'])) {
@@ -154,7 +188,7 @@ if (isset($_GET['edit'])) {
 }
 
 // Fetch all users for listing
-$users_result = $conn->query("SELECT id, username, password, role, is_frozen, frozen_until, created_at FROM users ORDER BY id ASC");
+$users_result = $conn->query("SELECT id, username, password, role, is_frozen, frozen_until, edit_access, created_at FROM users ORDER BY id ASC");
 $users = [];
 if ($users_result) {
     while ($row = $users_result->fetch_assoc()) {
@@ -205,6 +239,9 @@ if ($users_result) {
                         <a href="student_record.php" class="module-nav-btn">
                             <i class="fas fa-address-book"></i> Student Record
                         </a>
+                        <a href="student_add_details.php" class="module-nav-btn">
+                            <i class="fas fa-history"></i> Add Log
+                        </a>
                         <a href="fee_schedule.php" class="module-nav-btn">
                             <i class="fas fa-calendar-alt"></i> Fee Schedule
                         </a>
@@ -219,6 +256,9 @@ if ($users_result) {
                         </a>
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
+                        </a>
+                        <a href="data_correction.php" class="module-nav-btn">
+                            <i class="fas fa-edit"></i> Data Correction
                         </a>
                         <a href="promotion.php" class="module-nav-btn">
                             <i class="fas fa-arrow-up"></i> Promotion
@@ -306,11 +346,31 @@ if ($users_result) {
                                                         <?php else: ?>
                                                             <span class="badge bg-success" style="font-size: 0.8rem;"><i class="fas fa-check-circle"></i> Active</span>
                                                         <?php endif; ?>
+                                                        
+                                                        <?php if ($u['role'] !== 'master'): ?>
+                                                            <br>
+                                                            <?php if (intval($u['edit_access'] ?? 0) === 1): ?>
+                                                                <span class="badge bg-info text-dark" style="font-size: 0.75rem; margin-top: 4px;"><i class="fas fa-user-edit"></i> Edit Allowed</span>
+                                                            <?php else: ?>
+                                                                <span class="badge bg-secondary text-light" style="font-size: 0.75rem; margin-top: 4px;"><i class="fas fa-eye"></i> View Only</span>
+                                                            <?php endif; ?>
+                                                        <?php endif; ?>
                                                     </td>
                                                     <td class="text-muted small">
                                                         <?php echo date('d-M-Y h:i A', strtotime($u['created_at'])); ?>
                                                     </td>
                                                     <td class="text-end">
+                                                        <?php if ($u['id'] != get_user_id() && $u['role'] !== 'master'): ?>
+                                                            <?php if (intval($u['edit_access'] ?? 0) === 1): ?>
+                                                                <a href="users.php?toggle_edit_access=<?php echo $u['id']; ?>" class="btn btn-sm btn-outline-secondary me-1" style="padding: 4px 10px; font-size: 0.85rem;" title="Revoke Edit Access">
+                                                                    <i class="fas fa-user-slash"></i> Revoke Edit
+                                                                </a>
+                                                            <?php else: ?>
+                                                                <a href="users.php?toggle_edit_access=<?php echo $u['id']; ?>" class="btn btn-sm btn-outline-info me-1" style="padding: 4px 10px; font-size: 0.85rem;" title="Grant Edit Access">
+                                                                    <i class="fas fa-user-shield"></i> Grant Edit
+                                                                </a>
+                                                            <?php endif; ?>
+                                                        <?php endif; ?>
                                                         <?php if ($u['id'] != get_user_id()): ?>
                                                             <?php if ($is_f === 1): ?>
                                                                 <a href="users.php?toggle_freeze=<?php echo $u['id']; ?>" class="btn btn-sm btn-outline-success me-1" style="padding: 4px 10px; font-size: 0.85rem;" title="Unfreeze Account">

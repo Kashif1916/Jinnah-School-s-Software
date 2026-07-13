@@ -80,6 +80,9 @@ if ($res && $row = $res->fetch_assoc()) {
                         <a href="student_record.php" class="module-nav-btn">
                             <i class="fas fa-address-book"></i> Student Record
                         </a>
+                        <a href="student_add_details.php" class="module-nav-btn">
+                            <i class="fas fa-history"></i> Add Log
+                        </a>
                         <a href="fee_schedule.php" class="module-nav-btn">
                             <i class="fas fa-calendar-alt"></i> Fee Schedule
                         </a>
@@ -94,6 +97,9 @@ if ($res && $row = $res->fetch_assoc()) {
                         </a>
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
+                        </a>
+                        <a href="data_correction.php" class="module-nav-btn">
+                            <i class="fas fa-edit"></i> Data Correction
                         </a>
                         <a href="promotion.php" class="module-nav-btn">
                             <i class="fas fa-arrow-up"></i> Promotion

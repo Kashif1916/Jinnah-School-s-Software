@@ -74,6 +74,12 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
         $conn->query("ALTER TABLE `students` ADD COLUMN `admission_fee` DECIMAL(10, 2) DEFAULT 0.00 AFTER fixed_monthly_fee");
     }
 
+    // Dynamically ensure created_by column exists in students table
+    $colCheckCreatedBy = $conn->query("SHOW COLUMNS FROM `students` LIKE 'created_by'");
+    if ($colCheckCreatedBy && $colCheckCreatedBy->num_rows == 0) {
+        $conn->query("ALTER TABLE `students` ADD COLUMN `created_by` VARCHAR(50) DEFAULT NULL");
+    }
+
     // Dynamically ensure settings table exists
     $tableCheckSettings = $conn->query("SHOW TABLES LIKE 'settings'");
     if ($tableCheckSettings && $tableCheckSettings->num_rows == 0) {
@@ -105,6 +111,12 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
     $colCheckFrozenUntil = $conn->query("SHOW COLUMNS FROM `users` LIKE 'frozen_until'");
     if ($colCheckFrozenUntil && $colCheckFrozenUntil->num_rows == 0) {
         $conn->query("ALTER TABLE `users` ADD COLUMN `frozen_until` DATETIME DEFAULT NULL");
+    }
+
+    // Dynamically ensure edit_access column exists in users table
+    $colCheckEditAccess = $conn->query("SHOW COLUMNS FROM `users` LIKE 'edit_access'");
+    if ($colCheckEditAccess && $colCheckEditAccess->num_rows == 0) {
+        $conn->query("ALTER TABLE `users` ADD COLUMN `edit_access` TINYINT DEFAULT 0");
     }
 
     // Dynamically ensure dropped_students table exists

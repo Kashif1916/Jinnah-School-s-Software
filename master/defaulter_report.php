@@ -32,6 +32,7 @@ if ($defaulters) {
 <!DOCTYPE html>
 <html>
 <head>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -47,16 +48,16 @@ if ($defaulters) {
             border: 1px solid #333;
         }
         .header {
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             border-bottom: 2px solid #1f5f46;
             padding-bottom: 5mm;
             margin-bottom: 10mm;
         }
         .report-logo {
-            display: block;
-            width: 90px; /* Matched with login page logo size */
+            width: 80px;
             height: auto;
-            margin: 0 auto 4mm;
         }
         .header p {
             margin: 2mm 0;
@@ -124,9 +125,14 @@ if ($defaulters) {
 <body>
     <div class="report-container">
         <div class="header">
-            <?php echo render_system_logo('report-logo'); ?>
-            <p>Pending Fees Students Report</p>
-            <p>Generated on <?php echo date('d-m-Y h:i A'); ?></p>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <?php echo render_system_logo('report-logo'); ?>
+                <div style="text-align: left;">
+                    <h2 style="margin: 0; color: #1f5f46; font-size: 20px; font-weight: bold;">Jinnah School And Intermediate College Khushab</h2>
+                    <p style="margin: 5px 0 0 0; color: #666; font-size: 13px;">Pending Fees Students Report</p>
+                </div>
+            </div>
+            
         </div>
         
         <div class="report-info">
@@ -165,7 +171,7 @@ if ($defaulters) {
                             <td><?php echo $defaulter['name']; ?></td>
                             <td><?php echo $defaulter['father_name']; ?></td>
                             <td>
-                                <?php echo !empty($defaulter['contact_number']) ? $defaulter['contact_number'] . '<br>' : ''; ?>
+                                <?php echo !empty($defaulter['contact_number']) ? '<i class="fas fa-phone"></i> ' . $defaulter['contact_number'] . '<br>' : ''; ?>
                                 <?php echo !empty($defaulter['whatsapp_number']) ? '<i class="fab fa-whatsapp"></i> ' . $defaulter['whatsapp_number'] : ''; ?>
                             </td>
                             <td><?php echo $defaulter['class'] . '-' . $defaulter['section']; ?></td>

@@ -61,25 +61,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $father_name = sanitize_input($_POST['father_name'] ?? '');
         $class = sanitize_input($_POST['class'] ?? '');
         $section = sanitize_input($_POST['section'] ?? '');
-        $monthly_fee = floatval($_POST['monthly_fee'] ?? 0);
+        $fixed_monthly_fee = floatval($_POST['monthly_fee'] ?? 0); // Note: Form input is named 'monthly_fee' but contains fixed_monthly_fee
         $contact_number = sanitize_input($_POST['contact_number'] ?? '');
         $contact_number2 = sanitize_input($_POST['contact_number2'] ?? '');
         $whatsapp_number = sanitize_input($_POST['whatsapp_number'] ?? '');
         $concession_amount = floatval($_POST['concession_amount'] ?? 0);
         $concession_reason = sanitize_input($_POST['concession_reason'] ?? '');
         
-        if (!empty($name) && !empty($father_name) && $monthly_fee > 0) {
+        if (!empty($name) && !empty($father_name) && $fixed_monthly_fee > 0) {
+            $net_fee = $fixed_monthly_fee - $concession_amount;
+            if ($net_fee < 0) $net_fee = 0;
+            
             $query = "UPDATE students SET name = ?, father_name = ?, class = ?, section = ?, 
-                      monthly_fee = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ? WHERE id = ?";
+                      fixed_monthly_fee = ?, monthly_fee = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ? WHERE id = ?";
             $stmt = $conn->prepare($query);
-            $stmt->bind_param('ssssdsssdsi', $name, $father_name, $class, $section, $monthly_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
+            $stmt->bind_param('ssssddsssdsi', $name, $father_name, $class, $section, $fixed_monthly_fee, $net_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
             
             if ($stmt->execute()) {
                 $success = 'Student updated successfully!';
                 $student = get_student($student_id);
                 
                 // Automatically sync future unpaid records with new fee
-                $net_fee = floatval($fixed_monthly_fee) - floatval($concession_amount);
                 sync_unpaid_fee_amounts($student_id, $net_fee);
                 auto_generate_fee_buffer($student_id, $net_fee);
                 
@@ -142,6 +144,9 @@ if (isset($_GET['id'])) {
                         <a href="student_record.php" class="module-nav-btn">
                             <i class="fas fa-address-book"></i> Student Record
                         </a>
+                        <a href="student_add_details.php" class="module-nav-btn">
+                            <i class="fas fa-history"></i> Add Log
+                        </a>
                         <a href="fee_schedule.php" class="module-nav-btn">
                             <i class="fas fa-calendar-alt"></i> Fee Schedule
                         </a>
@@ -156,6 +161,9 @@ if (isset($_GET['id'])) {
                         </a>
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
+                        </a>
+                        <a href="data_correction.php" class="module-nav-btn">
+                            <i class="fas fa-edit"></i> Data Correction
                         </a>
                         <a href="promotion.php" class="module-nav-btn">
                             <i class="fas fa-arrow-up"></i> Promotion
@@ -323,9 +331,9 @@ if (isset($_GET['id'])) {
                                             <option value="Sibling">Sibling</option>
                                             <option value="Hafiz">Hafiz</option>
                                             <option value="Orfan">Orfan</option>
-                                    <option value="S.C">S.C</option>
-                                    <option value="EMP">EMP</option>
-                                </select>
+                                            <option value="S.C">S.C</option>
+                                            <option value="EMP">EMP</option>
+                                        </select>
                                     </div>
                                 </div>
                                 

@@ -9,6 +9,11 @@ require_once '../includes/helpers.php';
 
 require_admission();
 
+if (!has_edit_access()) {
+    header('Location: student_record.php');
+    exit();
+}
+
 $error = '';
 $success = '';
 $student = null;
@@ -23,15 +28,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $contact_number = sanitize_input($_POST['contact_number'] ?? '');
         $contact_number2 = sanitize_input($_POST['contact_number2'] ?? '');
         $whatsapp_number = sanitize_input($_POST['whatsapp_number'] ?? '');
+        $concession_amount = floatval($_POST['concession_amount'] ?? 0);
+        $concession_reason = sanitize_input($_POST['concession_reason'] ?? '');
+
+        // Fetch fixed_monthly_fee from current student info
+        $current_student = get_student($student_id);
+        $fixed_monthly_fee = floatval($current_student['fixed_monthly_fee'] ?? 0);
+        $net_fee = $fixed_monthly_fee - $concession_amount;
+        if ($net_fee < 0) $net_fee = 0;
 
         if (!empty($name) && !empty($father_name)) {
-            $query = "UPDATE students SET name = ?, father_name = ?, class = ?, section = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ? WHERE id = ?";
+            $query = "UPDATE students SET name = ?, father_name = ?, class = ?, section = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ?, monthly_fee = ? WHERE id = ?";
             $stmt = $conn->prepare($query);
-            $stmt->bind_param('sssssssi', $name, $father_name, $class, $section, $contact_number, $contact_number2, $whatsapp_number, $student_id);
+            $stmt->bind_param('ssssssssdsi', $name, $father_name, $class, $section, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $net_fee, $student_id);
             
             if ($stmt->execute()) {
                 $success = 'Student info updated successfully!';
                 $student = get_student($student_id);
+                
+                // Automatically sync future unpaid records with new fee
+                sync_unpaid_fee_amounts($student_id, $net_fee);
+                auto_generate_fee_buffer($student_id, $net_fee);
             } else {
                 $error = 'Error updating student.';
             }
@@ -153,12 +170,19 @@ if (isset($_GET['id'])) {
 
                             <div class="row mb-3">
                                 <div class="col-md-6">
-                                    <label class="form-label">Concession Amount</label>
-                                    <input type="text" class="form-control bg-light" value="<?php echo $student['concession_amount']; ?>" readonly>
+                                    <label class="form-label" for="concession_amount">Concession Amount</label>
+                                    <input type="number" id="concession_amount" name="concession_amount" class="form-control" value="<?php echo $student['concession_amount'] ?? 0; ?>" step="0.01" min="0">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Concession Reason</label>
-                                    <input type="text" class="form-control bg-light" value="<?php echo $student['concession_reason']; ?>" readonly>
+                                    <label class="form-label" for="concession_reason">Concession Reason</label>
+                                    <select id="concession_reason" name="concession_reason" class="form-select">
+                                        <option value="" <?php echo ($student['concession_reason'] ?? '') === '' ? 'selected' : ''; ?>>None</option>
+                                        <option value="Sibling" <?php echo ($student['concession_reason'] ?? '') === 'Sibling' ? 'selected' : ''; ?>>Sibling</option>
+                                        <option value="Hafiz" <?php echo ($student['concession_reason'] ?? '') === 'Hafiz' ? 'selected' : ''; ?>>Hafiz</option>
+                                        <option value="Orfan" <?php echo ($student['concession_reason'] ?? '') === 'Orfan' ? 'selected' : ''; ?>>Orfan</option>
+                                        <option value="S.C" <?php echo ($student['concession_reason'] ?? '') === 'S.C' ? 'selected' : ''; ?>>S.C</option>
+                                        <option value="EMP" <?php echo ($student['concession_reason'] ?? '') === 'EMP' ? 'selected' : ''; ?>>EMP</option>
+                                    </select>
                                 </div>
                             </div>
 

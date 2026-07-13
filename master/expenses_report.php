@@ -89,15 +89,16 @@ $current_role = $_SESSION['role'] ?? 'User';
             border: 1px solid #ddd;
         }
         .header {
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             border-bottom: 2px solid #1f5f46;
-            padding-bottom: 2mm; /* Compact padding */
-            margin-bottom: 4mm;  /* Compact margin */
+            padding-bottom: 4mm;
+            margin-bottom: 6mm;
         }
-        /* MATCHED: Logo container and image size */
-        .logo-wrapper img {
-            width: 120px !important; 
-            height: 120px;
+        .report-logo {
+            width: 80px !important;
+            height: auto !important;
         }
         .header h1 {
             margin: 0 0 1mm;
@@ -179,20 +180,16 @@ $current_role = $_SESSION['role'] ?? 'User';
 <body>
     <div class="report-container">
         <div class="header">
-            <div class="logo-wrapper">
+            <div style="display: flex; align-items: center; gap: 15px;">
                 <?php echo render_system_logo('report-logo'); ?>
+                <div style="text-align: left;">
+                    <h2 style="margin: 0; color: #1f5f46; font-size: 20px; font-weight: bold;">Jinnah School And Intermediate College Khushab</h2>
+                    <p style="margin: 5px 0 0 0; color: #666; font-size: 13px;">Expenses Statement Report</p>
+                </div>
             </div>
-            <h1><?php echo SITE_NAME; ?></h1>
-            <p>Expenses Statement Report</p>
-            <p>
-                <?php if (!empty($start_date) && empty($end_date)): ?>
-                    For Date: <strong><?php echo date('d-m-Y', strtotime($start_date)); ?></strong>
-                <?php elseif (!empty($start_date) && !empty($end_date)): ?>
-                    Date Range: <strong><?php echo date('d-m-Y', strtotime($start_date)); ?></strong> to <strong><?php echo date('d-m-Y', strtotime($end_date)); ?></strong>
-                <?php else: ?>
-                    Showing: <strong>All Records</strong>
-                <?php endif; ?>
-            </p>
+            
+                
+            </div>
         </div>
 
         <div class="meta-info">

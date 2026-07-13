@@ -215,7 +215,7 @@ if ($defaulters) {
                                             <td><?php echo $defaulter['name']; ?></td>
                                             <td><?php echo $defaulter['father_name']; ?></td>
                                             <td>
-                                                <?php echo !empty($defaulter['contact_number']) ? $defaulter['contact_number'] . '<br>' : ''; ?>
+                                                <?php echo !empty($defaulter['contact_number']) ? '<i class="fas fa-phone"></i> ' . $defaulter['contact_number'] . '<br>' : ''; ?>
                                                 <?php echo !empty($defaulter['whatsapp_number']) ? '<i class="fab fa-whatsapp"></i> ' . $defaulter['whatsapp_number'] : ''; ?>
                                             </td>
                                             <td><?php echo $defaulter['class'] . '-' . $defaulter['section']; ?></td>

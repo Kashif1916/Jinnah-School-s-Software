@@ -39,6 +39,33 @@ function is_admission() {
 }
 
 /**
+ * Check if current user has edit access
+ */
+function has_edit_access() {
+    if (!is_logged_in()) {
+        return false;
+    }
+    if (is_master()) {
+        return true;
+    }
+    global $conn;
+    if (isset($conn)) {
+        $user_id = get_user_id();
+        if ($user_id !== null) {
+            $stmt = $conn->prepare("SELECT edit_access FROM users WHERE id = ?");
+            $stmt->bind_param("i", $user_id);
+            $stmt->execute();
+            $res = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if ($res) {
+                return intval($res['edit_access']) === 1;
+            }
+        }
+    }
+    return false;
+}
+
+/**
  * Get current user ID
  */
 function get_user_id() {

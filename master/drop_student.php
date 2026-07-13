@@ -263,11 +263,13 @@ if ($view_mode === 'restore_mode') {
                         <a href="dashboard.php" class="module-nav-btn"><i class="fas fa-chart-bar"></i> Dashboard</a>
                         <a href="add_student.php" class="module-nav-btn"><i class="fas fa-user-plus"></i> Add Student</a>
                         <a href="student_record.php" class="module-nav-btn"><i class="fas fa-address-book"></i> Student Record</a>
+                        <a href="student_add_details.php" class="module-nav-btn"><i class="fas fa-history"></i> Add Log</a>
                         <a href="fee_schedule.php" class="module-nav-btn"><i class="fas fa-calendar-alt"></i> Fee Schedule</a>
                         <a href="fee_management.php" class="module-nav-btn"><i class="fas fa-money-bill-wave"></i> Fee Management</a>
                         <a href="defaulter_list.php" class="module-nav-btn"><i class="fas fa-list"></i> Pending List</a>
                         <a href="payment_analytics.php" class="module-nav-btn"><i class="fas fa-chart-line"></i> Analytics</a>
                         <a href="expenses.php" class="module-nav-btn"><i class="fas fa-wallet"></i> Expenses</a>
+                        <a href="data_correction.php" class="module-nav-btn"><i class="fas fa-edit"></i> Data Correction</a>
                         <a href="promotion.php" class="module-nav-btn"><i class="fas fa-arrow-up"></i> Promotion</a>
                         <a href="drop_student.php" class="module-nav-btn active"><i class="fas fa-trash"></i> Drop Student</a>
                         <a href="users.php" class="module-nav-btn"><i class="fas fa-users-cog"></i> Users</a>

@@ -173,9 +173,13 @@ $stmt->close();
                                                 </span>
                                             </td>
                                             <td>
-                                                <a href="edit_student.php?id=<?php echo $s['id']; ?>" class="btn-action">
-                                                    <i class="fas fa-edit"></i> Edit
-                                                </a>
+                                                <?php if (has_edit_access()): ?>
+                                                    <a href="edit_student.php?id=<?php echo $s['id']; ?>" class="btn-action">
+                                                        <i class="fas fa-edit"></i> Edit
+                                                    </a>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary"><i class="fas fa-lock"></i> No Edit Access</span>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>

@@ -99,6 +99,9 @@ if ($defaulters) {
                         <a href="student_record.php" class="module-nav-btn">
                             <i class="fas fa-address-book"></i> Student Record
                         </a>
+                        <a href="student_add_details.php" class="module-nav-btn">
+                            <i class="fas fa-history"></i> Add Log
+                        </a>
                         <a href="fee_schedule.php" class="module-nav-btn">
                             <i class="fas fa-calendar-alt"></i> Fee Schedule
                         </a>
@@ -113,6 +116,9 @@ if ($defaulters) {
                         </a>
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
+                        </a>
+                        <a href="data_correction.php" class="module-nav-btn">
+                            <i class="fas fa-edit"></i> Data Correction
                         </a>
                         <a href="promotion.php" class="module-nav-btn">
                             <i class="fas fa-arrow-up"></i> Promotion
@@ -220,7 +226,7 @@ if ($defaulters) {
                                             <td><?php echo $defaulter['name']; ?></td>
                                             <td><?php echo $defaulter['father_name']; ?></td>
                                             <td>
-                                                <?php echo !empty($defaulter['contact_number']) ? $defaulter['contact_number'] . '<br>' : ''; ?>
+                                                <?php echo !empty($defaulter['contact_number']) ? '<i class="fas fa-phone"></i> ' . $defaulter['contact_number'] . '<br>' : ''; ?>
                                                 <?php echo !empty($defaulter['whatsapp_number']) ? '<i class="fab fa-whatsapp"></i> ' . $defaulter['whatsapp_number'] : ''; ?>
                                             </td>
                                             <td><?php echo $defaulter['class'] . '-' . $defaulter['section']; ?></td>

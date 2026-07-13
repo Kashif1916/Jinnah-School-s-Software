@@ -105,6 +105,34 @@ if (!empty($payments_to_display)) {
     }
 }
 
+$grouped_payments = [];
+if (!empty($payments_to_display)) {
+    foreach ($payments_to_display as $payment) {
+        $student_id = $payment['student_id'];
+        $paid_month = $payment['paid_for_month'] ?? $payment['month'] ?? '';
+        $is_admission = (trim($paid_month) === 'Admission');
+        
+        $group_key = $is_admission ? ($student_id . '_admission') : ($student_id . '_months');
+        
+        if (!isset($grouped_payments[$group_key])) {
+            $grouped_payments[$group_key] = [
+                'name' => $payment['name'],
+                'father_name' => $payment['father_name'],
+                'class' => $payment['class'],
+                'section' => $payment['section'],
+                'fixed_monthly_fee' => $payment['fixed_monthly_fee'],
+                'concession_amount' => $payment['concession_amount'],
+                'is_admission' => $is_admission,
+                'months' => [],
+                'total_amount' => 0.0,
+                'payment_mode' => $payment['payment_mode'] ?? 'cash',
+            ];
+        }
+        $grouped_payments[$group_key]['months'][] = $paid_month;
+        $grouped_payments[$group_key]['total_amount'] += floatval($payment['amount']);
+    }
+}
+
 if (empty($payments_to_display)) {
     die('Receipt not found');
 }
@@ -275,6 +303,8 @@ ob_start();
             <div class="receipt-number">
                 <p><strong>Receipt #:</strong> <?php echo str_pad($payments_to_display[0]['id'], 6, '0', STR_PAD_LEFT); ?></p>
                 <p><strong>Date:</strong> <?php echo date('d-m-Y h:i A'); ?></p>
+                <p><strong>Phone:</strong> 03180711280</p>
+                <p><strong>Paid By:</strong> <?php echo htmlspecialchars($payments_to_display[0]['received_by'] ?? 'System'); ?></p>
                 <p><strong>Method:</strong> <?php echo strtoupper(str_replace('_', ' ', $payments_to_display[0]['payment_mode'] ?? 'cash')); ?></p>
             </div>
             
@@ -288,20 +318,20 @@ ob_start();
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($payments_to_display as $payment): ?>
+                        <?php foreach ($grouped_payments as $stud_id => $group): ?>
                             <tr>
                                 <td>
-                                    <strong><?php echo $payment['name'] . ' / ' . $payment['father_name']; ?></strong><br>
-                                    <?php echo $payment['class'] . '-' . $payment['section']; ?> | <?php echo $payment['paid_for_month']; ?>
+                                    <strong><?php echo htmlspecialchars($group['name']) . ' / ' . htmlspecialchars($group['father_name']); ?></strong><br>
+                                    <?php echo htmlspecialchars($group['class']) . '-' . htmlspecialchars($group['section']); ?> | <?php echo implode(', ', $group['months']); ?>
                                     <?php 
-                                    // If there is concession, show standard - concession = payable
-                                    if (isset($payment['fixed_monthly_fee']) && isset($payment['concession_amount']) && $payment['concession_amount'] > 0) {
-                                        $payable = floatval($payment['fixed_monthly_fee']) - floatval($payment['concession_amount']);
-                                        echo "<br><small class='text-muted' style='font-size: 9px; color:#555;'>Fee: " . number_format($payment['fixed_monthly_fee'], 0) . " - " . number_format($payment['concession_amount'], 0) . " = " . number_format($payable, 0) . "</small>";
+                                    // If there is concession and it is not admission fee, show standard - concession = payable
+                                    if (empty($group['is_admission']) && isset($group['fixed_monthly_fee']) && isset($group['concession_amount']) && $group['concession_amount'] > 0) {
+                                        $payable = floatval($group['fixed_monthly_fee']) - floatval($group['concession_amount']);
+                                        echo "<br><small class='text-muted' style='font-size: 9px; color:#555;'>Fee: " . number_format($group['fixed_monthly_fee'], 0) . " - " . number_format($group['concession_amount'], 0) . " = " . number_format($payable, 0) . " (Per Month)</small>";
                                     }
                                     ?>
                                 </td>
-                                <td class="amount-col"><?php echo number_format($payment['amount'], 2); ?></td>
+                                <td class="amount-col"><?php echo number_format($group['total_amount'], 2); ?></td>
                             </tr>
                         <?php endforeach; ?>
                         <tr style="font-weight: bold;">
