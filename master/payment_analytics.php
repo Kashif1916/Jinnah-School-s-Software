@@ -198,6 +198,11 @@ $cash_remaining = $total_cash - $total_expenses;
             gap: 8px;
         }
 
+        .report-logo {
+            width: 80px !important;
+            height: auto !important;
+        }
+
         .print-only-header {
             display: none;
         }
@@ -226,8 +231,8 @@ $cash_remaining = $total_cash - $total_expenses;
 
             .print-only-header {
                 display: block !important;
-                border-bottom: 2px solid #1f5f46 !important;
-                padding-bottom: 3px !important;
+                border-bottom: none !important;
+                padding-bottom: 0px !important;
                 margin-bottom: 10px !important;
             }
 
@@ -348,16 +353,21 @@ $cash_remaining = $total_cash - $total_expenses;
             </div>
 
             <div class="print-only-header">
-                <h1><?php echo SITE_NAME; ?></h1>
-                <h3>
-                    <?php 
-                    if ($clerk_filter === 'all') {
-                        echo "Principal's Consolidated Reconciliation Statement (All Clerks)";
-                    } else {
-                        echo "Clerk Cash Reconciliation Statement (Clerk: " . htmlspecialchars($clerk_filter) . ")";
-                    }
-                    ?>
-                </h3>
+                <div style="display: flex; align-items: center; gap: 15px; border-bottom: 2px solid #1f5f46; padding-bottom: 8px; margin-bottom: 8px;">
+                    <?php echo render_system_logo('report-logo'); ?>
+                    <div style="text-align: left;">
+                        <h2 style="margin: 0; color: #1f5f46; font-size: 20px; font-weight: bold;">Jinnah School And Intermediate College Khushab</h2>
+                        <h3 style="margin: 3px 0 0 0; color: #666; font-size: 13px; font-weight: normal; border: none; padding: 0;">
+                            <?php 
+                            if ($clerk_filter === 'all') {
+                                echo "Principal's Consolidated Reconciliation Statement (All Clerks)";
+                            } else {
+                                echo "Clerk Cash Reconciliation Statement (Clerk: " . htmlspecialchars($clerk_filter) . ")";
+                            }
+                            ?>
+                        </h3>
+                    </div>
+                </div>
                 <div class="print-meta-grid">
                     <div class="print-meta-col">
                         <strong>Reporting User:</strong> Principal (master)

@@ -46,25 +46,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($name) || empty($father_name) || empty($class) || empty($section) || $fixed_monthly_fee <= 0) {
         $error = 'All required fields must be filled correctly!';
     } else {
-        // Insert student
-        $created_by = get_username();
-        $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param('ssssddsssdss', $name, $father_name, $class, $section, $fixed_monthly_fee, $admission_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
+        // Check if student already exists in the same class and section
+        $check_query = "SELECT id FROM students WHERE name = ? AND father_name = ? AND class = ? AND section = ? AND status = 'active'";
+        $check_stmt = $conn->prepare($check_query);
+        $check_stmt->bind_param('ssss', $name, $father_name, $class, $section);
+        $check_stmt->execute();
+        $check_stmt->store_result();
         
-        if ($stmt->execute()) {
-            $student_id = $conn->insert_id;
-            
-            // Create initial 12 months fee records starting from current month and include admission fee
-            create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount, $admission_fee);
-            
-            $success = 'Student added successfully! Annual fees created.';
+        if ($check_stmt->num_rows > 0) {
+            $error = 'Student is not entered because this student is already exist in the same class with the same name and same class section!';
+            $check_stmt->close();
         } else {
-            $error = 'Error adding student: ' . $stmt->error;
+            $check_stmt->close();
+            // Insert student
+            $created_by = get_username();
+            $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
+            $stmt = $conn->prepare($query);
+            $stmt->bind_param('ssssddsssdss', $name, $father_name, $class, $section, $fixed_monthly_fee, $admission_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
+            
+            if ($stmt->execute()) {
+                $student_id = $conn->insert_id;
+                
+                // Create initial 12 months fee records starting from current month and include admission fee
+                create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount, $admission_fee);
+                
+                $success = 'Student added successfully! Annual fees created.';
+            } else {
+                $error = 'Error adding student: ' . $stmt->error;
+            }
+            
+            $stmt->close();
         }
-        
-        $stmt->close();
     }
 }
 ?>
@@ -287,6 +300,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 alert('Concession amount must be between 0 and the monthly fee.');
             }
         });
+
+        <?php if (!empty($error) && strpos($error, 'already exist') !== false): ?>
+        alert(<?php echo json_encode($error); ?>);
+        <?php endif; ?>
     </script>
 </body>
 </html>

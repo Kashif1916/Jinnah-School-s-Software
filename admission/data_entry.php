@@ -49,17 +49,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($name) || empty($father_name) || empty($class) || empty($section) || $fixed_monthly_fee <= 0) {
         $error = 'All required fields must be filled correctly!';
     } else {
-        $conn->begin_transaction();
-        try {
-            $monthly_fee = $fixed_monthly_fee - $concession_amount;
-            if ($monthly_fee < 0) $monthly_fee = 0;
-            
-            // Insert student with monthly_fee calculated and pending_amount stored in admission_fee
-            $created_by = get_username();
-            $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, monthly_fee, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
-            $stmt = $conn->prepare($query);
-            $stmt->bind_param('ssssdddsssdss', $name, $father_name, $class, $section, $fixed_monthly_fee, $monthly_fee, $pending_amount, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
+        // Check if student already exists in the same class and section
+        $check_query = "SELECT id FROM students WHERE name = ? AND father_name = ? AND class = ? AND section = ? AND status = 'active'";
+        $check_stmt = $conn->prepare($check_query);
+        $check_stmt->bind_param('ssss', $name, $father_name, $class, $section);
+        $check_stmt->execute();
+        $check_stmt->store_result();
+        
+        if ($check_stmt->num_rows > 0) {
+            $error = 'Student is not entered because this student is already exist in the same class with the same name and same class section!';
+            $check_stmt->close();
+        } else {
+            $check_stmt->close();
+            $conn->begin_transaction();
+            try {
+                $monthly_fee = $fixed_monthly_fee - $concession_amount;
+                if ($monthly_fee < 0) $monthly_fee = 0;
+                
+                // Insert student with monthly_fee calculated and pending_amount stored in admission_fee
+                $created_by = get_username();
+                $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, monthly_fee, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
+                $stmt = $conn->prepare($query);
+                $stmt->bind_param('ssssdddsssdss', $name, $father_name, $class, $section, $fixed_monthly_fee, $monthly_fee, $pending_amount, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
             
             if ($stmt->execute()) {
                 $student_id = $conn->insert_id;
@@ -139,6 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $error = 'Error adding student: ' . $e->getMessage();
         }
     }
+}
 }
 
 $months_list = [
@@ -375,6 +388,10 @@ $months_list = [
                 alert('Concession amount must be between 0 and the monthly fee.');
             }
         });
+
+        <?php if (!empty($error) && strpos($error, 'already exist') !== false): ?>
+        alert(<?php echo json_encode($error); ?>);
+        <?php endif; ?>
     </script>
 </body>
 </html>
