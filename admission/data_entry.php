@@ -203,7 +203,7 @@ $months_list = [
             
             <!-- Dashboard Content -->
             <div class="content">
-                <div class="module-nav-panel">
+                 <div class="module-nav-panel">
                     <div class="module-nav-row">
                         <a href="add_student.php" class="module-nav-btn">
                             <i class="fas fa-user-plus"></i> Add Student
@@ -213,6 +213,9 @@ $months_list = [
                         </a>
                         <a href="student_record.php" class="module-nav-btn">
                             <i class="fas fa-address-book"></i> Student Record
+                        </a>
+                        <a href="defaulter_list.php" class="module-nav-btn">
+                            <i class="fas fa-list"></i> Pending List
                         </a>
                         <a href="promotion.php" class="module-nav-btn">
                             <i class="fas fa-arrow-up"></i> Promotion

@@ -206,6 +206,9 @@ if ($view_mode === 'see_mode') {
                         <a href="student_record.php" class="module-nav-btn ">
                             <i class="fas fa-address-book"></i> Student Record
                         </a>
+                        <a href="defaulter_list.php" class="module-nav-btn">
+                            <i class="fas fa-list"></i> Pending List
+                        </a>
                         <a href="promotion.php" class="module-nav-btn ">
                             <i class="fas fa-arrow-up"></i> Promotion
                         </a>

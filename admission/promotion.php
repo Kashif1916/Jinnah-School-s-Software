@@ -151,18 +151,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <a href="data_entry.php" class="module-nav-btn">
                             <i class="fas fa-keyboard"></i> Data Entry
                         </a>
-                        <a href="student_record.php" class="module-nav-btn ">
+                        <a href="student_record.php" class="module-nav-btn">
                             <i class="fas fa-address-book"></i> Student Record
+                        </a>
+                        <a href="defaulter_list.php" class="module-nav-btn">
+                            <i class="fas fa-list"></i> Pending List
                         </a>
                         <a href="promotion.php" class="module-nav-btn active">
                             <i class="fas fa-arrow-up"></i> Promotion
                         </a>
-                       
                         <a href="drop_student.php" class="module-nav-btn">
                             <i class="fas fa-trash"></i> Drop Student
                         </a>
                     </div>
                 </div>
+            </div>
 
                 <div class="form-section">
                     <div class="promotion-card">
