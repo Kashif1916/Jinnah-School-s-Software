@@ -41,8 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $whatsapp_number = sanitize_input($_POST['whatsapp_number'] ?? '');
     $concession_amount = floatval($_POST['concession_amount'] ?? 0);
     $concession_reason = sanitize_input($_POST['concession_reason'] ?? '');
+    $pending_amount = floatval($_POST['pending_amount'] ?? 0);
     
-    $pending_amounts = $_POST['pending_amounts'] ?? []; // Map of month => pending_amount
+    $paid_months = $_POST['paid_months'] ?? []; // Checked months array
     
     // Validation
     if (empty($name) || empty($father_name) || empty($class) || empty($section) || $fixed_monthly_fee <= 0) {
@@ -50,19 +51,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } else {
         $conn->begin_transaction();
         try {
-            // Insert student (default admission_fee to 0)
+            $monthly_fee = $fixed_monthly_fee - $concession_amount;
+            if ($monthly_fee < 0) $monthly_fee = 0;
+            
+            // Insert student with monthly_fee calculated and pending_amount stored in admission_fee
             $created_by = get_username();
-            $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
-                 VALUES (?, ?, ?, ?, ?, 0.00, ?, ?, ?, ?, ?, 'active', ?)";
+            $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, monthly_fee, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
             $stmt = $conn->prepare($query);
-            $stmt->bind_param('ssssdssssss', $name, $father_name, $class, $section, $fixed_monthly_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
+            $stmt->bind_param('ssssdddsssdss', $name, $father_name, $class, $section, $fixed_monthly_fee, $monthly_fee, $pending_amount, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
             
             if ($stmt->execute()) {
                 $student_id = $conn->insert_id;
                 $stmt->close();
-                
-                $monthly_fee = $fixed_monthly_fee - $concession_amount;
-                if ($monthly_fee < 0) $monthly_fee = 0;
                 
                 // Historical Months of 2026
                 $months_2026 = [
@@ -73,11 +74,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $payment_date = date('Y-m-d H:i:s');
                 $received_by = get_username() ?? 'System';
                 
+                // Determine partial month
+                $partial_month = null;
+                $fully_paid_months = $paid_months;
+                
+                if ($pending_amount > 0) {
+                    if (!empty($paid_months)) {
+                        $partial_month = $paid_months[count($paid_months) - 1];
+                        $fully_paid_months = array_diff($paid_months, [$partial_month]);
+                    } else {
+                        $partial_month = 'Jan-2026';
+                        $fully_paid_months = [];
+                    }
+                }
+                
                 foreach ($months_2026 as $month) {
-                    $pending = floatval($pending_amounts[$month] ?? $monthly_fee);
-                    $pending = max(0, min($monthly_fee, $pending)); // clamp
-                    
-                    if ($pending <= 0) {
+                    if (in_array($month, $fully_paid_months)) {
                         // Mark as Paid in fee_records (amount = 0 remaining)
                         $query_fee = "INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES (?, ?, 0, 'paid', ?)";
                         $stmt_fee = $conn->prepare($query_fee);
@@ -91,29 +103,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $stmt_pay->bind_param('idsss', $student_id, $monthly_fee, $month, $payment_date, $received_by);
                         $stmt_pay->execute();
                         $stmt_pay->close();
-                    } elseif ($pending >= $monthly_fee) {
-                        // Mark as fully Unpaid in fee_records
+                    } elseif ($month === $partial_month) {
+                        // Mark as Partially Paid: status is 'unpaid', amount remaining is $pending_amount
+                        $query_fee = "INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES (?, ?, ?, 'unpaid', ?)";
+                        $stmt_fee = $conn->prepare($query_fee);
+                        $stmt_fee->bind_param('isds', $student_id, $month, $pending_amount, $payment_date);
+                        $stmt_fee->execute();
+                        $stmt_fee->close();
+                        
+                        $paid_amount = $monthly_fee - $pending_amount;
+                        if ($paid_amount > 0) {
+                            $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
+                            $stmt_pay = $conn->prepare($query_pay);
+                            $stmt_pay->bind_param('idsss', $student_id, $paid_amount, $month, $payment_date, $received_by);
+                            $stmt_pay->execute();
+                            $stmt_pay->close();
+                        }
+                    } else {
+                        // Mark as Unpaid in fee_records
                         $query_fee = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')";
                         $stmt_fee = $conn->prepare($query_fee);
                         $stmt_fee->bind_param('isd', $student_id, $month, $monthly_fee);
                         $stmt_fee->execute();
                         $stmt_fee->close();
-                    } else {
-                        // Partially paid
-                        // Mark as Unpaid in fee_records with $pending remaining
-                        $query_fee = "INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES (?, ?, ?, 'unpaid', ?)";
-                        $stmt_fee = $conn->prepare($query_fee);
-                        $stmt_fee->bind_param('isds', $student_id, $month, $pending, $payment_date);
-                        $stmt_fee->execute();
-                        $stmt_fee->close();
-                        
-                        // Insert partial payment into payments table
-                        $paid_amount = $monthly_fee - $pending;
-                        $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
-                        $stmt_pay = $conn->prepare($query_pay);
-                        $stmt_pay->bind_param('idsss', $student_id, $paid_amount, $month, $payment_date, $received_by);
-                        $stmt_pay->execute();
-                        $stmt_pay->close();
                     }
                 }
                 
@@ -263,11 +275,11 @@ $months_list = [
                             </div>
                         </div>
                         <div class="row mb-3">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label class="form-label" for="concession_amount">Concession Amount</label>
                                 <input type="number" id="concession_amount" name="concession_amount" class="form-control" value="0" step="0.01" min="0">
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label class="form-label" for="concession_reason">Concession Reason</label>
                                 <select id="concession_reason" name="concession_reason" class="form-select">
                                     <option value="">None</option>
@@ -278,46 +290,35 @@ $months_list = [
                                     <option value="EMP">EMP</option>
                                 </select>
                             </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="pending_amount">Previous Pending Fee (if any)</label>
+                                <input type="number" id="pending_amount" name="pending_amount" class="form-control" value="0" step="0.01" min="0">
+                            </div>
                         </div>
 
                         <!-- 2026 Fee Paid Months Block -->
                         <div class="card p-4 mb-4 border-0 shadow-sm" style="background: rgba(31, 95, 70, 0.05); border-radius: 12px;">
                             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                                 <h5 class="text-success mb-0" style="font-weight: 600;">
-                                    <i class="fas fa-calendar-check me-2"></i> Monthly Payments & Pending Amounts (2026)
+                                    <i class="fas fa-calendar-check me-2"></i> Fee Paid for Month (Jan 2026 - Dec 2026)
                                 </h5>
                                 <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-outline-success" id="selectAll">Mark All Paid</button>
-                                    <button type="button" class="btn btn-outline-secondary" id="deselectAll">Mark All Unpaid</button>
+                                    <button type="button" class="btn btn-outline-success" id="selectAll">Select All</button>
+                                    <button type="button" class="btn btn-outline-secondary" id="deselectAll">Deselect All</button>
                                 </div>
                             </div>
-                            <p class="text-muted small mb-3">Check the months that are fully paid. For partially paid months, uncheck the box and enter the remaining pending amount manually.</p>
-                            
-                            <div class="table-responsive">
-                                <table class="table table-sm table-bordered bg-white align-middle">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Month</th>
-                                            <th style="width: 150px; text-align: center;">Fully Paid?</th>
-                                            <th style="width: 250px;">Pending Amount (Rs.)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($months_list as $value => $label): ?>
-                                            <tr>
-                                                <td><strong><?php echo $label; ?></strong></td>
-                                                <td style="text-align: center;">
-                                                    <div class="form-check form-switch d-inline-block">
-                                                        <input class="form-check-input month-check" type="checkbox" role="switch" id="check_<?php echo $value; ?>" onchange="toggleMonthPaid('<?php echo $value; ?>')">
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <input type="number" name="pending_amounts[<?php echo $value; ?>]" id="pending_<?php echo $value; ?>" class="form-control form-control-sm pending-input" min="0" step="0.01" value="0">
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
+                            <p class="text-muted small mb-3">Check the months for which the student has already paid. Unchecked months will remain pending (unpaid).</p>
+                            <div class="row g-3">
+                                <?php foreach ($months_list as $value => $label): ?>
+                                    <div class="col-6 col-md-3">
+                                        <div class="form-check p-2 border rounded bg-white shadow-xs" style="transition: all 0.2s;">
+                                            <input class="form-check-input ms-1 me-2 month-check" type="checkbox" name="paid_months[]" value="<?php echo $value; ?>" id="check_<?php echo $value; ?>">
+                                            <label class="form-check-label text-dark small cursor-pointer" for="check_<?php echo $value; ?>">
+                                                <?php echo $label; ?>
+                                            </label>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
                             </div>
                         </div>
                         
@@ -339,25 +340,6 @@ $months_list = [
     <script src="../assets/js/script.js"></script>
     <script>
         const classFees = <?php echo json_encode($class_fees); ?>;
-        
-        function getNetMonthlyFee() {
-            const fixedFee = parseFloat(document.getElementById('fixed_monthly_fee').value || 0);
-            const concession = parseFloat(document.getElementById('concession_amount').value || 0);
-            const net = fixedFee - concession;
-            return net < 0 ? 0 : net;
-        }
-
-        function updatePendingAmountsToDefault() {
-            const netFee = getNetMonthlyFee();
-            document.querySelectorAll('.pending-input').forEach(input => {
-                const month = input.id.replace('pending_', '');
-                const cb = document.getElementById('check_' + month);
-                if (cb && !cb.checked) {
-                    input.value = netFee;
-                }
-            });
-        }
-
         document.getElementById('class').addEventListener('change', function() {
             const selectedClass = this.value;
             const feeInput = document.getElementById('fixed_monthly_fee');
@@ -366,62 +348,15 @@ $months_list = [
             } else {
                 feeInput.value = '';
             }
-            updatePendingAmountsToDefault();
-        });
-
-        document.getElementById('concession_amount').addEventListener('input', updatePendingAmountsToDefault);
-
-        function toggleMonthPaid(month) {
-            const cb = document.getElementById('check_' + month);
-            const input = document.getElementById('pending_' + month);
-            if (cb.checked) {
-                input.value = 0;
-            } else {
-                input.value = getNetMonthlyFee();
-            }
-        }
-
-        // Add event listeners to pending-inputs
-        document.querySelectorAll('.pending-input').forEach(input => {
-            input.addEventListener('input', function() {
-                const month = this.id.replace('pending_', '');
-                const cb = document.getElementById('check_' + month);
-                const val = parseFloat(this.value || 0);
-                const netFee = getNetMonthlyFee();
-                if (val <= 0) {
-                    cb.checked = true;
-                } else {
-                    cb.checked = false;
-                }
-                // Clamp max value to net monthly fee
-                if (val > netFee) {
-                    this.value = netFee;
-                }
-            });
         });
 
         // Select All / Deselect All
         document.getElementById('selectAll').addEventListener('click', function() {
-            document.querySelectorAll('.month-check').forEach(cb => {
-                cb.checked = true;
-                const month = cb.id.replace('check_', '');
-                document.getElementById('pending_' + month).value = 0;
-            });
+            document.querySelectorAll('.month-check').forEach(cb => cb.checked = true);
         });
-        
         document.getElementById('deselectAll').addEventListener('click', function() {
-            const netFee = getNetMonthlyFee();
-            document.querySelectorAll('.month-check').forEach(cb => {
-                cb.checked = false;
-                const month = cb.id.replace('check_', '');
-                document.getElementById('pending_' + month).value = netFee;
-            });
+            document.querySelectorAll('.month-check').forEach(cb => cb.checked = false);
         });
-
-        // Initialize defaults
-        setTimeout(() => {
-            updatePendingAmountsToDefault();
-        }, 100);
 
         document.getElementById('dataEntryForm').addEventListener('submit', function(e) {
             const name = document.getElementById('name').value.trim();
