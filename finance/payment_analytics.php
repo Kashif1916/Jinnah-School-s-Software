@@ -517,6 +517,9 @@ $cash_remaining = $total_cash - $total_expenses;
                         <a href="payment_analytics.php" class="module-nav-btn active"><i class="fas fa-chart-line"></i> Analytics</a>
                         <a href="expenses.php" class="module-nav-btn"><i class="fas fa-wallet"></i> Expenses</a>
                         <a href="account_close.php" class="module-nav-btn"><i class="fas fa-lock"></i> Close Account</a>
+                        <a href="../help.php" class="module-nav-btn">
+                            <i class="fas fa-question-circle text-success"></i> Help & About
+                        </a>
                     </div>
                 </div>
 

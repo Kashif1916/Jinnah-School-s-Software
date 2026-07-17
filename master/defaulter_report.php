@@ -18,10 +18,11 @@ if (!is_master() && !is_finance() && !is_admission() && !is_teacher()) {
 
 $class_filter = isset($_GET['class']) ? sanitize_input($_GET['class']) : '';
 $section_filter = isset($_GET['section']) ? sanitize_input($_GET['section']) : '';
+$name_filter = isset($_GET['name']) ? sanitize_input($_GET['name']) : '';
 $months_filter = isset($_GET['months']) ? (is_array($_GET['months']) ? $_GET['months'] : [sanitize_input($_GET['months'])]) : [];
 
 // Get defaulters
-$defaulters = get_defaulters($class_filter, $section_filter, $months_filter);
+$defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter);
 $defaulter_list = [];
 if ($defaulters) {
     $defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
@@ -138,9 +139,10 @@ if ($defaulters) {
         <div class="report-info">
             <p><strong>Report Criteria:</strong></p>
             <p>
-                Class: <?php echo !empty($class_filter) ? $class_filter : 'All'; ?> |
-                Section: <?php echo !empty($section_filter) ? $section_filter : 'All'; ?> |
-                Months: <?php echo !empty($months_filter) ? implode(', ', $months_filter) : 'All'; ?>
+                Name: <?php echo !empty($name_filter) ? htmlspecialchars($name_filter) : 'All'; ?> |
+                Class: <?php echo !empty($class_filter) ? htmlspecialchars($class_filter) : 'All'; ?> |
+                Section: <?php echo !empty($section_filter) ? htmlspecialchars($section_filter) : 'All'; ?> |
+                Months: <?php echo !empty($months_filter) ? implode(', ', array_map('htmlspecialchars', $months_filter)) : 'All'; ?>
             </p>
             <p><strong>Total Pending:</strong> <?php echo count($defaulter_list); ?></p>
         </div>

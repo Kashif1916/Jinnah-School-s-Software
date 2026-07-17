@@ -195,7 +195,7 @@ function get_total_paid_fees($student_id) {
 /**
  * Get defaulters list
  */
-function get_defaulters($class = '', $section = '', $months = []) {
+function get_defaulters($class = '', $section = '', $months = [], $name = '') {
     global $conn;
     
     // If no months are specified, default to previous 12 months (inclusive of current month)
@@ -222,6 +222,10 @@ function get_defaulters($class = '', $section = '', $months = []) {
     
     if (!empty($section)) {
         $query .= " AND s.section = '" . $conn->real_escape_string($section) . "'";
+    }
+
+    if (!empty($name)) {
+        $query .= " AND s.name LIKE '%" . $conn->real_escape_string($name) . "%'";
     }
     
     if (!empty($months)) {

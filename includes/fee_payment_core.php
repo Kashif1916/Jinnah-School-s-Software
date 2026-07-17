@@ -267,6 +267,9 @@ if (isset($_GET['id'])) {
                                 <i class="fas fa-lock"></i> Close Account
                             </a>
                         <?php endif; ?>
+                        <a href="../help.php" class="module-nav-btn">
+                            <i class="fas fa-question-circle text-success"></i> Help & About
+                        </a>
                     </div>
                 </div>
 

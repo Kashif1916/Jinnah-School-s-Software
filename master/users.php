@@ -303,6 +303,9 @@ if ($users_result) {
                         <a href="receipt_note.php" class="module-nav-btn">
                             <i class="fas fa-sticky-note"></i> Receipt Note
                         </a>
+                        <a href="../help.php" class="module-nav-btn">
+                            <i class="fas fa-question-circle text-success"></i> Help & About
+                        </a>
                     </div>
                 </div>
 
@@ -472,40 +475,7 @@ if ($users_result) {
                                 </form>
                             </div>
                         <?php else: ?>
-                            <div class="form-section">
-                                <h4 class="mb-3"><i class="fas fa-user-plus text-primary"></i> Add New User</h4>
-                                <p class="text-muted small">Create a new login account for staff or teachers.</p>
-                                <form method="POST" action="users.php">
-                                    <input type="hidden" name="action" value="add">
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label" for="add_username">Username *</label>
-                                        <input type="text" id="add_username" name="username" class="form-control" 
-                                               placeholder="Enter username" required>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label" for="add_password">Password *</label>
-                                        <input type="text" id="add_password" name="password" class="form-control" 
-                                               placeholder="Enter password" required>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label" for="add_role">Role *</label>
-                                        <select id="add_role" name="role" class="form-select" required>
-                                            <option value="" disabled selected>Select Role</option>
-                                            <option value="admission">Admission User</option>
-                                            <option value="finance">Finance User</option>
-                                            <option value="teacher">Teacher</option>
-                                            <option value="master">Master Admin</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <button type="submit" class="btn-primary w-100" style="padding: 10px;">
-                                        <i class="fas fa-plus"></i> Create User
-                                    </button>
-                                </form>
-                            </div>
+                            
                         <?php endif; ?>
                     </div>
                 </div>

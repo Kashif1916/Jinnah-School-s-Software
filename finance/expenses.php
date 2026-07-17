@@ -133,6 +133,9 @@ $stmt->close();
                         <a href="account_close.php" class="module-nav-btn">
                             <i class="fas fa-lock"></i> Close Account
                         </a>
+                        <a href="../help.php" class="module-nav-btn">
+                            <i class="fas fa-question-circle text-success"></i> Help & About
+                        </a>
                     </div>
                 </div>
 

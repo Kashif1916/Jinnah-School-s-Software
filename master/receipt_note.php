@@ -113,6 +113,9 @@ if ($res && $row = $res->fetch_assoc()) {
                         <a href="receipt_note.php" class="module-nav-btn active">
                             <i class="fas fa-sticky-note"></i> Receipt Note
                         </a>
+                        <a href="../help.php" class="module-nav-btn">
+                            <i class="fas fa-question-circle text-success"></i> Help & About
+                        </a>
                     </div>
                 </div>
 

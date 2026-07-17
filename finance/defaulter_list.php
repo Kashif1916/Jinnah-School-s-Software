@@ -13,16 +13,18 @@ require_finance();
 
 $class_filter = '';
 $section_filter = '';
+$name_filter = '';
 $months_filter = [];
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $class_filter = sanitize_input($_POST['class'] ?? '');
     $section_filter = sanitize_input($_POST['section'] ?? '');
+    $name_filter = sanitize_input($_POST['name'] ?? '');
     $months_filter = $_POST['months'] ?? [];
 }
 
 // Get defaulters
-$defaulters = get_defaulters($class_filter, $section_filter, $months_filter);
+$defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter);
 $defaulter_list = [];
 if ($defaulters) {
     $defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
@@ -115,6 +117,9 @@ if ($defaulters) {
                         <a href="account_close.php" class="module-nav-btn">
                             <i class="fas fa-lock"></i> Close Account
                         </a>
+                        <a href="../help.php" class="module-nav-btn">
+                            <i class="fas fa-question-circle text-success"></i> Help & About
+                        </a>
                     </div>
                 </div>
 
@@ -123,6 +128,11 @@ if ($defaulters) {
                         <h4>Filter Pending List</h4>
                         <form method="POST" class="filter-form">
                             <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="name">Student Name</label>
+                                    <input type="text" id="name" name="name" class="form-control" placeholder="Search by name..." value="<?php echo htmlspecialchars($name_filter); ?>">
+                                </div>
+
                                 <div class="form-group">
                                     <label for="class">Class</label>
                                     <select id="class" name="class" class="form-control">
@@ -188,7 +198,7 @@ if ($defaulters) {
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h4 class="mb-0">Pending Fees (<?php echo count($defaulter_list); ?>)</h4>
                             <?php 
-                                $query_data = ['class' => $class_filter, 'section' => $section_filter, 'months' => $months_filter];
+                                $query_data = ['class' => $class_filter, 'section' => $section_filter, 'name' => $name_filter, 'months' => $months_filter];
                                 $report_url = "../master/defaulter_report.php?" . http_build_query($query_data);
                             ?>
                             <a href="<?php echo $report_url; ?>" 
