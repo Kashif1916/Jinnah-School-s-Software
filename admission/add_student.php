@@ -136,6 +136,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <a href="drop_student.php" class="module-nav-btn">
                             <i class="fas fa-trash"></i> Drop Student
                         </a>
+                        <a href="../help.php" class="module-nav-btn">
+                            <i class="fas fa-question-circle text-success"></i> Help & About
+                        </a>
                     </div>
                 </div>
 
@@ -241,6 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         </div>
                     </form>
                 </div>
+
             </div>
         </main>
     </div>

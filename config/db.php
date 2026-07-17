@@ -119,6 +119,15 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
         $conn->query("ALTER TABLE `users` ADD COLUMN `edit_access` TINYINT DEFAULT 0");
     }
 
+    // Dynamically ensure 'teacher' role exists in the role enum
+    $colCheckRole = $conn->query("SHOW COLUMNS FROM `users` LIKE 'role'");
+    if ($colCheckRole && $colCheckRole->num_rows > 0) {
+        $row = $colCheckRole->fetch_assoc();
+        if (isset($row['Type']) && strpos($row['Type'], 'teacher') === false) {
+            $conn->query("ALTER TABLE `users` MODIFY COLUMN `role` ENUM('master', 'finance', 'admission', 'teacher') NOT NULL");
+        }
+    }
+
     // Dynamically ensure dropped_students table exists
     $tableCheckDrops = $conn->query("SHOW TABLES LIKE 'dropped_students'");
     if ($tableCheckDrops && $tableCheckDrops->num_rows == 0) {

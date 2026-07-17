@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `id` INT PRIMARY KEY AUTO_INCREMENT,
   `username` VARCHAR(50) UNIQUE NOT NULL,
   `password` VARCHAR(255) NOT NULL,
-  `role` ENUM('master', 'finance', 'admission') NOT NULL,
+  `role` ENUM('master', 'finance', 'admission', 'teacher') NOT NULL,
   `is_frozen` TINYINT DEFAULT 0,
   `frozen_until` DATETIME DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP

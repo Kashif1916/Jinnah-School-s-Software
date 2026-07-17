@@ -39,7 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 if ($item['record_id'] == $rec_id) { $exists = true; break; }
             }
 
-            if (!$exists && $paid_amt > 0) {
+            // FIX: Changed from > 0 to >= 0 to allow zero amount entries[cite: 2]
+            if (!$exists && $paid_amt >= 0) {
                 $query = "SELECT fr.*, s.name, s.class, s.section FROM fee_records fr 
                           JOIN students s ON fr.student_id = s.id WHERE fr.id = ?";
                 $stmt = $conn->prepare($query);
@@ -477,12 +478,13 @@ if (isset($_GET['id'])) {
                                                         
                                                         <div class="input-group input-group-sm" style="width: 140px;">
                                                             <span class="input-group-text">Rs.</span>
+                                                            <!-- FIX: Changed min="0.01" to min="0" to allow zero value input[cite: 2] -->
                                                             <input type="number" name="paid_amount[<?php echo $fee['id']; ?>]" 
                                                                    class="form-control paid-amount-input" 
                                                                    data-fee-id="<?php echo $fee['id']; ?>"
                                                                    data-original-val="<?php echo $fee['amount']; ?>"
                                                                    value="<?php echo $fee['amount']; ?>" 
-                                                                   step="0.01" min="0.01" max="<?php echo $fee['amount']; ?>" 
+                                                                   step="0.01" min="0" max="<?php echo $fee['amount']; ?>" 
                                                                    disabled>
                                                         </div>
                                                         <span id="remaining_<?php echo $fee['id']; ?>" class="font-monospace text-warning small fw-bold"></span>
@@ -635,8 +637,11 @@ if (isset($_GET['id'])) {
                             remainingSpan.innerHTML = '<i ></i> <span style="color: #f50f0f; font-size: 25px; font-weight: bold;">   Remaining: Rs. ' + remaining.toFixed(0) + '</span>';
                         } else if (remaining === 0) {
                             remainingSpan.textContent = '';
-                        } else if (val === 0) {
-                            remainingSpan.innerHTML = '<span style="color: #f50f0f; font-size: 25px; font-weight: bold;"> Must be > 0</span>';
+                        } else if (val < 0) {
+                            // FIX: Changed condition from val === 0 to val < 0 to accept zero amount properly[cite: 2]
+                            remainingSpan.innerHTML = '<span style="color: #f50f0f; font-size: 25px; font-weight: bold;"> Cannot be negative</span>';
+                        } else {
+                            remainingSpan.textContent = '';
                         }
                     }
                 });

@@ -47,9 +47,40 @@ if (isset($_GET['delete'])) {
     }
 }
 
-// Handle Edit Form submission
+// Handle Form submission (Add & Edit User)
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $action = $_POST['action'] ?? '';
+    
+    if ($action === 'add') {
+        $username = sanitize_input($_POST['username'] ?? '');
+        $password = $_POST['password'] ?? '';
+        $role = sanitize_input($_POST['role'] ?? '');
+        
+        if (empty($username) || empty($password) || empty($role)) {
+            $error = "Username, Password, and Role are required!";
+        } elseif (!in_array($role, ['master', 'finance', 'admission', 'teacher'])) {
+            $error = "Invalid role selected!";
+        } else {
+            // Check if username exists
+            $stmt = $conn->prepare("SELECT id FROM users WHERE username = ?");
+            $stmt->bind_param("s", $username);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            if ($res->num_rows > 0) {
+                $error = "Username already exists!";
+            } else {
+                $add_stmt = $conn->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
+                $add_stmt->bind_param("sss", $username, $password, $role);
+                if ($add_stmt->execute()) {
+                    $success = "User '" . htmlspecialchars($username) . "' has been created successfully!";
+                } else {
+                    $error = "Error creating user: " . $conn->error;
+                }
+                $add_stmt->close();
+            }
+            $stmt->close();
+        }
+    }
     
     if ($action === 'edit') {
         $user_id = intval($_POST['user_id'] ?? 0);
@@ -60,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         if (empty($username) || empty($role)) {
             $error = "Username and Role are required!";
-        } elseif (!in_array($role, ['master', 'finance', 'admission'])) {
+        } elseif (!in_array($role, ['master', 'finance', 'admission', 'teacher'])) {
             $error = "Invalid role selected!";
         } else {
             // Check if username exists on another user
@@ -325,6 +356,8 @@ if ($users_result) {
                                                             <span class="badge bg-danger" style="font-size: 0.8rem;"><i class="fas fa-shield-alt"></i> Master</span>
                                                         <?php elseif ($u['role'] === 'finance'): ?>
                                                             <span class="badge bg-primary" style="font-size: 0.8rem;"><i class="fas fa-calculator"></i> Finance</span>
+                                                        <?php elseif ($u['role'] === 'teacher'): ?>
+                                                            <span class="badge bg-success" style="font-size: 0.8rem;"><i class="fas fa-chalkboard-teacher"></i> Teacher</span>
                                                         <?php else: ?>
                                                             <span class="badge bg-info text-dark" style="font-size: 0.8rem;"><i class="fas fa-user-edit"></i> Admission</span>
                                                         <?php endif; ?>
@@ -425,6 +458,7 @@ if ($users_result) {
                                         <select id="role" name="role" class="form-select" required>
                                             <option value="admission" <?php echo $edit_user['role'] === 'admission' ? 'selected' : ''; ?>>Admission User</option>
                                             <option value="finance" <?php echo $edit_user['role'] === 'finance' ? 'selected' : ''; ?>>Finance User</option>
+                                            <option value="teacher" <?php echo $edit_user['role'] === 'teacher' ? 'selected' : ''; ?>>Teacher</option>
                                             <option value="master" <?php echo $edit_user['role'] === 'master' ? 'selected' : ''; ?>>Master Admin</option>
                                         </select>
                                     </div>
@@ -438,11 +472,39 @@ if ($users_result) {
                                 </form>
                             </div>
                         <?php else: ?>
-                            <div class="card h-100 border-0 shadow-sm d-flex align-items-center justify-content-center text-center p-4" style="background: #fafafa; border-radius: 8px; min-height: 250px;">
-                                <div>
-                                    <i class="fas fa-user-cog fa-2x text-muted mb-3" style="opacity: 0.5;"></i>
-                                    <p class="text-muted mb-0">Select any user's <strong>Edit</strong> button from the table to modify their details here.</p>
-                                </div>
+                            <div class="form-section">
+                                <h4 class="mb-3"><i class="fas fa-user-plus text-primary"></i> Add New User</h4>
+                                <p class="text-muted small">Create a new login account for staff or teachers.</p>
+                                <form method="POST" action="users.php">
+                                    <input type="hidden" name="action" value="add">
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label" for="add_username">Username *</label>
+                                        <input type="text" id="add_username" name="username" class="form-control" 
+                                               placeholder="Enter username" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label" for="add_password">Password *</label>
+                                        <input type="text" id="add_password" name="password" class="form-control" 
+                                               placeholder="Enter password" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label" for="add_role">Role *</label>
+                                        <select id="add_role" name="role" class="form-select" required>
+                                            <option value="" disabled selected>Select Role</option>
+                                            <option value="admission">Admission User</option>
+                                            <option value="finance">Finance User</option>
+                                            <option value="teacher">Teacher</option>
+                                            <option value="master">Master Admin</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn-primary w-100" style="padding: 10px;">
+                                        <i class="fas fa-plus"></i> Create User
+                                    </button>
+                                </form>
                             </div>
                         <?php endif; ?>
                     </div>

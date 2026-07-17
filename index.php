@@ -26,6 +26,8 @@ if (is_master()) {
     header('Location: ' . BASE_URL . 'admission/add_student.php');
 } elseif (is_finance()) {
     header('Location: ' . BASE_URL . 'finance/dashboard.php');
+} elseif (is_teacher()) {
+    header('Location: ' . BASE_URL . 'teacher/defaulter_list.php');
 } else {
     header('Location: ' . BASE_URL . 'login.php');
 }

@@ -11,7 +11,7 @@ require_once '../includes/helpers.php';
 
 // Allow Master, Finance, and Admission roles to access this report
 require_login();
-if (!is_master() && !is_finance() && !is_admission()) {
+if (!is_master() && !is_finance() && !is_admission() && !is_teacher()) {
     header('Location: ' . BASE_URL . 'index.php');
     exit();
 }

@@ -39,6 +39,13 @@ function is_admission() {
 }
 
 /**
+ * Check if user is Teacher
+ */
+function is_teacher() {
+    return is_logged_in() && $_SESSION['role'] === 'teacher';
+}
+
+/**
  * Check if current user has edit access
  */
 function has_edit_access() {
@@ -186,6 +193,17 @@ function require_finance() {
 function require_admission() {
     require_login();
     if (!is_admission()) {
+        header('Location: ' . BASE_URL . 'index.php');
+        exit();
+    }
+}
+
+/**
+ * Require teacher role
+ */
+function require_teacher() {
+    require_login();
+    if (!is_teacher()) {
         header('Location: ' . BASE_URL . 'index.php');
         exit();
     }

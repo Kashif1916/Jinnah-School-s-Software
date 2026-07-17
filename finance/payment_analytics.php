@@ -237,6 +237,26 @@ $cash_remaining = $total_cash - $total_expenses;
             font-size: 1.1rem;
             color: #1f5f46;
         }
+        .denom-cash-collected-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 5px;
+            padding-top: 5px;
+            font-weight: 600;
+            font-size: 1.05rem;
+            color: #555;
+        }
+        .difference-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed rgba(0,0,0,0.15);
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
 
         .report-logo {
             width: 80px !important;
@@ -418,6 +438,16 @@ $cash_remaining = $total_cash - $total_expenses;
             .denom-grand-total-row {
                 margin-top: 10px !important;
                 padding-top: 8px !important;
+                font-size: 12px !important;
+            }
+            .denom-cash-collected-row {
+                margin-top: 4px !important;
+                padding-top: 4px !important;
+                font-size: 11px !important;
+            }
+            .difference-row {
+                margin-top: 8px !important;
+                padding-top: 6px !important;
                 font-size: 12px !important;
             }
 
@@ -802,6 +832,18 @@ $cash_remaining = $total_cash - $total_expenses;
                                 <span>Grand Total:</span>
                                 <span id="denom-grand-total">0.00</span>
                             </div>
+
+                            <!-- Nayi Row: Cash Collected (Reconciled Cash Remaining) -->
+                            <div class="denom-cash-collected-row">
+                                <span>Cash Collected:</span>
+                                <span id="audit-cash-collected"><?php echo number_format($cash_remaining, 2); ?></span>
+                            </div>
+
+                            <!-- Difference Row (Cash Collected - Grand Total) -->
+                            <div class="difference-row" id="difference-container">
+                                <span>Difference:</span>
+                                <span id="audit-difference">0.00</span>
+                            </div>
                         </div>
                     </div>
                 </div> </div>
@@ -811,6 +853,9 @@ $cash_remaining = $total_cash - $total_expenses;
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/script.js"></script>
     <script>
+        // PHP Cash Remaining Value passed to JavaScript safely
+        const reconciledCashRemaining = <?php echo floatval($cash_remaining); ?>;
+
         // Real-time currency denomination calculation logic
         function calcDenom(inputElement) {
             const noteValue = parseInt(inputElement.getAttribute('data-value'));
@@ -829,8 +874,29 @@ $cash_remaining = $total_cash - $total_expenses;
                 grandTotal += (val * qty);
             });
             
+            // Update Grand Total UI
             document.getElementById('denom-grand-total').innerText = grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            // Calculate & Update Difference: Reconciled Cash - Grand Total
+            const difference = reconciledCashRemaining - grandTotal;
+            const diffElement = document.getElementById('audit-difference');
+            
+            diffElement.innerText = difference.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            // Styling feedback based on balance
+            if (difference === 0) {
+                diffElement.style.color = '#1f5f46'; // Green if perfectly balanced
+                diffElement.innerText = "Balanced (0.00)";
+            } else {
+                diffElement.style.color = '#dc3545'; // Red if there's any deficit or surplus
+            }
         }
+
+        // Run calculation once on page load to set the initial difference state
+        window.addEventListener('DOMContentLoaded', () => {
+            const dummyInput = document.querySelector('.denom-input');
+            if (dummyInput) calcDenom(dummyInput);
+        });
     </script>
 </body>
 </html>
