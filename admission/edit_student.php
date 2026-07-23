@@ -184,7 +184,7 @@ if (isset($_GET['id'])) {
                                         <option value="" <?php echo ($student['concession_reason'] ?? '') === '' ? 'selected' : ''; ?>>None</option>
                                         <option value="Sibling" <?php echo ($student['concession_reason'] ?? '') === 'Sibling' ? 'selected' : ''; ?>>Sibling</option>
                                         <option value="Hafiz" <?php echo ($student['concession_reason'] ?? '') === 'Hafiz' ? 'selected' : ''; ?>>Hafiz</option>
-                                        <option value="Orfan" <?php echo ($student['concession_reason'] ?? '') === 'Orfan' ? 'selected' : ''; ?>>Orfan</option>
+                                        <option value="Orphan" <?php echo ($student['concession_reason'] ?? '') === 'Orphan' ? 'selected' : ''; ?>>Orphan</option>
                                         <option value="S.C" <?php echo ($student['concession_reason'] ?? '') === 'S.C' ? 'selected' : ''; ?>>S.C</option>
                                         <option value="EMP" <?php echo ($student['concession_reason'] ?? '') === 'EMP' ? 'selected' : ''; ?>>EMP</option>
                                     </select>

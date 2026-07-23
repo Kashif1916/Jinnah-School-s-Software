@@ -323,22 +323,22 @@ if (isset($_GET['id'])) {
                                 </div>
                                 
                                 <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label for="concession_amount" class="form-label">Concession Amount</label>
-                                        <input type="number" id="concession_amount" name="concession_amount" class="form-control" value="<?php echo $student['concession_amount'] ?? 0; ?>" step="0.01" min="0">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="concession_reason" class="form-label">Concession Reason</label>
-                                        <select id="concession_reason" name="concession_reason" class="form-control" value="<?php echo $student['concession_reason'] ?? ''; ?>">
-                                            <option value="">None</option>
-                                            <option value="Sibling">Sibling</option>
-                                            <option value="Hafiz">Hafiz</option>
-                                            <option value="Orfan">Orfan</option>
-                                            <option value="S.C">S.C</option>
-                                            <option value="EMP">EMP</option>
-                                        </select>
-                                    </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="concession_amount">Concession Amount</label>
+                                    <input type="number" id="concession_amount" name="concession_amount" class="form-control" value="<?php echo $student['concession_amount'] ?? 0; ?>" step="0.01" min="0">
                                 </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="concession_reason">Concession Reason</label>
+                                    <select id="concession_reason" name="concession_reason" class="form-select">
+                                        <option value="" <?php echo ($student['concession_reason'] ?? '') === '' ? 'selected' : ''; ?>>None</option>
+                                        <option value="Sibling" <?php echo ($student['concession_reason'] ?? '') === 'Sibling' ? 'selected' : ''; ?>>Sibling</option>
+                                        <option value="Hafiz" <?php echo ($student['concession_reason'] ?? '') === 'Hafiz' ? 'selected' : ''; ?>>Hafiz</option>
+                                        <option value="Orphan" <?php echo ($student['concession_reason'] ?? '') === 'Orphan' ? 'selected' : ''; ?>>Orphan</option>
+                                        <option value="S.C" <?php echo ($student['concession_reason'] ?? '') === 'S.C' ? 'selected' : ''; ?>>S.C</option>
+                                        <option value="EMP" <?php echo ($student['concession_reason'] ?? '') === 'EMP' ? 'selected' : ''; ?>>EMP</option>
+                                    </select>
+                                </div>
+                            </div>
                                 
                                 <div class="form-actions mt-4">
                                     <button type="submit" class="btn-primary me-2">

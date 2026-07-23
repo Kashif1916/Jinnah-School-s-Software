@@ -165,6 +165,9 @@ $stmt->close();
                 <div class="table-section">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h4>Total Students: <?php echo count($students); ?></h4>
+                        <a href="student_report.php?search_name=<?php echo urlencode($search_name); ?>&search_class=<?php echo urlencode($search_class); ?>&search_section=<?php echo urlencode($search_section); ?>" target="_blank" class="btn btn-success">
+                            <i class="fas fa-print"></i> Print List
+                        </a>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-hover">
@@ -176,8 +179,9 @@ $stmt->close();
                                     <th>Class</th>
                                     <th>Section</th>
                                     <th>Monthly Fee (Fixed)</th>
-                                    <th>Monthly Fee (Net)</th>
                                     <th>Concession</th>
+                                    <th>Monthly Fee (Net)</th>
+                                    
                                     <th>Contact Number(s)</th>
                                     <th>Action</th>
                                 </tr>
@@ -192,8 +196,9 @@ $stmt->close();
                                             <td><?php echo $s['class']; ?></td>
                                             <td><?php echo $s['section']; ?></td>
                                             <td><?php echo format_currency($s['fixed_monthly_fee']); ?></td>
-                                            <td><?php echo format_currency($s['monthly_fee']); ?></td>
+                                            
                                             <td><?php echo format_currency($s['concession_amount']); ?></td>
+                                            <td><?php echo format_currency($s['monthly_fee']); ?></td>
                                             <td>
                                                 <?php echo !empty($s['contact_number']) ? $s['contact_number'] . '<br>' : ''; ?>
                                                 <?php echo !empty($s['contact_number2']) ? $s['contact_number2'] . '<br>' : ''; ?>
@@ -211,7 +216,7 @@ $stmt->close();
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="9" class="text-center">No students found.</td>
+                                        <td colspan="10" class="text-center">No students found.</td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>

@@ -304,7 +304,7 @@ $months_list = [
                                     <option value="">None</option>
                                     <option value="Sibling">Sibling</option>
                                     <option value="Hafiz">Hafiz</option>
-                                    <option value="Orfan">Orfan</option>
+                                    <option value="Orphan">Orphan</option>
                                     <option value="S.C">S.C</option>
                                     <option value="EMP">EMP</option>
                                 </select>

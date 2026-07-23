@@ -263,8 +263,9 @@ $stmt->close();
                                     <th>Class</th>
                                     <th>Section</th>
                                     <th>Monthly Fee (Fixed)</th>
-                                    <th>Monthly Fee (Net)</th>
+                                    
                                     <th>Concession</th>
+                                    <th>Monthly Fee (Net)</th>
                                     <th>Contact Number(s)</th>
                                     <th>Admitted By</th>
                                     <th>Admitted At</th>
@@ -280,8 +281,9 @@ $stmt->close();
                                             <td><?php echo htmlspecialchars($s['class']); ?></td>
                                             <td><?php echo htmlspecialchars($s['section']); ?></td>
                                             <td><?php echo format_currency($s['fixed_monthly_fee']); ?></td>
-                                            <td><?php echo format_currency($s['monthly_fee']); ?></td>
+                                            
                                             <td><?php echo format_currency($s['concession_amount']); ?></td>
+                                            <td><?php echo format_currency($s['monthly_fee']); ?></td>
                                             <td>
                                                 <?php echo !empty($s['contact_number']) ? htmlspecialchars($s['contact_number']) . '<br>' : ''; ?>
                                                 <?php echo !empty($s['contact_number2']) ? htmlspecialchars($s['contact_number2']) . '<br>' : ''; ?>

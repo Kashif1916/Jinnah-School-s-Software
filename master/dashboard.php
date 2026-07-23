@@ -35,6 +35,18 @@ if ($month_coll_res) {
     $this_month_collection = floatval($month_coll_res->fetch_assoc()['total'] ?? 0);
 }
 
+// FETCH THIS MONTH UNPAID/PENDING FEES FOR GRAPH
+$this_month_unpaid = 0.00;
+$month_unpaid_res = $conn->query("SELECT SUM(amount) as total FROM fee_records WHERE status = 'unpaid' AND (created_at >= '$start_of_month' AND created_at <= '$end_of_month')");
+if ($month_unpaid_res) {
+    $this_month_unpaid = floatval($month_unpaid_res->fetch_assoc()['total'] ?? 0);
+}
+
+// Calculations for Month Fee Breakdown
+$this_month_total_expected = $this_month_collection + $this_month_unpaid;
+$month_paid_percentage = $this_month_total_expected > 0 ? round(($this_month_collection / $this_month_total_expected) * 100) : 0;
+$month_remaining_percentage = 100 - $month_paid_percentage;
+
 $this_month_expenses = 0.00;
 $month_exp_res = $conn->query("SELECT SUM(amount) as total FROM expenses WHERE created_at >= '$start_of_month' AND created_at <= '$end_of_month'");
 if ($month_exp_res) {
@@ -123,9 +135,6 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                         <a href="receipt_note.php" class="module-nav-btn">
                             <i class="fas fa-sticky-note"></i> Receipt Note
                         </a>
-                        <a href="../help.php" class="module-nav-btn">
-                            <i class="fas fa-question-circle text-success"></i> Help & About
-                        </a>
                     </div>
                 </div>
 
@@ -152,38 +161,40 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
 
                     <aside class="stage-panel">
                         <div class="dashboard-nav-header">
-                            <h4>Payment Graph</h4>
-                            <p>Paid vs remaining active students.</p>
+                            <h4>Collected vs Pending Fees</h4>
+                            <p>For the current month.</p>
                         </div>
                         <div class="metric-card" style="padding: 18px;">
                             <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-                                <div style="width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(#1f5f46 0% <?php echo $paid_percentage; ?>%, #d8e2dc <?php echo $paid_percentage; ?>% 100%); position: relative; flex-shrink: 0;">
+                                <!-- Conic Gradient Donut Chart (Blue = Collected, Theme Green = Pending) -->
+                                <div style="width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(#3b82f6 0% <?php echo $month_paid_percentage; ?>%, #1f5f46 <?php echo $month_paid_percentage; ?>% 100%); position: relative; flex-shrink: 0;">
                                     <div style="position: absolute; inset: 16px; border-radius: 50%; background: #ffffff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
-                                        <strong style="font-size: 24px; margin: 0; color: #13211a;"><?php echo $paid_percentage; ?>%</strong>
-                                        <small style="margin: 0; color: #6c7a73; font-size: 11px;">Paid</small>
+                                        <strong style="font-size: 24px; margin: 0; color: #13211a;"><?php echo $month_paid_percentage; ?>%</strong>
+                                        <small style="margin: 0; color: #6c7a73; font-size: 11px;">Collected</small>
                                     </div>
                                 </div>
+                                
+                                <!-- Text Data (Right Side) -->
                                 <div style="flex: 1; min-width: 180px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; color: #5b6962;">
-                                        <span><i class="fas fa-check-circle" style="color: #1f5f46;"></i> Paid Students</span>
-                                        <strong style="color: #13211a;"><?php echo $paid_students; ?></strong>
-                                    </div>
-                                    <div style="height: 9px; background: #e7efea; border-radius: 999px; overflow: hidden; margin-bottom: 12px;">
-                                        <div style="height: 100%; width: <?php echo $paid_percentage; ?>%; background: linear-gradient(90deg, #163325 0%, #1f5f46 100%);"></div>
+                                    <!-- Total Collection -->
+                                    <div style="margin-bottom: 12px;">
+                                        <span style="font-size: 12px; color: #6c7a73; display: block; font-weight: 500;">Total Collection of This Month</span>
+                                        <strong style="font-size: 15px; color: #13211a;"><?php echo format_currency(round($this_month_total_expected)); ?></strong>
                                     </div>
 
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; color: #5b6962;">
-                                        <span><i class="fas fa-hourglass-half" style="color: #90a49b;"></i> Remaining Students</span>
-                                        <strong style="color: #13211a;"><?php echo $remaining_students; ?></strong>
+                                    <!-- Total Received Collection -->
+                                    <div style="margin-bottom: 12px;">
+                                        <span style="font-size: 12px; color: #6c7a73; display: block; font-weight: 500;"><i class="fas fa-circle" style="color: #3b82f6; font-size: 9px; margin-right: 4px;"></i> Total Received Collection of This Month</span>
+                                        <strong style="font-size: 15px; color: #3b82f6;"><?php echo format_currency(round($this_month_collection)); ?></strong>
                                     </div>
-                                    <div style="height: 9px; background: #e7efea; border-radius: 999px; overflow: hidden;">
-                                        <div style="height: 100%; width: <?php echo $remaining_percentage; ?>%; background: #c4d3cc;"></div>
+
+                                    <!-- Remaining Collection -->
+                                    <div>
+                                        <span style="font-size: 12px; color: #6c7a73; display: block; font-weight: 500;"><i class="fas fa-circle" style="color: #1f5f46; font-size: 9px; margin-right: 4px;"></i> Remaining Collection of This Month</span>
+                                        <strong style="font-size: 15px; color: #1f5f46;"><?php echo format_currency(round($this_month_unpaid)); ?></strong>
                                     </div>
                                 </div>
                             </div>
-                            <small style="display: block; margin-top: 12px; color: #6c7a73; font-size: 12px;">
-                                Total active students: <?php echo $total_students; ?>
-                            </small>
                         </div>
                     </aside>
                 </div>
@@ -275,9 +286,9 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
 
                     </div>
                 </div>
-
             </div>
         </main>
+        
     </div>
     
     <!-- Monthly Report Modal -->
