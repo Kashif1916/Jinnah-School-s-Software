@@ -110,13 +110,30 @@ $stmt->close();
             background: #1f5f46;
             color: white;
             border: 1px solid #555;
-            padding: 4mm;
+            padding: 5px 6px;
             text-align: left;
             font-weight: bold;
+            font-size: 10px;
         }
         table td {
             border: 1px solid #ddd;
-            padding: 3mm;
+            padding: 4px 6px;
+            font-size: 10px;
+        }
+        .contact-cell {
+            white-space: nowrap;
+            min-width: 115px;
+        }
+        .contact-item {
+            white-space: nowrap;
+            line-height: 1.4;
+        }
+        .contact-item i {
+            display: inline-block;
+            width: 13px;
+            text-align: center;
+            margin-right: 3px;
+            font-size: 10px;
         }
         table tr:nth-child(even) {
             background: #f9f9f9;
@@ -138,10 +155,18 @@ $stmt->close();
             body {
                 margin: 0;
                 padding: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
             .report-container {
                 border: none;
                 box-shadow: none;
+                max-width: 100%;
+                padding: 5mm;
+            }
+            .contact-item i {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
             /* Prevent table header (th) from repeating on every page */
             thead {
@@ -185,8 +210,9 @@ $stmt->close();
                         <th>Father Name</th>
                         <th>Class-Sec</th>
                         <th>Monthly Fee (Fixed)</th>
-                        <th>Monthly Fee (Net)</th>
                         <th>Concession</th>
+                        <th>Monthly Fee (Net)</th>
+                        
                         <th>Contact Number(s)</th>
                         <th>Status</th>
                     </tr>
@@ -203,12 +229,13 @@ $stmt->close();
                             <td><?php echo htmlspecialchars($s['father_name']); ?></td>
                             <td><?php echo htmlspecialchars($s['class'] . '-' . $s['section']); ?></td>
                             <td class="amount"><?php echo format_currency($s['fixed_monthly_fee']); ?></td>
-                            <td class="amount"><?php echo format_currency($s['monthly_fee']); ?></td>
+                            
                             <td class="amount"><?php echo format_currency($s['concession_amount']); ?></td>
-                            <td>
-                                <?php echo !empty($s['contact_number']) ? htmlspecialchars($s['contact_number']) . '<br>' : ''; ?>
-                                <?php echo !empty($s['contact_number2']) ? htmlspecialchars($s['contact_number2']) . '<br>' : ''; ?>
-                                <?php echo !empty($s['whatsapp_number']) ? htmlspecialchars($s['whatsapp_number']) : ''; ?>
+                            <td class="amount"><?php echo format_currency($s['monthly_fee']); ?></td>
+                            <td class="contact-cell">
+                                <?php echo !empty($s['contact_number']) ? '<div class="contact-item"><i class="fas fa-phone"></i> ' . htmlspecialchars($s['contact_number']) . '</div>' : ''; ?>
+                                <?php echo !empty($s['contact_number2']) ? '<div class="contact-item"><i class="fas fa-phone"></i> ' . htmlspecialchars($s['contact_number2']) . '</div>' : ''; ?>
+                                <?php echo !empty($s['whatsapp_number']) ? '<div class="contact-item"><i class="fab fa-whatsapp" style="color:#25D366;"></i> ' . htmlspecialchars($s['whatsapp_number']) . '</div>' : ''; ?>
                             </td>
                             <td>
                                 <span style="font-weight: bold; color: <?php echo $s['status'] == 'active' ? '#27ae60' : '#e74c3c'; ?>;">
@@ -231,7 +258,9 @@ $stmt->close();
     
     <script>
         window.onload = function() {
-            window.print();
+            setTimeout(function() {
+                window.print();
+            }, 250);
         };
     </script>
 </body>

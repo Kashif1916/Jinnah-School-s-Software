@@ -246,9 +246,9 @@ $stmt->close();
                                             <td><?php echo format_currency($s['concession_amount']); ?></td>
                                             <td><?php echo format_currency($s['monthly_fee']); ?></td>
                                             <td>
-                                                <?php echo !empty($s['contact_number']) ? htmlspecialchars($s['contact_number']) . '<br>' : ''; ?>
-                                                <?php echo !empty($s['contact_number2']) ? htmlspecialchars($s['contact_number2']) . '<br>' : ''; ?>
-                                                <?php echo !empty($s['whatsapp_number']) ? htmlspecialchars($s['whatsapp_number']) : ''; ?>
+                                                <?php echo !empty($s['contact_number']) ? '<i class="fas fa-phone"></i> ' . htmlspecialchars($s['contact_number']) . '<br>' : ''; ?>
+                                                <?php echo !empty($s['contact_number2']) ? '<i class="fas fa-phone"></i> ' . htmlspecialchars($s['contact_number2']) . '<br>' : ''; ?>
+                                                <?php echo !empty($s['whatsapp_number']) ? '<i class="fab fa-whatsapp text-success"></i> ' . htmlspecialchars($s['whatsapp_number']) : ''; ?>
                                                 <span class="badge <?php echo $s['status'] == 'active' ? 'bg-success' : 'bg-danger'; ?>" style="margin-top: 5px; display: block;">
                                                     Status: <?php echo ucfirst(htmlspecialchars($s['status'])); ?>
                                                 </span>
