@@ -95,6 +95,9 @@ if ($defaulters) {
                         <a href="defaulter_list.php" class="module-nav-btn active">
                             <i class="fas fa-list"></i> Pending List
                         </a>
+                        <a href="student_record.php" class="module-nav-btn">
+                            <i class="fas fa-address-book"></i> Student Record
+                        </a>
                         <a href="../help.php" class="module-nav-btn">
                             <i class="fas fa-question-circle text-success"></i> Help & About
                         </a>

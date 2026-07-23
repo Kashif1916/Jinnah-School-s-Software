@@ -15,17 +15,58 @@ $start_date = sanitize_input($_GET['start_date'] ?? '');
 $end_date = sanitize_input($_GET['end_date'] ?? '');
 $search_admitted_by = sanitize_input($_GET['search_admitted_by'] ?? '');
 
+// Check if user has applied any filter
+$is_filtered = (!empty($start_date) || !empty($end_date) || !empty($search_admitted_by));
+
+// Pagination Configuration (Only applies when NO filter is used)
+$limit = 20; // Default items per page
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$offset = ($page - 1) * $limit;
+
 // Fetch list of unique users who have added students for search dropdown
 $admitted_by_users = [];
-$users_query = $conn->query(" SELECT DISTINCT username FROM users WHERE role IN ('admission', 'master')
-    ORDER BY username ASC");
+$users_query = $conn->query("SELECT DISTINCT username FROM users WHERE role IN ('admission', 'master') ORDER BY username ASC");
 if ($users_query) {
     while ($row = $users_query->fetch_assoc()) {
         $admitted_by_users[] = $row['username'];
     }
 }
 
-// Query to fetch students based on filters
+// 1. Get Total Count for UI Display & Pagination Calculation
+$count_query = "SELECT COUNT(*) as total FROM students WHERE 1=1";
+$count_params = [];
+$count_types = '';
+
+if (!empty($start_date)) {
+    $count_query .= " AND DATE(created_at) >= ?";
+    $count_params[] = $start_date;
+    $count_types .= 's';
+}
+
+if (!empty($end_date)) {
+    $count_query .= " AND DATE(created_at) <= ?";
+    $count_params[] = $end_date;
+    $count_types .= 's';
+}
+
+if (!empty($search_admitted_by)) {
+    $count_query .= " AND created_by = ?";
+    $count_params[] = $search_admitted_by;
+    $count_types .= 's';
+}
+
+$stmt_count = $conn->prepare($count_query);
+if (!empty($count_params)) {
+    $stmt_count->bind_param($count_types, ...$count_params);
+}
+$stmt_count->execute();
+$total_students = $stmt_count->get_result()->fetch_assoc()['total'];
+$stmt_count->close();
+
+$total_pages = ceil($total_students / $limit);
+
+// 2. Query to fetch students based on filters
 $query = "SELECT * FROM students WHERE 1=1";
 $params = [];
 $param_types = '';
@@ -49,6 +90,14 @@ if (!empty($search_admitted_by)) {
 }
 
 $query .= " ORDER BY created_at DESC";
+
+// ONLY APPLY LIMIT 20 IF NO FILTER IS ACTIVE
+if (!$is_filtered) {
+    $query .= " LIMIT ? OFFSET ?";
+    $params[] = $limit;
+    $params[] = $offset;
+    $param_types .= 'ii';
+}
 
 $stmt = $conn->prepare($query);
 if (!empty($params)) {
@@ -94,7 +143,7 @@ $stmt->close();
                 min-height: auto !important;
                 display: block !important;
             }
-            .no-print, .topbar, .module-nav-panel, .search-section, .btn-action, button, a {
+            .no-print, .topbar, .module-nav-panel, .search-section, .btn-action, button, a, nav {
                 display: none !important;
             }
             .table-section {
@@ -251,7 +300,7 @@ $stmt->close();
 
                 <div class="table-section">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h4>Total Students: <?php echo count($students); ?></h4>
+                        <h4>Total Students: <?php echo $total_students; ?> </h4>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-hover">
@@ -263,7 +312,6 @@ $stmt->close();
                                     <th>Class</th>
                                     <th>Section</th>
                                     <th>Monthly Fee (Fixed)</th>
-                                    
                                     <th>Concession</th>
                                     <th>Monthly Fee (Net)</th>
                                     <th>Contact Number(s)</th>
@@ -281,7 +329,6 @@ $stmt->close();
                                             <td><?php echo htmlspecialchars($s['class']); ?></td>
                                             <td><?php echo htmlspecialchars($s['section']); ?></td>
                                             <td><?php echo format_currency($s['fixed_monthly_fee']); ?></td>
-                                            
                                             <td><?php echo format_currency($s['concession_amount']); ?></td>
                                             <td><?php echo format_currency($s['monthly_fee']); ?></td>
                                             <td>
@@ -311,6 +358,10 @@ $stmt->close();
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- PAGINATION BUTTONS -->
+                    <?php render_pagination($page, $total_pages, '', $is_filtered); ?>
+
                 </div>
             </div>
         </main>

@@ -1410,6 +1410,49 @@ textarea.form-control {
 }
 
 /* ============================================================================
+   PAGINATION STYLING
+   ============================================================================ */
+
+.pagination {
+    gap: 5px;
+}
+
+.pagination .page-item .page-link {
+    color: var(--primary-color, #1f5f46);
+    background-color: #ffffff;
+    border: 1px solid rgba(31, 95, 70, 0.2);
+    border-radius: 8px !important;
+    padding: 8px 14px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 2px 6px rgba(16, 22, 27, 0.05);
+}
+
+.pagination .page-item .page-link:hover {
+    color: #ffffff;
+    background: linear-gradient(135deg, #2f8f66 0%, #1f5f46 100%);
+    border-color: #2f8f66;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(31, 95, 70, 0.2);
+}
+
+.pagination .page-item.active .page-link {
+    color: #ffffff;
+    background: linear-gradient(135deg, #1f5f46 0%, #10161b 100%);
+    border-color: #1f5f46;
+    box-shadow: 0 4px 12px rgba(31, 95, 70, 0.3);
+}
+
+.pagination .page-item.disabled .page-link {
+    color: #a0aec0;
+    background-color: #f8f9fa;
+    border-color: #e2e8f0;
+    opacity: 0.7;
+    box-shadow: none;
+}
+
+/* ============================================================================
    PRINT STYLES
    ============================================================================ */
 
@@ -1418,7 +1461,9 @@ textarea.form-control {
     .btn-primary,
     .btn-secondary,
     .btn-action,
-    .form-section {
+    .form-section,
+    .pagination,
+    .no-print {
         display: none !important;
     }
     

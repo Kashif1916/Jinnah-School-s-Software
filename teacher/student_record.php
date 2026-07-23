@@ -1,6 +1,6 @@
 <?php
 /**
- * Student Record List - Finance Module
+ * Student Record List - Teacher Module
  * School Finance Management System
  */
 
@@ -9,7 +9,7 @@ require_once '../config/db.php';
 require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
-require_finance();
+require_teacher();
 
 $search_name = sanitize_input($_GET['search_name'] ?? '');
 $search_class = sanitize_input($_GET['search_class'] ?? '');
@@ -111,15 +111,15 @@ $stmt->close();
         <main class="main-content">
             <div class="topbar">
                 <div class="topbar-left d-flex align-items-center gap-3">
-                    <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
+                    <?php echo render_system_logo('topbar-logo'); ?>
                     <div class="panel-brand">
-                        <h2>Student Records</h2>
-                        <span>Finance / Clerk Panel</span>
+                        <h2>Teacher Dashboard</h2>
+                        <span>Student Records</span>
                     </div>
                 </div>
                 <div class="topbar-right">
                     <span class="user-info">
-                        <i class="fas fa-user-circle"></i> <?php echo get_username(); ?>
+                        <i class="fas fa-chalkboard-teacher"></i> <?php echo get_username(); ?> (Teacher)
                     </span>
                     <a href="../logout.php" class="btn-secondary">
                         <i class="fas fa-sign-out-alt"></i> Logout
@@ -130,29 +130,11 @@ $stmt->close();
             <div class="content">
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
-                        <a href="dashboard.php" class="module-nav-btn">
-                            <i class="fas fa-chart-bar"></i> Dashboard
-                        </a>
-                        <a href="add_student.php" class="module-nav-btn ">
-                            <i class="fas fa-list"></i> Add Student
-                        </a>
-                        <a href="student_record.php" class="module-nav-btn active">
-                            <i class="fas fa-address-book"></i> Student Record
-                        </a>
-                        <a href="fee_payment.php" class="module-nav-btn">
-                            <i class="fas fa-money-bill-wave"></i> Fee Payment
-                        </a>
                         <a href="defaulter_list.php" class="module-nav-btn">
                             <i class="fas fa-list"></i> Pending List
                         </a>
-                        <a href="payment_analytics.php" class="module-nav-btn">
-                            <i class="fas fa-chart-line"></i> Analytics
-                        </a>
-                        <a href="expenses.php" class="module-nav-btn">
-                            <i class="fas fa-wallet"></i> Expenses
-                        </a>
-                        <a href="account_close.php" class="module-nav-btn">
-                            <i class="fas fa-lock"></i> Close Account
+                        <a href="student_record.php" class="module-nav-btn active">
+                            <i class="fas fa-address-book"></i> Student Record
                         </a>
                         <a href="../help.php" class="module-nav-btn">
                             <i class="fas fa-question-circle text-success"></i> Help & About
@@ -160,7 +142,7 @@ $stmt->close();
                     </div>
                 </div>
 
-                <div class="search-section">
+                <div class="search-section mb-4">
                     <form method="GET" class="row g-3">
                         <div class="col-md-4">
                             <label class="form-label">Student Name</label>
@@ -257,6 +239,7 @@ $stmt->close();
 
                     <!-- PAGINATION BUTTONS -->
                     <?php render_pagination($page, $total_pages, '', $is_filtered); ?>
+
                 </div>
             </div>
         </main>

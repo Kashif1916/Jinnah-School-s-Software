@@ -347,4 +347,73 @@ function render_system_logo($class = '') {
     return '<img src="' . BASE_URL . 'images/logo.jfif" alt="' . htmlspecialchars(SITE_NAME, ENT_QUOTES, 'UTF-8') . '"' . $class_attr . '>';
 }
 
+
+/**
+ * Render Smart Truncated Pagination Links
+ */
+function render_pagination($page, $total_pages, $extra_params = '', $is_filtered = false) {
+    if ($is_filtered || $total_pages <= 1) {
+        return;
+    }
+    
+    // Process query string
+    $query_params = [];
+    if (is_array($extra_params)) {
+        $query_params = $extra_params;
+    } elseif (is_string($extra_params) && !empty($extra_params)) {
+        parse_str(ltrim($extra_params, '?'), $query_params);
+    }
+    
+    echo '<nav class="mt-4 no-print">';
+    echo '<ul class="pagination justify-content-center flex-wrap">';
+    
+    // Build link helper
+    $get_url = function($p) use ($query_params) {
+        $params = array_merge($query_params, ['page' => $p]);
+        return '?' . http_build_query($params);
+    };
+
+    // Previous Link
+    if ($page <= 1) {
+        echo '<li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-left me-1"></i> Prev</span></li>';
+    } else {
+        echo '<li class="page-item"><a class="page-link" href="' . $get_url($page - 1) . '"><i class="fas fa-chevron-left me-1"></i> Prev</a></li>';
+    }
+    
+    $range = 2; // Window range around current page
+    $start_page = max(1, $page - $range);
+    $end_page = min($total_pages, $page + $range);
+
+    if ($start_page > 1) {
+        echo '<li class="page-item ' . ($page == 1 ? 'active' : '') . '"><a class="page-link" href="' . $get_url(1) . '">1</a></li>';
+        if ($start_page > 2) {
+            echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+    }
+    
+    for ($i = $start_page; $i <= $end_page; $i++) {
+        if ($i == 1 && $start_page > 1) continue;
+        if ($i == $total_pages && $end_page < $total_pages) continue;
+        $active = ($page == $i) ? 'active' : '';
+        echo '<li class="page-item ' . $active . '"><a class="page-link" href="' . $get_url($i) . '">' . $i . '</a></li>';
+    }
+    
+    if ($end_page < $total_pages) {
+        if ($end_page < $total_pages - 1) {
+            echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+        echo '<li class="page-item ' . ($page == $total_pages ? 'active' : '') . '"><a class="page-link" href="' . $get_url($total_pages) . '">' . $total_pages . '</a></li>';
+    }
+    
+    // Next Link
+    if ($page >= $total_pages) {
+        echo '<li class="page-item disabled"><span class="page-link">Next <i class="fas fa-chevron-right ms-1"></i></span></li>';
+    } else {
+        echo '<li class="page-item"><a class="page-link" href="' . $get_url($page + 1) . '">Next <i class="fas fa-chevron-right ms-1"></i></a></li>';
+    }
+    
+    echo '</ul>';
+    echo '</nav>';
+}
+
 ?>

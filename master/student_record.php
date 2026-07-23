@@ -15,7 +15,47 @@ $search_name = sanitize_input($_GET['search_name'] ?? '');
 $search_class = sanitize_input($_GET['search_class'] ?? '');
 $search_section = sanitize_input($_GET['search_section'] ?? '');
 
-// Query to fetch students based on filters
+// Check if user has applied any filter
+$is_filtered = (!empty($search_name) || !empty($search_class) || !empty($search_section));
+
+// Pagination Configuration (Only applies when NO filter is used)
+$limit = 20; // Default items per page
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$offset = ($page - 1) * $limit;
+
+// 1. Get Total Count for UI Display & Pagination Calculation
+$count_query = "SELECT COUNT(*) as total FROM students WHERE 1=1";
+$count_params = [];
+$count_types = '';
+
+if (!empty($search_name)) {
+    $count_query .= " AND name LIKE ?";
+    $count_params[] = '%' . $search_name . '%';
+    $count_types .= 's';
+}
+if (!empty($search_class)) {
+    $count_query .= " AND class = ?";
+    $count_params[] = $search_class;
+    $count_types .= 's';
+}
+if (!empty($search_section)) {
+    $count_query .= " AND section = ?";
+    $count_params[] = $search_section;
+    $count_types .= 's';
+}
+
+$stmt_count = $conn->prepare($count_query);
+if (!empty($count_params)) {
+    $stmt_count->bind_param($count_types, ...$count_params);
+}
+$stmt_count->execute();
+$total_students = $stmt_count->get_result()->fetch_assoc()['total'];
+$stmt_count->close();
+
+$total_pages = ceil($total_students / $limit);
+
+// 2. Fetch Data Query
 $query = "SELECT * FROM students WHERE 1=1";
 $params = [];
 $param_types = '';
@@ -39,6 +79,14 @@ if (!empty($search_section)) {
 }
 
 $query .= " ORDER BY id DESC";
+
+// ONLY APPLY LIMIT 20 IF NO FILTER IS ACTIVE
+if (!$is_filtered) {
+    $query .= " LIMIT ? OFFSET ?";
+    $params[] = $limit;
+    $params[] = $offset;
+    $param_types .= 'ii';
+}
 
 $stmt = $conn->prepare($query);
 if (!empty($params)) {
@@ -164,7 +212,7 @@ $stmt->close();
 
                 <div class="table-section">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h4>Total Students: <?php echo count($students); ?></h4>
+                        <h4>Total Students: <?php echo $total_students; ?> </h4>
                         <a href="student_report.php?search_name=<?php echo urlencode($search_name); ?>&search_class=<?php echo urlencode($search_class); ?>&search_section=<?php echo urlencode($search_section); ?>" target="_blank" class="btn btn-success">
                             <i class="fas fa-print"></i> Print List
                         </a>
@@ -181,7 +229,6 @@ $stmt->close();
                                     <th>Monthly Fee (Fixed)</th>
                                     <th>Concession</th>
                                     <th>Monthly Fee (Net)</th>
-                                    
                                     <th>Contact Number(s)</th>
                                     <th>Action</th>
                                 </tr>
@@ -190,21 +237,20 @@ $stmt->close();
                                 <?php if (count($students) > 0): ?>
                                     <?php foreach ($students as $s): ?>
                                         <tr>
-                                            <td><?php echo $s['id']; ?></td>
-                                            <td><strong><?php echo $s['name']; ?></strong></td>
-                                            <td><?php echo $s['father_name']; ?></td>
-                                            <td><?php echo $s['class']; ?></td>
-                                            <td><?php echo $s['section']; ?></td>
+                                            <td><?php echo htmlspecialchars($s['id']); ?></td>
+                                            <td><strong><?php echo htmlspecialchars($s['name']); ?></strong></td>
+                                            <td><?php echo htmlspecialchars($s['father_name']); ?></td>
+                                            <td><?php echo htmlspecialchars($s['class']); ?></td>
+                                            <td><?php echo htmlspecialchars($s['section']); ?></td>
                                             <td><?php echo format_currency($s['fixed_monthly_fee']); ?></td>
-                                            
                                             <td><?php echo format_currency($s['concession_amount']); ?></td>
                                             <td><?php echo format_currency($s['monthly_fee']); ?></td>
                                             <td>
-                                                <?php echo !empty($s['contact_number']) ? $s['contact_number'] . '<br>' : ''; ?>
-                                                <?php echo !empty($s['contact_number2']) ? $s['contact_number2'] . '<br>' : ''; ?>
-                                                <?php echo !empty($s['whatsapp_number']) ? $s['whatsapp_number'] : ''; ?>
+                                                <?php echo !empty($s['contact_number']) ? htmlspecialchars($s['contact_number']) . '<br>' : ''; ?>
+                                                <?php echo !empty($s['contact_number2']) ? htmlspecialchars($s['contact_number2']) . '<br>' : ''; ?>
+                                                <?php echo !empty($s['whatsapp_number']) ? htmlspecialchars($s['whatsapp_number']) : ''; ?>
                                                 <span class="badge <?php echo $s['status'] == 'active' ? 'bg-success' : 'bg-danger'; ?>" style="margin-top: 5px; display: block;">
-                                                    Status: <?php echo ucfirst($s['status']); ?>
+                                                    Status: <?php echo ucfirst(htmlspecialchars($s['status'])); ?>
                                                 </span>
                                             </td>
                                             <td>
@@ -222,6 +268,9 @@ $stmt->close();
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- PAGINATION BUTTONS -->
+                    <?php render_pagination($page, $total_pages, '', $is_filtered); ?>
                 </div>
             </div>
         </main>
