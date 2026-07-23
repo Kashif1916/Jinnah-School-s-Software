@@ -11,23 +11,34 @@ require_once '../includes/helpers.php';
 
 require_finance();
 
-$class_filter = '';
-$section_filter = '';
-$name_filter = '';
-$months_filter = [];
+$class_filter = sanitize_input($_REQUEST['class'] ?? '');
+$section_filter = sanitize_input($_REQUEST['section'] ?? '');
+$name_filter = sanitize_input($_REQUEST['name'] ?? '');
+$months_filter = $_REQUEST['months'] ?? [];
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $class_filter = sanitize_input($_POST['class'] ?? '');
-    $section_filter = sanitize_input($_POST['section'] ?? '');
-    $name_filter = sanitize_input($_POST['name'] ?? '');
-    $months_filter = $_POST['months'] ?? [];
-}
+// Check if user has applied any filter
+$is_filtered = (!empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($months_filter));
+
+// Pagination Configuration (Only applies when NO filter is used)
+$limit = 20; // Default items per page
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$offset = ($page - 1) * $limit;
 
 // Get defaulters
 $defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter);
-$defaulter_list = [];
+$all_defaulter_list = [];
 if ($defaulters) {
-    $defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
+    $all_defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
+}
+$total_defaulters = count($all_defaulter_list);
+$total_pages = ceil($total_defaulters / $limit);
+
+// ONLY APPLY LIMIT 20 IF NO FILTER IS ACTIVE
+if (!$is_filtered) {
+    $defaulter_list = array_slice($all_defaulter_list, $offset, $limit);
+} else {
+    $defaulter_list = $all_defaulter_list;
 }
 ?>
 <!DOCTYPE html>
@@ -196,7 +207,7 @@ if ($defaulters) {
                     
                     <div class="table-section">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="mb-0">Pending Fees (<?php echo count($defaulter_list); ?>)</h4>
+                            <h4 class="mb-0">Pending Fees (<?php echo $total_defaulters; ?>)</h4>
                             <?php 
                                 $query_data = ['class' => $class_filter, 'section' => $section_filter, 'name' => $name_filter, 'months' => $months_filter];
                                 $report_url = "../master/defaulter_report.php?" . http_build_query($query_data);
@@ -222,22 +233,25 @@ if ($defaulters) {
                                 <tbody>
                                     <?php foreach ($defaulter_list as $defaulter): ?>
                                         <tr>
-                                            <td><?php echo $defaulter['name']; ?></td>
-                                            <td><?php echo $defaulter['father_name']; ?></td>
+                                            <td><?php echo htmlspecialchars($defaulter['name']); ?></td>
+                                            <td><?php echo htmlspecialchars($defaulter['father_name']); ?></td>
                                             <td>
-                                                <?php echo !empty($defaulter['contact_number']) ? '<i class="fas fa-phone"></i> ' . $defaulter['contact_number'] . '<br>' : ''; ?>
-                                                <?php echo !empty($defaulter['whatsapp_number']) ? '<i class="fab fa-whatsapp"></i> ' . $defaulter['whatsapp_number'] : ''; ?>
+                                                <?php echo !empty($defaulter['contact_number']) ? '<i class="fas fa-phone"></i> ' . htmlspecialchars($defaulter['contact_number']) . '<br>' : ''; ?>
+                                                <?php echo !empty($defaulter['whatsapp_number']) ? '<i class="fab fa-whatsapp"></i> ' . htmlspecialchars($defaulter['whatsapp_number']) : ''; ?>
                                             </td>
-                                            <td><?php echo $defaulter['class'] . '-' . $defaulter['section']; ?></td>
+                                            <td><?php echo htmlspecialchars($defaulter['class']) . '-' . htmlspecialchars($defaulter['section']); ?></td>
                                             <td style="max-width: 200px; font-size: 11px;">
-                                                <strong>(<?php echo $defaulter['pending_count']; ?> Month)</strong><br>
-                                                <?php echo str_replace(',', ', ', $defaulter['pending_months']); ?>
+                                                <strong>(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Month)</strong><br>
+                                                <?php echo htmlspecialchars(str_replace(',', ', ', $defaulter['pending_months'])); ?>
                                             </td>
                                             <td><?php echo format_currency($defaulter['monthly_fee']); ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
+                            
+                            <!-- PAGINATION BUTTONS -->
+                            <?php render_pagination($page, $total_pages, '', $is_filtered); ?>
                         <?php else: ?>
                             <div class="alert alert-info">
                                 <i class="fas fa-info-circle"></i> No pending fees found with the selected filters!

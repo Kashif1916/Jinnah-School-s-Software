@@ -11,23 +11,34 @@ require_once '../includes/helpers.php';
 
 require_teacher(); // Enforces Teacher permission
 
-$class_filter = '';
-$section_filter = '';
-$name_filter = '';
-$months_filter = [];
+$class_filter = sanitize_input($_REQUEST['class'] ?? '');
+$section_filter = sanitize_input($_REQUEST['section'] ?? '');
+$name_filter = sanitize_input($_REQUEST['name'] ?? '');
+$months_filter = $_REQUEST['months'] ?? [];
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $class_filter = sanitize_input($_POST['class'] ?? '');
-    $section_filter = sanitize_input($_POST['section'] ?? '');
-    $name_filter = sanitize_input($_POST['name'] ?? '');
-    $months_filter = $_POST['months'] ?? [];
-}
+// Check if user has applied any filter
+$is_filtered = (!empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($months_filter));
+
+// Pagination Configuration (Only applies when NO filter is used)
+$limit = 20; // Default items per page
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$offset = ($page - 1) * $limit;
 
 // Get defaulters
 $defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter);
-$defaulter_list = [];
+$all_defaulter_list = [];
 if ($defaulters) {
-    $defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
+    $all_defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
+}
+$total_defaulters = count($all_defaulter_list);
+$total_pages = ceil($total_defaulters / $limit);
+
+// ONLY APPLY LIMIT 20 IF NO FILTER IS ACTIVE
+if (!$is_filtered) {
+    $defaulter_list = array_slice($all_defaulter_list, $offset, $limit);
+} else {
+    $defaulter_list = $all_defaulter_list;
 }
 ?>
 <!DOCTYPE html>
@@ -176,7 +187,7 @@ if ($defaulters) {
                     
                     <div class="table-section mt-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="mb-0"><i class="fas fa-list-ol text-success me-2"></i>Pending Fees (<?php echo count($defaulter_list); ?>)</h4>
+                            <h4 class="mb-0"><i class="fas fa-list-ol text-success me-2"></i>Pending Fees (<?php echo $total_defaulters; ?>)</h4>
                             <?php 
                                 $query_data = ['class' => $class_filter, 'section' => $section_filter, 'name' => $name_filter, 'months' => $months_filter];
                                 $report_url = "../master/defaulter_report.php?" . http_build_query($query_data);
@@ -211,7 +222,7 @@ if ($defaulters) {
                                                 </td>
                                                 <td><span class="badge bg-secondary"><?php echo htmlspecialchars($defaulter['class']) . '-' . htmlspecialchars($defaulter['section']); ?></span></td>
                                                 <td style="max-width: 250px; font-size: 11px;">
-                                                    <span class="text-danger fw-bold">(<?php echo $defaulter['pending_count']; ?> Month)</span><br>
+                                                    <span class="text-danger fw-bold">(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Month)</span><br>
                                                     <?php echo htmlspecialchars(str_replace(',', ', ', $defaulter['pending_months'])); ?>
                                                 </td>
                                                 <td><strong><?php echo format_currency($defaulter['monthly_fee']); ?></strong></td>
@@ -220,6 +231,9 @@ if ($defaulters) {
                                     </tbody>
                                 </table>
                             </div>
+                            
+                            <!-- PAGINATION BUTTONS -->
+                            <?php render_pagination($page, $total_pages, '', $is_filtered); ?>
                         <?php else: ?>
                             <div class="alert alert-info">
                                 <i class="fas fa-info-circle me-2"></i> No pending fees found with the selected filters!

@@ -28,24 +28,39 @@ $today_collection = get_daily_collection(date('Y-m-d'));
 // Fetch Monthly Stats for Current Month
 $start_of_month = date('Y-m-01 00:00:00');
 $end_of_month = date('Y-m-t 23:59:59');
+$current_month_str = date('M-Y'); // Formats current month as 'Jul-2026' to match database 'month' column
 
+// 1. Total Received Collection for ALL payments made in this month (for overall stats card)
 $this_month_collection = 0.00;
 $month_coll_res = $conn->query("SELECT SUM(amount) as total FROM payments WHERE payment_date >= '$start_of_month' AND payment_date <= '$end_of_month'");
 if ($month_coll_res) {
     $this_month_collection = floatval($month_coll_res->fetch_assoc()['total'] ?? 0);
 }
 
-// FETCH THIS MONTH UNPAID/PENDING FEES FOR GRAPH
-$this_month_unpaid = 0.00;
-$month_unpaid_res = $conn->query("SELECT SUM(amount) as total FROM fee_records WHERE status = 'unpaid' AND (created_at >= '$start_of_month' AND created_at <= '$end_of_month')");
-if ($month_unpaid_res) {
-    $this_month_unpaid = floatval($month_unpaid_res->fetch_assoc()['total'] ?? 0);
+// ---------------------------------------------------------------------
+// GRAPH METRICS: EXACT CURRENT MONTH (e.g. 'Jul-2026') FEE BREAKDOWN
+// ---------------------------------------------------------------------
+
+// Current Month Received Fees (Only for current month's fee payments from active students)
+$graph_month_collected = 0.00;
+$graph_coll_res = $conn->query("SELECT SUM(p.amount) as total FROM payments p JOIN students s ON s.id = p.student_id WHERE p.paid_for_month = '$current_month_str' AND s.status = 'active'");
+if ($graph_coll_res) {
+    $graph_month_collected = floatval($graph_coll_res->fetch_assoc()['total'] ?? 0);
 }
 
-// Calculations for Month Fee Breakdown
-$this_month_total_expected = $this_month_collection + $this_month_unpaid;
-$month_paid_percentage = $this_month_total_expected > 0 ? round(($this_month_collection / $this_month_total_expected) * 100) : 0;
+// Current Month Unpaid/Pending Fees (Only for current month's fee records of active students)
+$graph_month_unpaid = 0.00;
+$graph_unpaid_res = $conn->query("SELECT SUM(fr.amount) as total FROM fee_records fr JOIN students s ON s.id = fr.student_id WHERE fr.month = '$current_month_str' AND fr.status = 'unpaid' AND s.status = 'active'");
+if ($graph_unpaid_res) {
+    $graph_month_unpaid = floatval($graph_unpaid_res->fetch_assoc()['total'] ?? 0);
+}
+
+// Graph Percentage Calculations for Current Month Fee
+$graph_month_total_expected = $graph_month_collected + $graph_month_unpaid;
+$month_paid_percentage = $graph_month_total_expected > 0 ? round(($graph_month_collected / $graph_month_total_expected) * 100) : 0;
 $month_remaining_percentage = 100 - $month_paid_percentage;
+
+// ---------------------------------------------------------------------
 
 $this_month_expenses = 0.00;
 $month_exp_res = $conn->query("SELECT SUM(amount) as total FROM expenses WHERE created_at >= '$start_of_month' AND created_at <= '$end_of_month'");
@@ -162,11 +177,11 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                     <aside class="stage-panel">
                         <div class="dashboard-nav-header">
                             <h4>Collected vs Pending Fees</h4>
-                            <p>For the current month.</p>
+                            <p>For <?php echo date('F Y'); ?> Fee Status.</p>
                         </div>
                         <div class="metric-card" style="padding: 18px;">
                             <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-                                <!-- Conic Gradient Donut Chart (Blue = Collected, Theme Green = Pending) -->
+                                <!-- Conic Gradient Donut Chart -->
                                 <div style="width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(#3b82f6 0% <?php echo $month_paid_percentage; ?>%, #1f5f46 <?php echo $month_paid_percentage; ?>% 100%); position: relative; flex-shrink: 0;">
                                     <div style="position: absolute; inset: 16px; border-radius: 50%; background: #ffffff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
                                         <strong style="font-size: 24px; margin: 0; color: #13211a;"><?php echo $month_paid_percentage; ?>%</strong>
@@ -176,22 +191,22 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                                 
                                 <!-- Text Data (Right Side) -->
                                 <div style="flex: 1; min-width: 180px;">
-                                    <!-- Total Collection -->
+                                    <!-- Total Expected Fee for Current Month -->
                                     <div style="margin-bottom: 12px;">
-                                        <span style="font-size: 12px; color: #6c7a73; display: block; font-weight: 500;">Total Collection of This Month</span>
-                                        <strong style="font-size: 15px; color: #13211a;"><?php echo format_currency(round($this_month_total_expected)); ?></strong>
+                                        <span style="font-size: 12px; color: #6c7a73; display: block; font-weight: 500;">Total Fee for <?php echo date('M Y'); ?></span>
+                                        <strong style="font-size: 15px; color: #13211a;"><?php echo format_currency(round($graph_month_total_expected)); ?></strong>
                                     </div>
 
-                                    <!-- Total Received Collection -->
+                                    <!-- Total Received Fee for Current Month -->
                                     <div style="margin-bottom: 12px;">
-                                        <span style="font-size: 12px; color: #6c7a73; display: block; font-weight: 500;"><i class="fas fa-circle" style="color: #3b82f6; font-size: 9px; margin-right: 4px;"></i> Total Received Collection of This Month</span>
-                                        <strong style="font-size: 15px; color: #3b82f6;"><?php echo format_currency(round($this_month_collection)); ?></strong>
+                                        <span style="font-size: 12px; color: #6c7a73; display: block; font-weight: 500;"><i class="fas fa-circle" style="color: #3b82f6; font-size: 9px; margin-right: 4px;"></i> Received Fee (<?php echo date('M Y'); ?>)</span>
+                                        <strong style="font-size: 15px; color: #3b82f6;"><?php echo format_currency(round($graph_month_collected)); ?></strong>
                                     </div>
 
-                                    <!-- Remaining Collection -->
+                                    <!-- Remaining/Unpaid Fee for Current Month -->
                                     <div>
-                                        <span style="font-size: 12px; color: #6c7a73; display: block; font-weight: 500;"><i class="fas fa-circle" style="color: #1f5f46; font-size: 9px; margin-right: 4px;"></i> Remaining Collection of This Month</span>
-                                        <strong style="font-size: 15px; color: #1f5f46;"><?php echo format_currency(round($this_month_unpaid)); ?></strong>
+                                        <span style="font-size: 12px; color: #6c7a73; display: block; font-weight: 500;"><i class="fas fa-circle" style="color: #1f5f46; font-size: 9px; margin-right: 4px;"></i> Pending Fee (<?php echo date('M Y'); ?>)</span>
+                                        <strong style="font-size: 15px; color: #1f5f46;"><?php echo format_currency(round($graph_month_unpaid)); ?></strong>
                                     </div>
                                 </div>
                             </div>
@@ -281,7 +296,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             </div>
                         </div>
 
-                        <!-- Empty Slot under Card 4 (Keeps layout perfect) -->
+                        <!-- Empty Slot under Card 4 -->
                         <div></div>
 
                     </div>
