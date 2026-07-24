@@ -142,7 +142,10 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             <i class="fas fa-arrow-up"></i> Promotion
                         </a>
                         <a href="drop_student.php" class="module-nav-btn">
-                            <i class="fas fa-trash"></i> Drop Student
+                            <i class="fas fa-trash text-success"></i> Drop Student
+                        </a>
+                        <a href="delete_student.php" class="module-nav-btn">
+                            <i class="fas fa-user-minus text-success"></i> Delete Student
                         </a>
                         <a href="users.php" class="module-nav-btn">
                             <i class="fas fa-users-cog"></i> Users
@@ -156,7 +159,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                 <div class="dashboard-stage">
                     <section class="stage-panel stage-panel--hero">
                         <span class="dashboard-kicker"><i class="fas fa-school"></i> Principal Dashboard</span>
-                        <h3>Control the school finance system from one place.</h3>
+                        <h3>Jinnah High School & Inter College Khushab</h3>
                         <p>Track students, manage fees, review pending payments, and keep promotion work moving with quick access to every major module.</p>
                         <div class="hero-row">
                             <span class="hero-tag"><i class="fas fa-shield-alt"></i> Principal access only</span>

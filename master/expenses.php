@@ -214,6 +214,9 @@ $stmt->close();
                         <a href="drop_student.php" class="module-nav-btn">
                             <i class="fas fa-trash"></i> Drop Student
                         </a>
+                        <a href="delete_student.php" class="module-nav-btn ">
+                            <i class="fas fa-user-minus text-success"></i> Delete Student
+                        </a>
                         <a href="users.php" class="module-nav-btn">
                             <i class="fas fa-users-cog"></i> Users
                         </a>

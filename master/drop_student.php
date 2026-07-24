@@ -1,6 +1,6 @@
 <?php
 /**
- * Drop Student (Updated UI & Colors Matching Search Button)
+ * Drop Student (Updated UI & Colors Matching Search Button + 20/page Pagination)
  * School Finance Management System
  */
 
@@ -15,91 +15,102 @@ $error = '';
 $success = '';
 $search_results = [];
 $dropped_students = [];
-$restore_students = [];
 
-// Determine current view mode ('drop_mode', 'see_mode' or 'restore_mode')
+// Determine current view mode ('drop_mode' or 'see_mode')
 $view_mode = $_GET['view'] ?? 'drop_mode';
 
 // --- HANDLE POST ACTIONS ---
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
-    if ($_POST['action'] == 'bulk_drop') {
-        $student_ids = $_POST['student_ids'] ?? [];
-        $drop_reason = sanitize_input($_POST['drop_reason'] ?? '');
-        $dropped_by = get_username();
-        
-        if (empty($student_ids)) {
-            $error = 'Please select at least one student to drop.';
-        } elseif (empty($drop_reason)) {
-            $error = 'Drop reason is required.';
-        } else {
-            $conn->begin_transaction();
-            try {
-                $placeholders = implode(',', array_fill(0, count($student_ids), '?'));
-                
-                // Update students status
-                $query = "UPDATE students SET status = 'dropped', drop_reason = ? WHERE id IN ($placeholders)";
-                $stmt = $conn->prepare($query);
-                
-                $types = 's' . str_repeat('i', count($student_ids));
-                $bind_params = array_merge([$drop_reason], array_map('intval', $student_ids));
-                $stmt->bind_param($types, ...$bind_params);
-                $stmt->execute();
-                $stmt->close();
-                
-                // Insert log records
-                $log_query = "INSERT INTO dropped_students (student_id, dropped_by, drop_reason) VALUES (?, ?, ?)";
-                $log_stmt = $conn->prepare($log_query);
-                foreach ($student_ids as $id) {
-                    $student_id = intval($id);
-                    $log_stmt->bind_param('iss', $student_id, $dropped_by, $drop_reason);
-                    $log_stmt->execute();
-                }
-                $log_stmt->close();
-                
-                $conn->commit();
-                $success = count($student_ids) . ' student(s) marked as dropped successfully!';
-            } catch (Exception $e) {
-                $conn->rollback();
-                $error = 'Error dropping students: ' . $e->getMessage();
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'bulk_drop') {
+    $student_ids = $_POST['student_ids'] ?? [];
+    $drop_reason = sanitize_input($_POST['drop_reason'] ?? '');
+    $dropped_by = get_username();
+    
+    if (empty($student_ids)) {
+        $error = 'Please select at least one student to drop.';
+    } elseif (empty($drop_reason)) {
+        $error = 'Drop reason is required.';
+    } else {
+        $conn->begin_transaction();
+        try {
+            $placeholders = implode(',', array_fill(0, count($student_ids), '?'));
+            
+            // Update students status
+            $query = "UPDATE students SET status = 'dropped', drop_reason = ? WHERE id IN ($placeholders)";
+            $stmt = $conn->prepare($query);
+            
+            $types = 's' . str_repeat('i', count($student_ids));
+            $bind_params = array_merge([$drop_reason], array_map('intval', $student_ids));
+            $stmt->bind_param($types, ...$bind_params);
+            $stmt->execute();
+            $stmt->close();
+            
+            // Insert log records
+            $log_query = "INSERT INTO dropped_students (student_id, dropped_by, drop_reason) VALUES (?, ?, ?)";
+            $log_stmt = $conn->prepare($log_query);
+            foreach ($student_ids as $id) {
+                $student_id = intval($id);
+                $log_stmt->bind_param('iss', $student_id, $dropped_by, $drop_reason);
+                $log_stmt->execute();
             }
-        }
-    } elseif ($_POST['action'] == 'restore_student') {
-        $student_id = intval($_POST['student_id'] ?? 0);
-        if ($student_id > 0) {
-            $conn->begin_transaction();
-            try {
-                // Update student status to active
-                $query = "UPDATE students SET status = 'active', drop_reason = NULL WHERE id = ?";
-                $stmt = $conn->prepare($query);
-                $stmt->bind_param('i', $student_id);
-                $stmt->execute();
-                $stmt->close();
-                
-                // Delete from dropped_students log
-                $del_query = "DELETE FROM dropped_students WHERE student_id = ?";
-                $del_stmt = $conn->prepare($del_query);
-                $del_stmt->bind_param('i', $student_id);
-                $del_stmt->execute();
-                $del_stmt->close();
-                
-                $conn->commit();
-                $success = 'Student restored to active status successfully!';
-            } catch (Exception $e) {
-                $conn->rollback();
-                $error = 'Error restoring student: ' . $e->getMessage();
-            }
-        } else {
-            $error = 'Invalid student ID.';
+            $log_stmt->close();
+            
+            $conn->commit();
+            $success = count($student_ids) . ' student(s) marked as dropped successfully!';
+        } catch (Exception $e) {
+            $conn->rollback();
+            $error = 'Error dropping students: ' . $e->getMessage();
         }
     }
 }
+
+// Pagination setup (20 items per page)
+$limit = 20;
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$offset = ($page - 1) * $limit;
 
 // --- LOGIC FOR DROP MODE (ACTIVE STUDENTS) ---
 $search_name = sanitize_input($_GET['search_name'] ?? '');
 $search_class = sanitize_input($_GET['search_class'] ?? '');
 $search_section = sanitize_input($_GET['search_section'] ?? '');
 
+$is_filtered_drop = (!empty($search_name) || !empty($search_class) || !empty($search_section));
+$total_students = 0;
+$total_pages_drop = 0;
+
 if ($view_mode === 'drop_mode') {
+    // 1. Get Count
+    $count_query = "SELECT COUNT(*) as total FROM students WHERE status = 'active'";
+    $count_params = [];
+    $count_types = '';
+
+    if (!empty($search_name)) {
+        $count_query .= " AND name LIKE ?";
+        $count_params[] = '%' . $search_name . '%';
+        $count_types .= 's';
+    }
+    if (!empty($search_class)) {
+        $count_query .= " AND class = ?";
+        $count_params[] = $search_class;
+        $count_types .= 's';
+    }
+    if (!empty($search_section)) {
+        $count_query .= " AND section = ?";
+        $count_params[] = $search_section;
+        $count_types .= 's';
+    }
+
+    $stmt_count = $conn->prepare($count_query);
+    if (!empty($count_params)) {
+        $stmt_count->bind_param($count_types, ...$count_params);
+    }
+    $stmt_count->execute();
+    $total_students = $stmt_count->get_result()->fetch_assoc()['total'];
+    $stmt_count->close();
+
+    $total_pages_drop = ceil($total_students / $limit);
+
+    // 2. Fetch Data
     $query = "SELECT * FROM students WHERE status = 'active'";
     $params = [];
     $param_types = '';
@@ -121,6 +132,14 @@ if ($view_mode === 'drop_mode') {
     }
 
     $query .= " ORDER BY id DESC";
+
+    if (!$is_filtered_drop) {
+        $query .= " LIMIT ? OFFSET ?";
+        $params[] = $limit;
+        $params[] = $offset;
+        $param_types .= 'ii';
+    }
+
     $stmt = $conn->prepare($query);
     if (!empty($params)) {
         $stmt->bind_param($param_types, ...$params);
@@ -134,7 +153,40 @@ if ($view_mode === 'drop_mode') {
 $filter_year = sanitize_input($_GET['filter_year'] ?? '');
 $filter_class = sanitize_input($_GET['filter_class'] ?? '');
 
+$is_filtered_see = (!empty($filter_year) || !empty($filter_class));
+$total_dropped = 0;
+$total_pages_see = 0;
+
 if ($view_mode === 'see_mode') {
+    // 1. Get Count
+    $count_query = "SELECT COUNT(*) as total 
+                    FROM dropped_students ds 
+                    JOIN students s ON ds.student_id = s.id WHERE 1=1";
+    $count_params = [];
+    $count_types = '';
+
+    if (!empty($filter_year)) {
+        $count_query .= " AND YEAR(ds.dropped_at) = ?";
+        $count_params[] = intval($filter_year);
+        $count_types .= 'i';
+    }
+    if (!empty($filter_class)) {
+        $count_query .= " AND s.class = ?";
+        $count_params[] = $filter_class;
+        $count_types .= 's';
+    }
+
+    $stmt_count = $conn->prepare($count_query);
+    if (!empty($count_params)) {
+        $stmt_count->bind_param($count_types, ...$count_params);
+    }
+    $stmt_count->execute();
+    $total_dropped = $stmt_count->get_result()->fetch_assoc()['total'];
+    $stmt_count->close();
+
+    $total_pages_see = ceil($total_dropped / $limit);
+
+    // 2. Fetch Data
     $query = "SELECT ds.*, s.name, s.class, s.section 
               FROM dropped_students ds 
               JOIN students s ON ds.student_id = s.id WHERE 1=1";
@@ -153,44 +205,20 @@ if ($view_mode === 'see_mode') {
     }
 
     $query .= " ORDER BY ds.dropped_at DESC";
+
+    if (!$is_filtered_see) {
+        $query .= " LIMIT ? OFFSET ?";
+        $params[] = $limit;
+        $params[] = $offset;
+        $param_types .= 'ii';
+    }
+
     $stmt = $conn->prepare($query);
     if (!empty($params)) {
         $stmt->bind_param($param_types, ...$params);
     }
     $stmt->execute();
     $dropped_students = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-}
-
-// --- LOGIC FOR RESTORE MODE (DROPPED STUDENTS TO RESTORE) ---
-$restore_name = sanitize_input($_GET['restore_name'] ?? '');
-$restore_class = sanitize_input($_GET['restore_class'] ?? '');
-
-if ($view_mode === 'restore_mode') {
-    $query = "SELECT ds.*, s.name, s.class, s.section 
-              FROM dropped_students ds 
-              JOIN students s ON ds.student_id = s.id WHERE 1=1";
-    $params = [];
-    $param_types = '';
-
-    if (!empty($restore_name)) {
-        $query .= " AND s.name LIKE ?";
-        $params[] = '%' . $restore_name . '%';
-        $param_types .= 's';
-    }
-    if (!empty($restore_class)) {
-        $query .= " AND s.class = ?";
-        $params[] = $restore_class;
-        $param_types .= 's';
-    }
-
-    $query .= " ORDER BY ds.dropped_at DESC";
-    $stmt = $conn->prepare($query);
-    if (!empty($params)) {
-        $stmt->bind_param($param_types, ...$params);
-    }
-    $stmt->execute();
-    $restore_students = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 }
 ?>
@@ -243,7 +271,7 @@ if ($view_mode === 'restore_mode') {
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
                     <div class="panel-brand">
-                        <h2>Drop Student Management</h2>
+                        <h2>Drop Student </h2>
                         <span>Principal Panel</span>
                     </div>
                 </div>
@@ -271,7 +299,8 @@ if ($view_mode === 'restore_mode') {
                         <a href="expenses.php" class="module-nav-btn"><i class="fas fa-wallet"></i> Expenses</a>
                         <a href="data_correction.php" class="module-nav-btn"><i class="fas fa-edit"></i> Data Correction</a>
                         <a href="promotion.php" class="module-nav-btn"><i class="fas fa-arrow-up"></i> Promotion</a>
-                        <a href="drop_student.php" class="module-nav-btn active"><i class="fas fa-trash"></i> Drop Student</a>
+                        <a href="drop_student.php" class="module-nav-btn active"><i class="fas fa-trash text-success"></i> Drop Student</a>
+                        <a href="delete_student.php" class="module-nav-btn "><i class="fas fa-user-minus text-success"></i> Delete Student</a>
                         <a href="users.php" class="module-nav-btn"><i class="fas fa-users-cog"></i> Users</a>
                         <a href="receipt_note.php" class="module-nav-btn"><i class="fas fa-sticky-note"></i> Receipt Note</a>
                         <a href="../help.php" class="module-nav-btn">
@@ -295,7 +324,7 @@ if ($view_mode === 'restore_mode') {
                         </div>
                     <?php endif; ?>
                     
-                    <!-- --- MODE SELECTION BUTTONS --- -->
+                    <!-- --- BOTH BUTTONS HAVE SAME ACTIVE COLOR NOW --- -->
                     <div class="text-center mb-4">
                         <div class="mode-container">
                             <a href="drop_student.php?view=drop_mode" class="btn mode-btn <?php echo $view_mode === 'drop_mode' ? 'active-mode' : ''; ?>">
@@ -303,9 +332,6 @@ if ($view_mode === 'restore_mode') {
                             </a>
                             <a href="drop_student.php?view=see_mode" class="btn mode-btn <?php echo $view_mode === 'see_mode' ? 'active-mode' : ''; ?>">
                                 <i class="fas fa-eye me-2"></i> Want to See Drop Student
-                            </a>
-                            <a href="drop_student.php?view=restore_mode" class="btn mode-btn <?php echo $view_mode === 'restore_mode' ? 'active-mode' : ''; ?>">
-                                <i class="fas fa-undo me-2"></i> Want to Restore Drop Student
                             </a>
                         </div>
                     </div>
@@ -349,7 +375,7 @@ if ($view_mode === 'restore_mode') {
                         </div>
                         
                         <div class="search-results mt-4">
-                            <h5>Active Students (Total: <?php echo count($search_results); ?>)</h5>
+                            <h5>Active Students (Total: <?php echo $total_students; ?>)</h5>
                             <?php if (count($search_results) > 0): ?>
                                 <form id="bulkDropForm" method="POST" onsubmit="return handleBulkDropSubmit(this);">
                                     <input type="hidden" name="action" value="bulk_drop">
@@ -394,13 +420,17 @@ if ($view_mode === 'restore_mode') {
                                         </button>
                                     </div>
                                 </form>
+                                
+                                <!-- PAGINATION BUTTONS -->
+                                <?php render_pagination($page, $total_pages_drop, ['view' => 'drop_mode'], $is_filtered_drop); ?>
+
                             <?php else: ?>
                                 <div class="alert alert-info">No active students found with these filters!</div>
                             <?php endif; ?>
                         </div>
 
                     <!-- ==================== MODE 2: WANT TO SEE DROP STUDENT ==================== -->
-                    <?php elseif ($view_mode === 'see_mode'): ?>
+                    <?php else: ?>
                         <div class="search-section mb-4">
                             <h4>Search Dropped Students History</h4>
                             <form method="GET" class="row g-3">
@@ -418,7 +448,6 @@ if ($view_mode === 'restore_mode') {
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                                <!-- Match exact same design and color layout as shared -->
                                 <div class="col-md-2 d-flex align-items-end">
                                     <button type="submit" class="btn btn-primary w-100 py-2">
                                         <i class="fas fa-search"></i> Search
@@ -428,7 +457,7 @@ if ($view_mode === 'restore_mode') {
                         </div>
 
                         <div class="dropped-section mt-4">
-                            <h5>Dropped Students Records (Total: <?php echo count($dropped_students); ?>)</h5>
+                            <h5>Dropped Students Records (Total: <?php echo $total_dropped; ?>)</h5>
                             <?php if (count($dropped_students) > 0): ?>
                                 <table class="table table-hover align-middle">
                                     <thead>
@@ -454,77 +483,10 @@ if ($view_mode === 'restore_mode') {
                                         <?php endforeach; ?>
                                     </tbody>
                                 </table>
-                            <?php else: ?>
-                                <div class="alert alert-info">
-                                    <i class="fas fa-info-circle"></i> No dropped students found with current filters.
-                                </div>
-                            <?php endif; ?>
-                        </div>
 
-                    <!-- ==================== MODE 3: WANT TO RESTORE DROP STUDENT ==================== -->
-                    <?php else: ?>
-                        <div class="search-section mb-4">
-                            <h4>Search Dropped Students to Restore</h4>
-                            <form method="GET" class="row g-3">
-                                <input type="hidden" name="view" value="restore_mode">
-                                <div class="col-md-5">
-                                    <label class="form-label">Student Name</label>
-                                    <input type="text" name="restore_name" class="form-control" value="<?php echo htmlspecialchars($restore_name); ?>" placeholder="Search by name...">
-                                </div>
-                                <div class="col-md-5">
-                                    <label class="form-label">Class</label>
-                                    <select name="restore_class" class="form-select">
-                                        <option value="">All Classes</option>
-                                        <?php foreach ($CLASSES as $cls): ?>
-                                            <option value="<?php echo $cls; ?>" <?php echo $restore_class == $cls ? 'selected' : ''; ?>><?php echo $cls; ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-2 d-flex align-items-end">
-                                    <button type="submit" class="btn btn-primary w-100 py-2">
-                                        <i class="fas fa-search"></i> Search
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                                <!-- PAGINATION BUTTONS -->
+                                <?php render_pagination($page, $total_pages_see, ['view' => 'see_mode'], $is_filtered_see); ?>
 
-                        <div class="dropped-section mt-4">
-                            <h5>Dropped Students to Restore (Total: <?php echo count($restore_students); ?>)</h5>
-                            <?php if (count($restore_students) > 0): ?>
-                                <table class="table table-hover align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Class</th>
-                                            <th>Section</th>
-                                            <th>Dropped Date</th>
-                                            <th>Dropped By</th>
-                                            <th>Reason</th>
-                                            <th class="text-end">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($restore_students as $dropped): ?>
-                                            <tr>
-                                                <td><strong><?php echo htmlspecialchars($dropped['name']); ?></strong></td>
-                                                <td><?php echo htmlspecialchars($dropped['class']); ?></td>
-                                                <td><?php echo htmlspecialchars($dropped['section']); ?></td>
-                                                <td><?php echo format_datetime($dropped['dropped_at']); ?></td>
-                                                <td><span class="badge bg-secondary"><?php echo htmlspecialchars($dropped['dropped_by']); ?></span></td>
-                                                <td><?php echo htmlspecialchars($dropped['drop_reason']); ?></td>
-                                                <td class="text-end">
-                                                    <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to restore <?php echo htmlspecialchars($dropped['name']); ?> to active status?');">
-                                                        <input type="hidden" name="action" value="restore_student">
-                                                        <input type="hidden" name="student_id" value="<?php echo $dropped['student_id']; ?>">
-                                                        <button type="submit" class="btn btn-success btn-sm">
-                                                            <i class="fas fa-undo"></i> Restore
-                                                        </button>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
                             <?php else: ?>
                                 <div class="alert alert-info">
                                     <i class="fas fa-info-circle"></i> No dropped students found with current filters.

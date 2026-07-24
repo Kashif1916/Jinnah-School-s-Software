@@ -1,6 +1,6 @@
 <?php
 /**
- * Drop Student (Updated UI & Colors Matching Search Button)
+ * Drop Student (Updated UI & Colors Matching Search Button + 20/page Pagination)
  * School Finance Management System
  */
 
@@ -63,12 +63,54 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     }
 }
 
+// Pagination setup (20 items per page)
+$limit = 20;
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$offset = ($page - 1) * $limit;
+
 // --- LOGIC FOR DROP MODE (ACTIVE STUDENTS) ---
 $search_name = sanitize_input($_GET['search_name'] ?? '');
 $search_class = sanitize_input($_GET['search_class'] ?? '');
 $search_section = sanitize_input($_GET['search_section'] ?? '');
 
+$is_filtered_drop = (!empty($search_name) || !empty($search_class) || !empty($search_section));
+$total_students = 0;
+$total_pages_drop = 0;
+
 if ($view_mode === 'drop_mode') {
+    // 1. Get Count
+    $count_query = "SELECT COUNT(*) as total FROM students WHERE status = 'active'";
+    $count_params = [];
+    $count_types = '';
+
+    if (!empty($search_name)) {
+        $count_query .= " AND name LIKE ?";
+        $count_params[] = '%' . $search_name . '%';
+        $count_types .= 's';
+    }
+    if (!empty($search_class)) {
+        $count_query .= " AND class = ?";
+        $count_params[] = $search_class;
+        $count_types .= 's';
+    }
+    if (!empty($search_section)) {
+        $count_query .= " AND section = ?";
+        $count_params[] = $search_section;
+        $count_types .= 's';
+    }
+
+    $stmt_count = $conn->prepare($count_query);
+    if (!empty($count_params)) {
+        $stmt_count->bind_param($count_types, ...$count_params);
+    }
+    $stmt_count->execute();
+    $total_students = $stmt_count->get_result()->fetch_assoc()['total'];
+    $stmt_count->close();
+
+    $total_pages_drop = ceil($total_students / $limit);
+
+    // 2. Fetch Data
     $query = "SELECT * FROM students WHERE status = 'active'";
     $params = [];
     $param_types = '';
@@ -90,6 +132,14 @@ if ($view_mode === 'drop_mode') {
     }
 
     $query .= " ORDER BY id DESC";
+
+    if (!$is_filtered_drop) {
+        $query .= " LIMIT ? OFFSET ?";
+        $params[] = $limit;
+        $params[] = $offset;
+        $param_types .= 'ii';
+    }
+
     $stmt = $conn->prepare($query);
     if (!empty($params)) {
         $stmt->bind_param($param_types, ...$params);
@@ -103,7 +153,40 @@ if ($view_mode === 'drop_mode') {
 $filter_year = sanitize_input($_GET['filter_year'] ?? '');
 $filter_class = sanitize_input($_GET['filter_class'] ?? '');
 
+$is_filtered_see = (!empty($filter_year) || !empty($filter_class));
+$total_dropped = 0;
+$total_pages_see = 0;
+
 if ($view_mode === 'see_mode') {
+    // 1. Get Count
+    $count_query = "SELECT COUNT(*) as total 
+                    FROM dropped_students ds 
+                    JOIN students s ON ds.student_id = s.id WHERE 1=1";
+    $count_params = [];
+    $count_types = '';
+
+    if (!empty($filter_year)) {
+        $count_query .= " AND YEAR(ds.dropped_at) = ?";
+        $count_params[] = intval($filter_year);
+        $count_types .= 'i';
+    }
+    if (!empty($filter_class)) {
+        $count_query .= " AND s.class = ?";
+        $count_params[] = $filter_class;
+        $count_types .= 's';
+    }
+
+    $stmt_count = $conn->prepare($count_query);
+    if (!empty($count_params)) {
+        $stmt_count->bind_param($count_types, ...$count_params);
+    }
+    $stmt_count->execute();
+    $total_dropped = $stmt_count->get_result()->fetch_assoc()['total'];
+    $stmt_count->close();
+
+    $total_pages_see = ceil($total_dropped / $limit);
+
+    // 2. Fetch Data
     $query = "SELECT ds.*, s.name, s.class, s.section 
               FROM dropped_students ds 
               JOIN students s ON ds.student_id = s.id WHERE 1=1";
@@ -122,6 +205,14 @@ if ($view_mode === 'see_mode') {
     }
 
     $query .= " ORDER BY ds.dropped_at DESC";
+
+    if (!$is_filtered_see) {
+        $query .= " LIMIT ? OFFSET ?";
+        $params[] = $limit;
+        $params[] = $offset;
+        $param_types .= 'ii';
+    }
+
     $stmt = $conn->prepare($query);
     if (!empty($params)) {
         $stmt->bind_param($param_types, ...$params);
@@ -213,7 +304,7 @@ if ($view_mode === 'see_mode') {
                             <i class="fas fa-arrow-up"></i> Promotion
                         </a>
                         <a href="drop_student.php" class="module-nav-btn active">
-                            <i class="fas fa-trash"></i> Drop Student
+                            <i class="fas fa-trash text-success"></i> Drop Student
                         </a>
                         <a href="../help.php" class="module-nav-btn">
                             <i class="fas fa-question-circle text-success"></i> Help & About
@@ -287,7 +378,7 @@ if ($view_mode === 'see_mode') {
                         </div>
                         
                         <div class="search-results mt-4">
-                            <h5>Active Students (Total: <?php echo count($search_results); ?>)</h5>
+                            <h5>Active Students (Total: <?php echo $total_students; ?>)</h5>
                             <?php if (count($search_results) > 0): ?>
                                 <form id="bulkDropForm" method="POST" onsubmit="return handleBulkDropSubmit(this);">
                                     <input type="hidden" name="action" value="bulk_drop">
@@ -332,6 +423,10 @@ if ($view_mode === 'see_mode') {
                                         </button>
                                     </div>
                                 </form>
+                                
+                                <!-- PAGINATION BUTTONS -->
+                                <?php render_pagination($page, $total_pages_drop, ['view' => 'drop_mode'], $is_filtered_drop); ?>
+
                             <?php else: ?>
                                 <div class="alert alert-info">No active students found with these filters!</div>
                             <?php endif; ?>
@@ -356,7 +451,6 @@ if ($view_mode === 'see_mode') {
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                                <!-- Match exact same design and color layout as shared -->
                                 <div class="col-md-2 d-flex align-items-end">
                                     <button type="submit" class="btn btn-primary w-100 py-2">
                                         <i class="fas fa-search"></i> Search
@@ -366,7 +460,7 @@ if ($view_mode === 'see_mode') {
                         </div>
 
                         <div class="dropped-section mt-4">
-                            <h5>Dropped Students Records (Total: <?php echo count($dropped_students); ?>)</h5>
+                            <h5>Dropped Students Records (Total: <?php echo $total_dropped; ?>)</h5>
                             <?php if (count($dropped_students) > 0): ?>
                                 <table class="table table-hover align-middle">
                                     <thead>
@@ -392,6 +486,10 @@ if ($view_mode === 'see_mode') {
                                         <?php endforeach; ?>
                                     </tbody>
                                 </table>
+
+                                <!-- PAGINATION BUTTONS -->
+                                <?php render_pagination($page, $total_pages_see, ['view' => 'see_mode'], $is_filtered_see); ?>
+
                             <?php else: ?>
                                 <div class="alert alert-info">
                                     <i class="fas fa-info-circle"></i> No dropped students found with current filters.

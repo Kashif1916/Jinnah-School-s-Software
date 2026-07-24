@@ -1,0 +1,430 @@
+<?php
+/**
+ * Delete Student Feature
+ * School Finance Management System - Master Panel
+ */
+
+require_once '../config/config.php';
+require_once '../config/db.php';
+require_once '../includes/session.php';
+require_once '../includes/helpers.php';
+
+require_master();
+
+$error = '';
+$success = '';
+$search_results = [];
+
+// Determine current view mode ('active_mode' or 'dropped_mode')
+$view_mode = $_GET['view'] ?? 'active_mode';
+if (!in_array($view_mode, ['active_mode', 'dropped_mode'])) {
+    $view_mode = 'active_mode';
+}
+
+// --- HANDLE POST ACTIONS (BULK / SINGLE DELETE) ---
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'bulk_delete') {
+    $student_ids = $_POST['student_ids'] ?? [];
+    
+    if (empty($student_ids)) {
+        $error = 'Please select at least one student to delete.';
+    } else {
+        $conn->begin_transaction();
+        try {
+            $placeholders = implode(',', array_fill(0, count($student_ids), '?'));
+            $types = str_repeat('i', count($student_ids));
+            $int_ids = array_map('intval', $student_ids);
+            
+            // 1. Delete from dropped_students log
+            $del_dropped = "DELETE FROM dropped_students WHERE student_id IN ($placeholders)";
+            $stmt1 = $conn->prepare($del_dropped);
+            $stmt1->bind_param($types, ...$int_ids);
+            $stmt1->execute();
+            $stmt1->close();
+            
+            // 2. Delete from payments
+            $del_payments = "DELETE FROM payments WHERE student_id IN ($placeholders)";
+            $stmt2 = $conn->prepare($del_payments);
+            $stmt2->bind_param($types, ...$int_ids);
+            $stmt2->execute();
+            $stmt2->close();
+            
+            // 3. Delete from fee_records
+            $del_fee = "DELETE FROM fee_records WHERE student_id IN ($placeholders)";
+            $stmt3 = $conn->prepare($del_fee);
+            $stmt3->bind_param($types, ...$int_ids);
+            $stmt3->execute();
+            $stmt3->close();
+            
+            // 4. Delete from students table
+            $del_students = "DELETE FROM students WHERE id IN ($placeholders)";
+            $stmt4 = $conn->prepare($del_students);
+            $stmt4->bind_param($types, ...$int_ids);
+            $stmt4->execute();
+            $stmt4->close();
+            
+            $conn->commit();
+            $success = count($student_ids) . ' student(s) and all associated records deleted permanently!';
+        } catch (Exception $e) {
+            $conn->rollback();
+            $error = 'Error deleting student(s): ' . $e->getMessage();
+        }
+    }
+}
+
+// --- SEARCH FILTERS & PAGINATION ---
+$search_name = sanitize_input($_GET['search_name'] ?? '');
+$search_class = sanitize_input($_GET['search_class'] ?? '');
+$search_section = sanitize_input($_GET['search_section'] ?? '');
+
+$is_filtered = (!empty($search_name) || !empty($search_class) || !empty($search_section));
+
+$limit = 20; // Default 20 per page
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$offset = ($page - 1) * $limit;
+
+$target_status = ($view_mode === 'active_mode') ? 'active' : 'dropped';
+
+// 1. Get Count Query
+$count_query = "SELECT COUNT(*) as total FROM students WHERE status = ?";
+$count_params = [$target_status];
+$count_types = 's';
+
+if (!empty($search_name)) {
+    $count_query .= " AND name LIKE ?";
+    $count_params[] = '%' . $search_name . '%';
+    $count_types .= 's';
+}
+if (!empty($search_class)) {
+    $count_query .= " AND class = ?";
+    $count_params[] = $search_class;
+    $count_types .= 's';
+}
+if (!empty($search_section)) {
+    $count_query .= " AND section = ?";
+    $count_params[] = $search_section;
+    $count_types .= 's';
+}
+
+$stmt_count = $conn->prepare($count_query);
+if (!empty($count_params)) {
+    $stmt_count->bind_param($count_types, ...$count_params);
+}
+$stmt_count->execute();
+$total_students = $stmt_count->get_result()->fetch_assoc()['total'];
+$stmt_count->close();
+
+$total_pages = ceil($total_students / $limit);
+
+// 2. Fetch Data Query
+$query = "SELECT * FROM students WHERE status = ?";
+$params = [$target_status];
+$param_types = 's';
+
+if (!empty($search_name)) {
+    $query .= " AND name LIKE ?";
+    $params[] = '%' . $search_name . '%';
+    $param_types .= 's';
+}
+if (!empty($search_class)) {
+    $query .= " AND class = ?";
+    $params[] = $search_class;
+    $param_types .= 's';
+}
+if (!empty($search_section)) {
+    $query .= " AND section = ?";
+    $params[] = $search_section;
+    $param_types .= 's';
+}
+
+$query .= " ORDER BY id DESC";
+
+if (!$is_filtered) {
+    $query .= " LIMIT ? OFFSET ?";
+    $params[] = $limit;
+    $params[] = $offset;
+    $param_types .= 'ii';
+}
+
+$stmt = $conn->prepare($query);
+if (!empty($params)) {
+    $stmt->bind_param($param_types, ...$params);
+}
+$stmt->execute();
+$search_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Student - <?php echo SITE_NAME; ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="../assets/css/style.css" rel="stylesheet">
+    <style>
+        .mode-container {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 50px;
+            display: inline-flex;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
+        }
+        .mode-btn {
+            border-radius: 40px !important;
+            font-weight: 600;
+            padding: 10px 28px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            border: none !important;
+        }
+        .mode-btn.active-mode {
+            background-color: #24493a !important;
+            color: #fff !important;
+            box-shadow: 0 4px 12px rgba(36, 73, 58, 0.3);
+        }
+        .mode-btn:not(.active-mode) {
+            color: #7f8c8d;
+            background: transparent;
+        }
+        .mode-btn:not(.active-mode):hover {
+            color: #333;
+            background: rgba(0,0,0,0.04);
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper feature-shell">
+        <main class="main-content">
+            <div class="topbar">
+                <div class="topbar-left d-flex align-items-center gap-3">
+                    <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
+                    <div class="panel-brand">
+                        <h2>Delete Student Management</h2>
+                        <span>Principal Panel</span>
+                    </div>
+                </div>
+                <div class="topbar-right">
+                    <span class="user-info">
+                        <i class="fas fa-user-circle"></i> <?php echo get_username(); ?>
+                    </span>
+                    <a href="../logout.php" class="btn-secondary">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
+            </div>
+            
+            <div class="content">
+                <div class="module-nav-panel">
+                    <div class="module-nav-row">
+                        <a href="dashboard.php" class="module-nav-btn"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                        <a href="add_student.php" class="module-nav-btn"><i class="fas fa-user-plus"></i> Add Student</a>
+                        <a href="student_record.php" class="module-nav-btn"><i class="fas fa-address-book"></i> Student Record</a>
+                        <a href="student_add_details.php" class="module-nav-btn"><i class="fas fa-history"></i> Add Log</a>
+                        <a href="fee_schedule.php" class="module-nav-btn"><i class="fas fa-calendar-alt"></i> Fee Schedule</a>
+                        <a href="fee_management.php" class="module-nav-btn"><i class="fas fa-money-bill-wave"></i> Fee Management</a>
+                        <a href="defaulter_list.php" class="module-nav-btn"><i class="fas fa-list"></i> Pending List</a>
+                        <a href="payment_analytics.php" class="module-nav-btn"><i class="fas fa-chart-line"></i> Analytics</a>
+                        <a href="expenses.php" class="module-nav-btn"><i class="fas fa-wallet"></i> Expenses</a>
+                        <a href="data_correction.php" class="module-nav-btn"><i class="fas fa-edit"></i> Data Correction</a>
+                        <a href="promotion.php" class="module-nav-btn"><i class="fas fa-arrow-up"></i> Promotion</a>
+                        <a href="drop_student.php" class="module-nav-btn"><i class="fas fa-trash text-success"></i> Drop Student</a>
+                        <a href="delete_student.php" class="module-nav-btn active"><i class="fas fa-user-minus text-success"></i> Delete Student</a>
+                        <a href="users.php" class="module-nav-btn"><i class="fas fa-users-cog"></i> Users</a>
+                        <a href="receipt_note.php" class="module-nav-btn"><i class="fas fa-sticky-note"></i> Receipt Note</a>
+                        <a href="../help.php" class="module-nav-btn">
+                            <i class="fas fa-question-circle text-success"></i> Help & About
+                        </a>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <?php if (!empty($success)): ?>
+                        <div class="alert alert-success alert-dismissible fade show">
+                            <i class="fas fa-check-circle"></i> <?php echo $success; ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <?php if (!empty($error)): ?>
+                        <div class="alert alert-danger alert-dismissible fade show">
+                            <i class="fas fa-exclamation-circle"></i> <?php echo $error; ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <!-- --- MODE SELECTION BUTTONS (2 BUTTONS) --- -->
+                    <div class="text-center mb-4">
+                        <div class="mode-container">
+                            <a href="delete_student.php?view=active_mode<?php echo !empty($search_name) ? '&search_name='.urlencode($search_name) : ''; ?><?php echo !empty($search_class) ? '&search_class='.urlencode($search_class) : ''; ?><?php echo !empty($search_section) ? '&search_section='.urlencode($search_section) : ''; ?>" class="btn mode-btn <?php echo $view_mode === 'active_mode' ? 'active-mode' : ''; ?>">
+                                <i class="fas fa-user-times me-2"></i> Delete Active Students
+                            </a>
+                            <a href="delete_student.php?view=dropped_mode<?php echo !empty($search_name) ? '&search_name='.urlencode($search_name) : ''; ?><?php echo !empty($search_class) ? '&search_class='.urlencode($search_class) : ''; ?><?php echo !empty($search_section) ? '&search_section='.urlencode($search_section) : ''; ?>" class="btn mode-btn <?php echo $view_mode === 'dropped_mode' ? 'active-mode' : ''; ?>">
+                                <i class="fas fa-trash-alt me-2"></i> Delete Drop Students
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <hr class="mb-4 text-muted opacity-25">
+
+                    <!-- ==================== SEARCH FILTERS SECTION ==================== -->
+                    <div class="search-section mb-4">
+                        <h4><?php echo $view_mode === 'active_mode' ? 'Search Active Students to Delete' : 'Search Dropped Students to Delete'; ?></h4>
+                        <form method="GET" class="row g-3">
+                            <input type="hidden" name="view" value="<?php echo htmlspecialchars($view_mode); ?>">
+                            <div class="col-md-4">
+                                <label class="form-label">Student Name</label>
+                                <input type="text" name="search_name" class="form-control" value="<?php echo htmlspecialchars($search_name); ?>" placeholder="Search by name...">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Class</label>
+                                <select name="search_class" class="form-select">
+                                    <option value="">All Classes</option>
+                                    <?php foreach ($CLASSES as $cls): ?>
+                                        <option value="<?php echo $cls; ?>" <?php echo $search_class == $cls ? 'selected' : ''; ?>><?php echo $cls; ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Section</label>
+                                <select name="search_section" class="form-select">
+                                    <option value="">All Sections</option>
+                                    <?php foreach ($SECTIONS as $sec): ?>
+                                        <option value="<?php echo $sec; ?>" <?php echo $search_section == $sec ? 'selected' : ''; ?>><?php echo $sec; ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary w-100 py-2">
+                                    <i class="fas fa-search"></i> Search
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- ==================== RESULTS & ACTION TABLE ==================== -->
+                    <div class="search-results mt-4">
+                        <h5><?php echo $view_mode === 'active_mode' ? 'Active Students' : 'Dropped Students'; ?> (Total: <?php echo $total_students; ?>)</h5>
+                        <?php if (count($search_results) > 0): ?>
+                            <form id="bulkDeleteForm" method="POST" onsubmit="return handleBulkDeleteSubmit(this);">
+                                <input type="hidden" name="action" value="bulk_delete">
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th width="40px">
+                                                    <input type="checkbox" id="selectAll" class="form-check-input">
+                                                </th>
+                                                <th>ID</th>
+                                                <th>Name</th>
+                                                <th>Father Name</th>
+                                                <th>Class</th>
+                                                <th>Section</th>
+                                                <th>Contact</th>
+                                                <th>Status</th>
+                                                <th class="text-end">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($search_results as $res): ?>
+                                                <tr>
+                                                    <td>
+                                                        <input type="checkbox" name="student_ids[]" value="<?php echo $res['id']; ?>" class="form-check-input student-checkbox">
+                                                    </td>
+                                                    <td><?php echo $res['id']; ?></td>
+                                                    <td><strong><?php echo htmlspecialchars($res['name']); ?></strong></td>
+                                                    <td><?php echo htmlspecialchars($res['father_name']); ?></td>
+                                                    <td><?php echo htmlspecialchars($res['class']); ?></td>
+                                                    <td><?php echo htmlspecialchars($res['section']); ?></td>
+                                                    <td><?php echo htmlspecialchars($res['contact_number']); ?></td>
+                                                    <td>
+                                                        <?php if ($res['status'] === 'active'): ?>
+                                                            <span class="badge bg-success">Active</span>
+                                                        <?php else: ?>
+                                                            <span class="badge bg-danger">Dropped</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteSingleStudent(<?php echo $res['id']; ?>, '<?php echo addslashes(htmlspecialchars($res['name'])); ?>')">
+                                                            <i class="fas fa-trash-alt"></i> Delete
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <button type="submit" class="btn btn-danger px-4 py-2">
+                                        <i class="fas fa-trash-alt me-1"></i> <?php echo $view_mode === 'active_mode' ? 'Delete Selected Active Students' : 'Delete Selected Drop Students'; ?>
+                                    </button>
+                                </div>
+                            </form>
+
+                            <!-- PAGINATION BUTTONS -->
+                            <?php render_pagination($page, $total_pages, ['view' => $view_mode], $is_filtered); ?>
+
+                        <?php else: ?>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> No <?php echo $view_mode === 'active_mode' ? 'active' : 'dropped'; ?> students found with current search filters!
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/js/script.js"></script>
+    
+    <script>
+        // Select All Checkboxes
+        const selectAllCheckbox = document.getElementById('selectAll');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                const checkboxes = document.querySelectorAll('.student-checkbox');
+                checkboxes.forEach(cb => cb.checked = this.checked);
+            });
+        }
+
+        // Bulk Delete Submit Validation & Confirmation
+        function handleBulkDeleteSubmit(form) {
+            const checkedBoxes = document.querySelectorAll('.student-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert("Please select at least one student to delete!");
+                return false;
+            }
+            
+            return confirm("WARNING: Are you sure you want to PERMANENTLY delete " + checkedBoxes.length + " selected student(s) and all their associated records?\nThis action CANNOT be undone!");
+        }
+
+        // Single Student Delete
+        function deleteSingleStudent(studentId, studentName) {
+            if (confirm("WARNING: Are you sure you want to PERMANENTLY delete student '" + studentName + "' (ID: " + studentId + ") and all associated records?\nThis action CANNOT be undone!")) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                
+                const actionInput = document.createElement('input');
+                actionInput.type = 'hidden';
+                actionInput.name = 'action';
+                actionInput.value = 'bulk_delete';
+                form.appendChild(actionInput);
+                
+                const idInput = document.createElement('input');
+                idInput.type = 'hidden';
+                idInput.name = 'student_ids[]';
+                idInput.value = studentId;
+                form.appendChild(idInput);
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+    </script>
+</body>
+</html>
