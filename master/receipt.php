@@ -110,11 +110,14 @@ if (!empty($payments_to_display)) {
     foreach ($payments_to_display as $payment) {
         $student_id = $payment['student_id'];
         $paid_month = $payment['paid_for_month'] ?? $payment['month'] ?? '';
+        
         $is_admission = (trim($paid_month) === 'Admission');
+        // Check for Prev-Year case
+        $is_prev_year = (trim($paid_month) === 'Prev-Year' || strpos($paid_month, 'Prev-Year') !== false);
         
         // Check if this payment is a pending/subsequent payment for this month
         $is_pending = false;
-        if ($paid_month && !$is_admission) {
+        if ($paid_month && !$is_admission && !$is_prev_year) {
             $stmt_check = $conn->prepare("SELECT id FROM payments WHERE student_id = ? AND paid_for_month = ? AND id < ? LIMIT 1");
             $stmt_check->bind_param("isi", $student_id, $paid_month, $payment['id']);
             $stmt_check->execute();
@@ -125,9 +128,11 @@ if (!empty($payments_to_display)) {
             $stmt_check->close();
         }
 
-        // Group key definition: Keep pending payments completely separate
+        // Group key definition: Keep admission, prev-year & pending payments completely separate
         if ($is_admission) {
             $group_key = $student_id . '_admission';
+        } elseif ($is_prev_year) {
+            $group_key = $student_id . '_prev_year_' . $payment['id'];
         } elseif ($is_pending) {
             $group_key = $student_id . '_pending_' . $payment['id'];
         } else {
@@ -143,6 +148,7 @@ if (!empty($payments_to_display)) {
                 'fixed_monthly_fee' => $payment['fixed_monthly_fee'],
                 'concession_amount' => $payment['concession_amount'],
                 'is_admission' => $is_admission,
+                'is_prev_year' => $is_prev_year,
                 'is_pending' => $is_pending,
                 'months' => [],
                 'total_amount' => 0.0,
@@ -261,9 +267,12 @@ ob_start();
             text-align: center;
             font-size: 9px;
             color: #999;
-            padding-top: 1.5mm;
-            margin-top: 1mm;
-        }
+            padding-top: 1mm;
+            margin-top: 0mm;
+        }.footer p {
+            margin: 0;
+            line-height: 1.3;}
+        
         .receipt-note {
             margin: 2mm auto;
             padding-top: 1mm;
@@ -305,7 +314,7 @@ ob_start();
 <body>
     <div class="receipt-container" style="position: relative;"> <div class="header">
             <img src="../images/logo.jfif" style="width: 80px !important; height: auto" alt="Logo">
-            <h4> Jinnah School & Inter College Khushab </h4>
+            <h4> Jinnah High School & Inter College Khushab </h4>
             <p>Fee Receipt</p>
         </div>
 
@@ -328,7 +337,7 @@ ob_start();
             <div class="receipt-number">
                 <p><strong>Receipt #:</strong> <?php echo str_pad($payments_to_display[0]['id'], 6, '0', STR_PAD_LEFT); ?></p>
                 <p><strong>Date:</strong> <?php echo date('d-m-Y h:i A'); ?></p>
-                <p><strong>Phone:</strong> 03180711280</p>
+                <p><strong>Phone:</strong>03096684856</p>
                 <p><strong>Paid By:</strong> <?php echo htmlspecialchars($payments_to_display[0]['received_by'] ?? 'System'); ?></p>
                 <p><strong>Method:</strong> <?php echo strtoupper(str_replace('_', ' ', $payments_to_display[0]['payment_mode'] ?? 'cash')); ?></p>
             </div>
@@ -350,7 +359,7 @@ ob_start();
                                     <?php echo htmlspecialchars($group['class']) . '-' . htmlspecialchars($group['section']); ?> | <?php echo implode(', ', $group['months']); ?>
                                     <?php 
                                     // If there is concession and it is not admission fee, show standard - concession = payable
-                                    if (empty($group['is_admission']) && isset($group['fixed_monthly_fee'])) {
+                                   if (empty($group['is_admission']) && empty($group['is_prev_year']) && isset($group['fixed_monthly_fee'])) {
                                         if (isset($group['concession_amount']) && $group['concession_amount'] > 0) {
                                             $payable = floatval($group['fixed_monthly_fee']) - floatval($group['concession_amount']);
                                             echo "<br><small class='text-muted' style='font-size: 9px; color:#555;'>Fee: " . number_format($group['fixed_monthly_fee'], 0) . " - " . number_format($group['concession_amount'], 0) . " = " . number_format($payable, 0) . " (Per Month)</small>";
@@ -400,11 +409,13 @@ ob_start();
     <?php endif; ?>
     
     <div class="footer">
-        <p>Thank you for your payment!</p>
-        <p><?php echo date('d-m-Y h:i:s A'); ?></p>
+        <p>Thank You For Your Payment!</p>
+        <p>KJ Software House Khushab</p>
+        
     </div>
     
     <div style="height: 5mm;"></div>
+   
         
     <script>
         window.onload = function() {

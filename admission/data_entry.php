@@ -77,9 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $student_id = $conn->insert_id;
                 $stmt->close();
                 
-                // Historical Months of 2026
+                // Historical Months List (Includes "Previous Year Fee" before Jan-2026)
                 $months_2026 = [
-                    'Jan-2026', 'Feb-2026', 'Mar-2026', 'Apr-2026', 'May-2026', 'Jun-2026',
+                    'Prev-Year', 'Jan-2026', 'Feb-2026', 'Mar-2026', 'Apr-2026', 'May-2026', 'Jun-2026',
                     'Jul-2026', 'Aug-2026', 'Sep-2026', 'Oct-2026', 'Nov-2026', 'Dec-2026'
                 ];
                 
@@ -95,12 +95,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $partial_month = $paid_months[count($paid_months) - 1];
                         $fully_paid_months = array_diff($paid_months, [$partial_month]);
                     } else {
-                        $partial_month = 'Jan-2026';
+                        $partial_month = 'Prev-Year';
                         $fully_paid_months = [];
                     }
                 }
                 
                 foreach ($months_2026 as $month) {
+                    // Decide regular fee vs previous year fee amount calculation
+                    $current_month_fee = ($month === 'Prev-Year') ? $pending_amount : $monthly_fee;
+
                     if (in_array($month, $fully_paid_months)) {
                         // Mark as Paid in fee_records (amount = 0 remaining)
                         $query_fee = "INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES (?, ?, 0, 'paid', ?)";
@@ -112,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         // Insert into payments table
                         $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
                         $stmt_pay = $conn->prepare($query_pay);
-                        $stmt_pay->bind_param('idsss', $student_id, $monthly_fee, $month, $payment_date, $received_by);
+                        $stmt_pay->bind_param('idsss', $student_id, $current_month_fee, $month, $payment_date, $received_by);
                         $stmt_pay->execute();
                         $stmt_pay->close();
                     } elseif ($month === $partial_month) {
@@ -123,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $stmt_fee->execute();
                         $stmt_fee->close();
                         
-                        $paid_amount = $monthly_fee - $pending_amount;
+                        $paid_amount = $current_month_fee - $pending_amount;
                         if ($paid_amount > 0) {
                             $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
                             $stmt_pay = $conn->prepare($query_pay);
@@ -135,14 +138,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         // Mark as Unpaid in fee_records
                         $query_fee = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')";
                         $stmt_fee = $conn->prepare($query_fee);
-                        $stmt_fee->bind_param('isd', $student_id, $month, $monthly_fee);
+                        $stmt_fee->bind_param('isd', $student_id, $month, $current_month_fee);
                         $stmt_fee->execute();
                         $stmt_fee->close();
                     }
                 }
                 
                 $conn->commit();
-                $success = 'Student added successfully via Data Entry! Fees generated from Jan-2026.';
+                $success = 'Student added successfully via Data Entry! Fees generated including Previous Year Fee & 2026 schedule.';
             } else {
                 throw new Exception($stmt->error);
             }
@@ -154,19 +157,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 }
 
+// Checkboxes Array (Previous Year Fee is added at the top)
 $months_list = [
-    'Jan-2026' => 'January 2026',
-    'Feb-2026' => 'February 2026',
-    'Mar-2026' => 'March 2026',
-    'Apr-2026' => 'April 2026',
-    'May-2026' => 'May 2026',
-    'Jun-2026' => 'June 2026',
-    'Jul-2026' => 'July 2026',
-    'Aug-2026' => 'August 2026',
-    'Sep-2026' => 'September 2026',
-    'Oct-2026' => 'October 2026',
-    'Nov-2026' => 'November 2026',
-    'Dec-2026' => 'December 2026'
+    'Prev-Year' => 'Previous Year Pending Fee',
+    'Jan-2026'  => 'January 2026',
+    'Feb-2026'  => 'February 2026',
+    'Mar-2026'  => 'March 2026',
+    'Apr-2026'  => 'April 2026',
+    'May-2026'  => 'May 2026',
+    'Jun-2026'  => 'June 2026',
+    'Jul-2026'  => 'July 2026',
+    'Aug-2026'  => 'August 2026',
+    'Sep-2026'  => 'September 2026',
+    'Oct-2026'  => 'October 2026',
+    'Nov-2026'  => 'November 2026',
+    'Dec-2026'  => 'December 2026'
 ];
 ?>
 <!DOCTYPE html>
@@ -315,18 +320,18 @@ $months_list = [
                             </div>
                         </div>
 
-                        <!-- 2026 Fee Paid Months Block -->
+                        <!-- Fee Paid Months Block -->
                         <div class="card p-4 mb-4 border-0 shadow-sm" style="background: rgba(31, 95, 70, 0.05); border-radius: 12px;">
                             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                                 <h5 class="text-success mb-0" style="font-weight: 600;">
-                                    <i class="fas fa-calendar-check me-2"></i> Fee Paid for Month (Jan 2026 - Dec 2026)
+                                    <i class="fas fa-calendar-check me-2"></i> Fee Paid Status (Previous Year & 2026)
                                 </h5>
                                 <div class="btn-group btn-group-sm">
                                     <button type="button" class="btn btn-outline-success" id="selectAll">Select All</button>
                                     <button type="button" class="btn btn-outline-secondary" id="deselectAll">Deselect All</button>
                                 </div>
                             </div>
-                            <p class="text-muted small mb-3">Check the months for which the student has already paid. Unchecked months will remain pending (unpaid).</p>
+                            <p class="text-muted small mb-3">Check the options/months for which the student has already paid. Unchecked items will remain pending (unpaid).</p>
                             <div class="row g-3">
                                 <?php foreach ($months_list as $value => $label): ?>
                                     <div class="col-6 col-md-3">

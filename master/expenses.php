@@ -38,11 +38,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Fetch all expenses with optional date range filter
-$expenses = [];
+// Fetch Master and Finance users for filter dropdown
+$filter_users = [];
+$user_query = "SELECT id, username, role FROM users WHERE role IN ('master', 'finance') ORDER BY username ASC";
+$user_result = $conn->query($user_query);
+if ($user_result) {
+    $filter_users = $user_result->fetch_all(MYSQLI_ASSOC);
+}
+
+// Fetch filter inputs
 $start_date = sanitize_input($_GET['start_date'] ?? '');
 $end_date = sanitize_input($_GET['end_date'] ?? '');
+$selected_user_id = isset($_GET['user_id']) ? intval($_GET['user_id']) : 0;
 
+// Check if user has applied any filter
+$is_filtered = (!empty($start_date) || !empty($end_date) || $selected_user_id > 0);
+
+// Pagination Configuration (Only applies when NO filter is active)
+$limit = 20; // Default items per page
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$offset = ($page - 1) * $limit;
+
+// 1. Get Total Count for UI Display & Pagination Calculation
+$count_query = "SELECT COUNT(*) as total FROM expenses WHERE 1=1";
+$count_params = [];
+$count_types = '';
+
+if (!empty($start_date) && empty($end_date)) {
+    $count_query .= " AND DATE(created_at) = ?";
+    $count_params[] = $start_date;
+    $count_types .= 's';
+} elseif (!empty($start_date) && !empty($end_date)) {
+    $count_query .= " AND DATE(created_at) BETWEEN ? AND ?";
+    $count_params[] = $start_date;
+    $count_params[] = $end_date;
+    $count_types .= 'ss';
+} elseif (empty($start_date) && !empty($end_date)) {
+    $count_query .= " AND DATE(created_at) <= ?";
+    $count_params[] = $end_date;
+    $count_types .= 's';
+}
+
+if ($selected_user_id > 0) {
+    $count_query .= " AND user_id = ?";
+    $count_params[] = $selected_user_id;
+    $count_types .= 'i';
+}
+
+$stmt_count = $conn->prepare($count_query);
+if (!empty($count_params)) {
+    $stmt_count->bind_param($count_types, ...$count_params);
+}
+$stmt_count->execute();
+$total_expenses = $stmt_count->get_result()->fetch_assoc()['total'];
+$stmt_count->close();
+
+$total_pages = ceil($total_expenses / $limit);
+
+// 2. Fetch Expenses Data Query
+$expenses = [];
 $query = "SELECT * FROM expenses WHERE 1=1";
 $params = [];
 $param_types = "";
@@ -62,7 +117,22 @@ if (!empty($start_date) && empty($end_date)) {
     $param_types .= "s";
 }
 
+if ($selected_user_id > 0) {
+    $query .= " AND user_id = ?";
+    $params[] = $selected_user_id;
+    $param_types .= "i";
+}
+
 $query .= " ORDER BY created_at DESC, id DESC";
+
+// ONLY APPLY LIMIT 20 IF NO FILTER IS ACTIVE
+if (!$is_filtered) {
+    $query .= " LIMIT ? OFFSET ?";
+    $params[] = $limit;
+    $params[] = $offset;
+    $param_types .= 'ii';
+}
+
 $stmt = $conn->prepare($query);
 if (!empty($params)) {
     $stmt->bind_param($param_types, ...$params);
@@ -201,26 +271,39 @@ $stmt->close();
                     <!-- List Section -->
                     <div class="col-lg-8">
                         <div class="analytics-section">
-                            <h4>Recent Expenses Record (All Users)</h4>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h4>Recent Expenses Record (Total: <?php echo $total_expenses; ?>)</h4>
+                            </div>
                             
                             <!-- Search Form -->
                             <form method="GET" class="row g-2 mb-3 align-items-end mt-2">
-                                <div class="col-sm-4">
+                                <div class="col-sm-3">
                                     <label for="start_date" class="form-label small mb-1" style="font-size: 12px; color: #555;">From Date</label>
                                     <input type="date" class="form-control form-control-sm" id="start_date" name="start_date" value="<?php echo htmlspecialchars($start_date); ?>">
                                 </div>
-                                <div class="col-sm-4">
+                                <div class="col-sm-3">
                                     <label for="end_date" class="form-label small mb-1" style="font-size: 12px; color: #555;">To Date</label>
                                     <input type="date" class="form-control form-control-sm" id="end_date" name="end_date" value="<?php echo htmlspecialchars($end_date); ?>">
                                 </div>
-                                <div class="col-sm-4 d-flex gap-1">
+                                <div class="col-sm-3">
+                                    <label for="user_id" class="form-label small mb-1" style="font-size: 12px; color: #555;">Recorded By User</label>
+                                    <select class="form-select form-select-sm" id="user_id" name="user_id">
+                                        <option value="0">All Users</option>
+                                        <?php foreach ($filter_users as $f_user): ?>
+                                            <option value="<?php echo $f_user['id']; ?>" <?php echo ($selected_user_id == $f_user['id']) ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($f_user['username']) . ' (' . ucfirst($f_user['role']) . ')'; ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-sm-3 d-flex gap-1">
                                     <button type="submit" class="btn btn-sm btn-primary flex-grow-1" style="padding: 7px 10px;">
                                         <i class="fas fa-search"></i> Search
                                     </button>
-                                    <a href="../master/expenses_report.php?start_date=<?php echo urlencode($start_date); ?>&end_date=<?php echo urlencode($end_date); ?>" target="_blank" class="btn btn-sm btn-success" style="padding: 7px 10px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
+                                    <a href="../master/expenses_report.php?start_date=<?php echo urlencode($start_date); ?>&end_date=<?php echo urlencode($end_date); ?>&user_id=<?php echo $selected_user_id; ?>" target="_blank" class="btn btn-sm btn-success" style="padding: 7px 10px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
                                         <i class="fas fa-print"></i> Print
                                     </a>
-                                    <?php if (!empty($start_date) || !empty($end_date)): ?>
+                                    <?php if (!empty($start_date) || !empty($end_date) || $selected_user_id > 0): ?>
                                         <a href="expenses.php" class="btn btn-sm btn-secondary" style="padding: 7px 10px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
                                             <i class="fas fa-undo"></i> Clear
                                         </a>
@@ -279,6 +362,12 @@ $stmt->close();
                                     </div>
                                 <?php endif; ?>
                             </div>
+
+                            <!-- PAGINATION BUTTONS -->
+                            <div class="mt-3">
+                                <?php render_pagination($page, $total_pages, '', $is_filtered); ?>
+                            </div>
+
                         </div>
                     </div>
                 </div>
