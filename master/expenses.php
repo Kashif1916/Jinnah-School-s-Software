@@ -290,7 +290,7 @@ $stmt->close();
                                 </div>
                                 <div class="col-sm-3">
                                     <label for="user_id" class="form-label small mb-1" style="font-size: 12px; color: #555;">Recorded By User</label>
-                                    <select class="form-select form-select-sm" id="user_id" name="user_id">
+                                    <select class="form-select form-select-sm" style="height: 40px;" id="user_id" name="user_id">
                                         <option value="0">All Users</option>
                                         <?php foreach ($filter_users as $f_user): ?>
                                             <option value="<?php echo $f_user['id']; ?>" <?php echo ($selected_user_id == $f_user['id']) ? 'selected' : ''; ?>>
