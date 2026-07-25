@@ -198,18 +198,22 @@ function get_total_paid_fees($student_id) {
 function get_defaulters($class = '', $section = '', $months = [], $name = '') {
     global $conn;
     
-    // If no months are specified, default to previous 12 months (inclusive of current month)
+    // If no months are specified, default to previous 12 months (inclusive of current month) plus Admission and Pre_Year
     if (empty($months)) {
         $months = [];
         $start_date = strtotime(date('Y-m-01'));
         for ($i = 0; $i < 12; $i++) {
             $months[] = date('M-Y', strtotime("-$i months", $start_date));
         }
+        $months[] = 'Admission';
+        $months[] = 'Pre_Year';
+        $months[] = 'Prev-Year';
+        $months[] = 'Pre-Year';
     }
     
     $query = "SELECT s.id, s.name, s.father_name, s.class, s.section, s.fixed_monthly_fee, s.monthly_fee, 
                      s.contact_number, s.contact_number2, s.whatsapp_number,
-                     GROUP_CONCAT(f.month ORDER BY CASE WHEN f.month = 'Admission' THEN 1 ELSE 2 END, STR_TO_DATE(CONCAT('01-', f.month), '%d-%b-%Y')) as pending_months,
+                     GROUP_CONCAT(f.month ORDER BY CASE WHEN f.month = 'Admission' THEN 1 WHEN f.month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 ELSE 3 END, STR_TO_DATE(CONCAT('01-', f.month), '%d-%b-%Y')) as pending_months,
                      COUNT(f.id) as pending_count,
                      SUM(f.amount) as filtered_unpaid_amount
               FROM students s 
@@ -230,9 +234,19 @@ function get_defaulters($class = '', $section = '', $months = [], $name = '') {
     
     if (!empty($months)) {
         if (!is_array($months)) $months = [$months];
+        $expanded_months = [];
+        foreach ($months as $m) {
+            $expanded_months[] = $m;
+            if ($m === 'Pre_Year' || $m === 'Prev-Year' || $m === 'Pre-Year') {
+                $expanded_months[] = 'Pre_Year';
+                $expanded_months[] = 'Prev-Year';
+                $expanded_months[] = 'Pre-Year';
+            }
+        }
+        $expanded_months = array_unique($expanded_months);
         $escaped_months = array_map(function($m) use ($conn) { 
             return "'" . $conn->real_escape_string($m) . "'"; 
-        }, $months);
+        }, $expanded_months);
         $query .= " AND f.month IN (" . implode(',', $escaped_months) . ")";
     }
     

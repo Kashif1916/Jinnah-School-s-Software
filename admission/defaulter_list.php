@@ -191,6 +191,14 @@ if (!$is_filtered) {
                                             <?php 
                                          } 
                                         ?>
+                                        <label class="month-tick-item">
+                                            <input type="checkbox" name="months[]" value="Admission" <?php echo (in_array('Admission', (array)$months_filter)) ? 'checked' : ''; ?>>
+                                            Admission
+                                        </label>
+                                        <label class="month-tick-item">
+                                            <input type="checkbox" name="months[]" value="Pre_Year" <?php echo (in_array('Pre_Year', (array)$months_filter) || in_array('Prev-Year', (array)$months_filter) || in_array('Pre-Year', (array)$months_filter)) ? 'checked' : ''; ?>>
+                                            Pre_Year
+                                        </label>
                                     </div>
                                 </div>
                                 
