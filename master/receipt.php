@@ -199,8 +199,8 @@ ob_start();
         }
         .header p {
             margin: 1mm 0;
-            color: #666;
-            font-size: 10px;
+            color: #0c0c0c;
+            font-size: 12px;
         }
         .receipt-number p {
             margin: 1mm 0;
@@ -220,7 +220,7 @@ ob_start();
         }
         .student-info {
             margin-bottom: 5mm;
-            font-size: 11px;
+            font-size: 12px;
             line-height: 1.4;
         }
         .info-label {
@@ -233,7 +233,7 @@ ob_start();
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 3mm;
-            font-size: 10px;
+            font-size: 11px;
         }
         table th {
             border-bottom: 1px solid #333;
@@ -266,7 +266,7 @@ ob_start();
         .footer {
             text-align: center;
             font-size: 9px;
-            color: #999;
+            color: #0c0c0c;
             padding-top: 1mm;
             margin-top: 0mm;
         }.footer p {
@@ -315,7 +315,8 @@ ob_start();
     <div class="receipt-container" style="position: relative;"> <div class="header">
             <img src="../images/logo.jfif" style="width: 80px !important; height: auto" alt="Logo">
             <h4> Jinnah High School & Inter College Khushab </h4>
-            <p>Fee Receipt</p>
+            
+            <p> <strong>Fee Receipt</strong> </p>
         </div>
 
         <div class="paid-stamp" style="
@@ -325,8 +326,8 @@ ob_start();
             transform: translate(-50%, -50%) rotate(-15deg);
             font-size: 70px;
             font-weight: bold;
-            color: rgba(0, 0, 0, 0.18); /* Bohot halka grey jo thermal print mai piche base banayega */
-            border: 5px solid rgba(0, 0, 0, 0.08);
+            color: rgba(0, 0, 0, 0.80); /* Bohot halka grey jo thermal print mai piche base banayega */
+            border: 5px solid rgba(0, 0, 0, 0.75);
             padding: 10px 20px;
             z-index: 1; /* Isko piche rakhne ke liye */
             pointer-events: none;
@@ -355,22 +356,22 @@ ob_start();
                         <?php foreach ($grouped_payments as $stud_id => $group): ?>
                             <tr>
                                 <td>
-                                    <strong><?php echo htmlspecialchars($group['name']) . ' / ' . htmlspecialchars($group['father_name']); ?></strong><br>
+                                    <strong style="font-size: 14px;"><?php echo htmlspecialchars($group['name']) . ' / ' . htmlspecialchars($group['father_name']); ?></strong><br>
                                     <?php echo htmlspecialchars($group['class']) . '-' . htmlspecialchars($group['section']); ?> | <?php echo implode(', ', $group['months']); ?>
                                     <?php 
                                     // If there is concession and it is not admission fee, show standard - concession = payable
                                    if (empty($group['is_admission']) && empty($group['is_prev_year']) && isset($group['fixed_monthly_fee'])) {
                                         if (isset($group['concession_amount']) && $group['concession_amount'] > 0) {
                                             $payable = floatval($group['fixed_monthly_fee']) - floatval($group['concession_amount']);
-                                            echo "<br><small class='text-muted' style='font-size: 9px; color:#555;'>Fee: " . number_format($group['fixed_monthly_fee'], 0) . " - " . number_format($group['concession_amount'], 0) . " = " . number_format($payable, 0) . " (Per Month)</small>";
+                                            echo "<br><small class='text-muted' style='font-size: 11px; color: #0c0c0c;'>Fee: " . number_format($group['fixed_monthly_fee'], 0) . " - " . number_format($group['concession_amount'], 0) . " = " . number_format($payable, 0) . " (Per Month)</small>";
                                         } else {
                                             // No concession, show per month standard fee
-                                            echo "<br><small class='text-muted' style='font-size: 9px; color:#555;'>Fee Per Month = " . number_format($group['fixed_monthly_fee'], 0) . "</small>";
+                                            echo "<br><small class='text-muted' style='font-size: 11px; color: #0c0c0c;'>Fee Per Month = " . number_format($group['fixed_monthly_fee'], 0) . "</small>";
                                         }
                                     }
                                     ?>
                                 </td>
-                                <td class="amount-col"><?php echo number_format($group['total_amount'], 2); ?></td>
+                                <td class="amount-col" style="font-size: 11px;"><?php echo number_format($group['total_amount'], 2); ?></td>
                             </tr>
                         <?php endforeach; ?>
                         <tr style="font-weight: bold;">

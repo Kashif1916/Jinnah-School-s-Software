@@ -12,7 +12,7 @@ require_once '../includes/helpers.php';
 require_master();
 
 // Get Statistics
-$total_students = $conn->query("SELECT COUNT(*) as count FROM students WHERE status = 'active'")->fetch_assoc()['count'];
+$total_students = $conn->query("SELECT COUNT(*) as count FROM students WHERE status = 'active' AND class NOT IN ('Passed-10', 'Passed-12')")->fetch_assoc()['count'];
 $paid_students = $conn->query("SELECT COUNT(DISTINCT fr.student_id) as count FROM fee_records fr JOIN students s ON s.id = fr.student_id WHERE fr.status = 'paid' AND s.status = 'active'")->fetch_assoc()['count'] ?? 0;
 $remaining_students = max(0, $total_students - $paid_students);
 $paid_percentage = $total_students > 0 ? round(($paid_students / $total_students) * 100) : 0;
@@ -20,8 +20,8 @@ $remaining_percentage = 100 - $paid_percentage;
 $total_unpaid = $conn->query("SELECT SUM(amount) as total FROM fee_records WHERE status = 'unpaid'")->fetch_assoc()['total'] ?? 0;
 
 // NEW QUERIES: Fetch count for Section B (Boys) and Section G (Girls) for active students
-$total_boys = $conn->query("SELECT COUNT(*) as count FROM students WHERE section = 'B' AND status = 'active'")->fetch_assoc()['count'] ?? 0;
-$total_girls = $conn->query("SELECT COUNT(*) as count FROM students WHERE section = 'G' AND status = 'active'")->fetch_assoc()['count'] ?? 0;
+$total_boys = $conn->query("SELECT COUNT(*) as count FROM students WHERE section = 'B' AND status = 'active' AND class NOT IN ('Passed-10', 'Passed-12')")->fetch_assoc()['count'] ?? 0;
+$total_girls = $conn->query("SELECT COUNT(*) as count FROM students WHERE section = 'G' AND status = 'active' AND class NOT IN ('Passed-10', 'Passed-12')")->fetch_assoc()['count'] ?? 0;
 
 $today_collection = get_daily_collection(date('Y-m-d'));
 
