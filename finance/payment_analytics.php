@@ -273,16 +273,16 @@ $cash_remaining = $total_cash - $total_expenses;
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 0cm !important; /* Maximizes printing canvas, zero margin waste */
+                margin: 0cm !important;
             }
 
             body {
                 background: #ffffff !important;
                 color: #000000 !important;
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-                font-size: 11.5px !important; /* Fixed print text size */
+                font-size: 11.5px !important;
                 margin: 0 !important;
-                padding: 15px 20px !important; /* Safe padding away from extreme edges */
+                padding: 15px 20px !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
@@ -324,7 +324,7 @@ $cash_remaining = $total_cash - $total_expenses;
                 flex-direction: row !important;
                 flex-wrap: nowrap !important;
                 align-items: flex-start !important; 
-                gap: 0px !important; /* ELIMINATED GAP BETWEEN COLUMNS COMPLETELY */
+                gap: 0px !important;
                 width: 100% !important;
             }
 
@@ -361,7 +361,6 @@ $cash_remaining = $total_cash - $total_expenses;
                 border: 1px solid rgba(0,0,0,0.15) !important;
             }
 
-            /* CASH DRAWER RECONCILIATION BLOCK PRINT CORRECTION */
             .reconciliation-math-card {
                 border-left: 4px solid var(--primary-color) !important;
                 padding: 12px !important; 
@@ -386,7 +385,6 @@ $cash_remaining = $total_cash - $total_expenses;
                 font-size: 8.5px !important;
             }
 
-            /* AUDIT LOG SINGLE LINE ALIGNMENT FIX */
             .denomination-card {
                 padding: 15px !important;
                 margin-top: 10px !important;
@@ -836,20 +834,21 @@ $cash_remaining = $total_cash - $total_expenses;
                                 <span id="denom-grand-total">0.00</span>
                             </div>
 
-                            <!-- Nayi Row: Cash Collected (Reconciled Cash Remaining) -->
+                            <!-- Cash Collected (Reconciled Cash Remaining) -->
                             <div class="denom-cash-collected-row">
                                 <span>Cash Collected:</span>
                                 <span id="audit-cash-collected"><?php echo number_format($cash_remaining, 2); ?></span>
                             </div>
 
-                            <!-- Difference Row (Cash Collected - Grand Total) -->
+                            <!-- Dynamic Difference Row -->
                             <div class="difference-row" id="difference-container">
                                 <span>Difference:</span>
-                                <span id="audit-difference">0.00</span>
+                                <span id="audit-difference">0.00 (Balanced)</span>
                             </div>
                         </div>
                     </div>
-                </div> </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -880,18 +879,24 @@ $cash_remaining = $total_cash - $total_expenses;
             // Update Grand Total UI
             document.getElementById('denom-grand-total').innerText = grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-            // Calculate & Update Difference: Reconciled Cash - Grand Total
-            const difference = reconciledCashRemaining - grandTotal;
+            // Calculate Difference: Audit Grand Total - Reconciled Cash
+            const diffAmount = grandTotal - reconciledCashRemaining;
             const diffElement = document.getElementById('audit-difference');
             
-            diffElement.innerText = difference.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-            // Styling feedback based on balance
-            if (difference === 0) {
-                diffElement.style.color = '#1f5f46'; // Green if perfectly balanced
-                diffElement.innerText = "Balanced (0.00)";
+            if (diffAmount > 0) {
+                // Grand total ziada hai (Extra)
+                const formattedVal = Math.abs(diffAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                diffElement.innerText = formattedVal + ' Extra';
+                diffElement.style.color = '#dc3545'; // Red color highlight
+            } else if (diffAmount < 0) {
+                // Grand total kam hai (Less)
+                const formattedVal = Math.abs(diffAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                diffElement.innerText = formattedVal + ' Less';
+                diffElement.style.color = '#dc3545'; // Red color highlight
             } else {
-                diffElement.style.color = '#dc3545'; // Red if there's any deficit or surplus
+                // Perfectly Balanced
+                diffElement.innerText = '0.00 (Balanced)';
+                diffElement.style.color = '#1f5f46'; // Green color
             }
         }
 
