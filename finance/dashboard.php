@@ -22,8 +22,8 @@ $stmt_coll->execute();
 $today_collection = $stmt_coll->get_result()->fetch_assoc()['total'] ?? 0;
 $stmt_coll->close();
 
-// 2. Today's Total Receipts Count: Aaj is clerk ne total kitni receipts/transactions handle keen
-$stmt_rec = $conn->prepare("SELECT COUNT(*) as count FROM payments WHERE received_by = ? AND DATE(payment_date) = ?");
+// 2. Today's Total Receipts Count: Aaj is clerk ne total kitni unique receipts/transactions handle keen
+$stmt_rec = $conn->prepare("SELECT COUNT(DISTINCT payment_date) as count FROM payments WHERE received_by = ? AND DATE(payment_date) = ?");
 $stmt_rec->bind_param('ss', $current_user, $today_date);
 $stmt_rec->execute();
 $today_receipts = $stmt_rec->get_result()->fetch_assoc()['count'] ?? 0;
@@ -90,6 +90,9 @@ $total_defaulters = $conn->query("SELECT COUNT(DISTINCT student_id) as count FRO
                         </a>
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
+                        </a>
+                        <a href="drop_student.php" class="module-nav-btn ">
+                            <i class="fas fa-trash text-success"></i> Drop Student
                         </a>
                         <a href="account_close.php" class="module-nav-btn">
                             <i class="fas fa-lock"></i> Close Account

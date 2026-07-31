@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Fetch expenses for logged in user with optional date range filter
+// Fetch expenses for logged in user
 $expenses = [];
 $my_user_id = get_user_id();
 $start_date = sanitize_input($_GET['start_date'] ?? '');
@@ -48,7 +48,12 @@ $query = "SELECT * FROM expenses WHERE user_id = ?";
 $params = [$my_user_id];
 $param_types = "i";
 
-if (!empty($start_date) && empty($end_date)) {
+// FILTER LOGIC:
+// 1. Agar koi date filter na ho, to default "CURDATE()" (Aaj ki tareekh) ke expenses dikhao
+// 2. Agar user search kare, to selected date range ke mutabiq load karo
+if (empty($start_date) && empty($end_date)) {
+    $query .= " AND DATE(created_at) = CURDATE()";
+} elseif (!empty($start_date) && empty($end_date)) {
     $query .= " AND DATE(created_at) = ?";
     $params[] = $start_date;
     $param_types .= "s";
@@ -65,9 +70,11 @@ if (!empty($start_date) && empty($end_date)) {
 
 $query .= " ORDER BY created_at DESC, id DESC";
 $stmt = $conn->prepare($query);
+
 if (!empty($params)) {
     $stmt->bind_param($param_types, ...$params);
 }
+
 $stmt->execute();
 $result = $stmt->get_result();
 if ($result) {
@@ -112,7 +119,7 @@ $stmt->close();
                         <a href="dashboard.php" class="module-nav-btn">
                             <i class="fas fa-chart-bar"></i> Dashboard
                         </a>
-                        <a href="add_student.php" class="module-nav-btn ">
+                        <a href="add_student.php" class="module-nav-btn">
                             <i class="fas fa-list"></i> Add Student
                         </a>
                         <a href="student_record.php" class="module-nav-btn">
@@ -129,6 +136,9 @@ $stmt->close();
                         </a>
                         <a href="expenses.php" class="module-nav-btn active">
                             <i class="fas fa-wallet"></i> Expenses
+                        </a>
+                         <a href="drop_student.php" class="module-nav-btn ">
+                            <i class="fas fa-trash text-success"></i> Drop Student
                         </a>
                         <a href="account_close.php" class="module-nav-btn">
                             <i class="fas fa-lock"></i> Close Account
@@ -184,7 +194,14 @@ $stmt->close();
                     <!-- List Section -->
                     <div class="col-lg-8">
                         <div class="analytics-section">
-                            <h4>Recent Expenses Record</h4>
+                            <div class="d-flex justify-content-between align-items-center flex-wrap">
+                                <h4>Recent Expenses Record</h4>
+                                <?php if (empty($start_date) && empty($end_date)): ?>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary px-2 py-1">
+                                        <i class="fas fa-calendar-day me-1"></i> Today's Expenses Only
+                                    </span>
+                                <?php endif; ?>
+                            </div>
                             
                             <!-- Search Form -->
                             <form method="GET" class="row g-2 mb-3 align-items-end mt-2">
@@ -204,7 +221,7 @@ $stmt->close();
                                         <i class="fas fa-print"></i> Print
                                     </a>
                                     <?php if (!empty($start_date) || !empty($end_date)): ?>
-                                        <a href="expenses.php" class="btn btn-sm btn-secondary" style="padding: 7px 10px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
+                                        <a href="expenses.php" class="btn btn-sm btn-secondary" style="padding: 7px 10px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;" title="Reset to Today">
                                             <i class="fas fa-undo"></i> Clear
                                         </a>
                                     <?php endif; ?>
@@ -258,7 +275,12 @@ $stmt->close();
                                     </table>
                                 <?php else: ?>
                                     <div class="alert alert-info py-3 mb-0">
-                                        <i class="fas fa-info-circle me-2"></i> No expenses recorded yet.
+                                        <i class="fas fa-info-circle me-2"></i> 
+                                        <?php if (empty($start_date) && empty($end_date)): ?>
+                                            No expenses recorded for today.
+                                        <?php else: ?>
+                                            No expenses found for the selected date range.
+                                        <?php endif; ?>
                                     </div>
                                 <?php endif; ?>
                             </div>

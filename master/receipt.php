@@ -338,9 +338,12 @@ ob_start();
             <div class="receipt-number">
                 <p><strong>Receipt #:</strong> <?php echo str_pad($payments_to_display[0]['id'], 6, '0', STR_PAD_LEFT); ?></p>
                 <p><strong>Date:</strong> <?php echo date('d-m-Y h:i A'); ?></p>
-                <p><strong>Phone:</strong>03096684856</p>
+               
+
                 <p><strong>Paid By:</strong> <?php echo htmlspecialchars($payments_to_display[0]['received_by'] ?? 'System'); ?></p>
                 <p><strong>Method:</strong> <?php echo strtoupper(str_replace('_', ' ', $payments_to_display[0]['payment_mode'] ?? 'cash')); ?></p>
+                <p><strong>Phone:</strong>03096684856</p>
+                <p><strong></strong>jinnahschoolandintercollegekhb@gmail.com</p>
             </div>
             
             <div class="section payment-details">

@@ -51,7 +51,7 @@ $start_date = sanitize_input($_GET['start_date'] ?? '');
 $end_date = sanitize_input($_GET['end_date'] ?? '');
 $selected_user_id = isset($_GET['user_id']) ? intval($_GET['user_id']) : 0;
 
-// Check if user has applied any filter
+// Check if user has applied any manual filter
 $is_filtered = (!empty($start_date) || !empty($end_date) || $selected_user_id > 0);
 
 // Pagination Configuration (Only applies when NO filter is active)
@@ -65,7 +65,9 @@ $count_query = "SELECT COUNT(*) as total FROM expenses WHERE 1=1";
 $count_params = [];
 $count_types = '';
 
-if (!empty($start_date) && empty($end_date)) {
+if (empty($start_date) && empty($end_date)) {
+    $count_query .= " AND DATE(created_at) = CURDATE()";
+} elseif (!empty($start_date) && empty($end_date)) {
     $count_query .= " AND DATE(created_at) = ?";
     $count_params[] = $start_date;
     $count_types .= 's';
@@ -102,7 +104,9 @@ $query = "SELECT * FROM expenses WHERE 1=1";
 $params = [];
 $param_types = "";
 
-if (!empty($start_date) && empty($end_date)) {
+if (empty($start_date) && empty($end_date)) {
+    $query .= " AND DATE(created_at) = CURDATE()";
+} elseif (!empty($start_date) && empty($end_date)) {
     $query .= " AND DATE(created_at) = ?";
     $params[] = $start_date;
     $param_types .= "s";
@@ -125,7 +129,7 @@ if ($selected_user_id > 0) {
 
 $query .= " ORDER BY created_at DESC, id DESC";
 
-// ONLY APPLY LIMIT 20 IF NO FILTER IS ACTIVE
+// ONLY APPLY LIMIT IF NO FILTER IS ACTIVE
 if (!$is_filtered) {
     $query .= " LIMIT ? OFFSET ?";
     $params[] = $limit;
@@ -274,8 +278,13 @@ $stmt->close();
                     <!-- List Section -->
                     <div class="col-lg-8">
                         <div class="analytics-section">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap">
                                 <h4>Recent Expenses Record (Total: <?php echo $total_expenses; ?>)</h4>
+                                <?php if (empty($start_date) && empty($end_date)): ?>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary px-2 py-1">
+                                        <i class="fas fa-calendar-day me-1"></i> Today's Expenses Only
+                                    </span>
+                                <?php endif; ?>
                             </div>
                             
                             <!-- Search Form -->
@@ -307,7 +316,7 @@ $stmt->close();
                                         <i class="fas fa-print"></i> Print
                                     </a>
                                     <?php if (!empty($start_date) || !empty($end_date) || $selected_user_id > 0): ?>
-                                        <a href="expenses.php" class="btn btn-sm btn-secondary" style="padding: 7px 10px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
+                                        <a href="expenses.php" class="btn btn-sm btn-secondary" style="padding: 7px 10px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;" title="Reset to Today">
                                             <i class="fas fa-undo"></i> Clear
                                         </a>
                                     <?php endif; ?>
@@ -361,7 +370,12 @@ $stmt->close();
                                     </table>
                                 <?php else: ?>
                                     <div class="alert alert-info py-3 mb-0">
-                                        <i class="fas fa-info-circle me-2"></i> No expenses recorded yet.
+                                        <i class="fas fa-info-circle me-2"></i> 
+                                        <?php if (empty($start_date) && empty($end_date)): ?>
+                                            No expenses recorded for today.
+                                        <?php else: ?>
+                                            No expenses found for the selected filter.
+                                        <?php endif; ?>
                                     </div>
                                 <?php endif; ?>
                             </div>

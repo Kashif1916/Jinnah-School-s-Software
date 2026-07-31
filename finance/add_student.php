@@ -140,6 +140,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
                         </a>
+                         <a href="drop_student.php" class="module-nav-btn ">
+                            <i class="fas fa-trash text-success"></i> Drop Student
+                        </a>
                         <a href="account_close.php" class="module-nav-btn">
                             <i class="fas fa-lock"></i> Close Account
                         </a>
