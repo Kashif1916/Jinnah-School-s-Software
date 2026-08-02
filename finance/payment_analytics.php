@@ -50,6 +50,7 @@ $stmt_exp->close();
 $total_received = 0;
 $total_cash = 0;
 $total_bank_account = 0;
+$receipts_summary = [];
 
 foreach ($payments as $p) {
     $amount = floatval($p['amount']);
@@ -61,6 +62,20 @@ foreach ($payments as $p) {
     } else {
         $total_bank_account += $amount;
     }
+
+    $r_num = !empty($p['receipt_number']) ? $p['receipt_number'] : sprintf('%06d', $p['id']);
+    if (!isset($receipts_summary[$r_num])) {
+        $receipts_summary[$r_num] = [
+            'receipt_number' => $r_num,
+            'payment_date' => $p['payment_date'],
+            'received_by' => $p['received_by'],
+            'payment_mode' => $p['payment_mode'],
+            'total_amount' => 0,
+            'payment_ids' => []
+        ];
+    }
+    $receipts_summary[$r_num]['total_amount'] += $amount;
+    $receipts_summary[$r_num]['payment_ids'][] = $p['id'];
 }
 
 $total_expenses = 0;
@@ -512,7 +527,11 @@ $cash_remaining = $total_cash - $total_expenses;
                         <a href="student_record.php" class="module-nav-btn"><i class="fas fa-address-book"></i> Student Record</a>
                         <a href="fee_payment.php" class="module-nav-btn"><i class="fas fa-money-bill-wave"></i> Fee Payment</a>
                         <a href="defaulter_list.php" class="module-nav-btn"><i class="fas fa-list"></i> Pending List</a>
+                        <a href="paid_students.php" class="module-nav-btn">
+                            <i class="fas fa-check-circle text-success"></i> Paid Students
+                        </a>
                         <a href="payment_analytics.php" class="module-nav-btn active"><i class="fas fa-chart-line"></i> Analytics</a>
+                        <a href="receipt_analysis.php" class="module-nav-btn"><i class="fas fa-receipt"></i> Receipt Analysis</a>
                         <a href="expenses.php" class="module-nav-btn"><i class="fas fa-wallet"></i> Expenses</a>
                          <a href="drop_student.php" class="module-nav-btn ">
                             <i class="fas fa-trash text-success"></i> Drop Student
@@ -602,55 +621,59 @@ $cash_remaining = $total_cash - $total_expenses;
                                 Fee Payments Received (<?php echo htmlspecialchars($username); ?>)
                             </h5>
                             <div class="table-responsive">
-                                <?php if (count($payments) > 0): ?>
+                                <?php if (count($receipts_summary) > 0): ?>
                                     <table class="table table-hover align-middle">
                                         <thead>
                                             <tr>
-                                                <th>Student</th>
-                                                <th>Class</th>
-                                                <th>Month</th>
+                                                <th>Receipt #</th>
+                                                <th>Date & Time</th>
                                                 <th>Mode</th>
                                                 <th>Amount</th>
+                                                <th class="text-end no-print">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <?php foreach ($payments as $p): ?>
+                                            <?php foreach ($receipts_summary as $r_no => $r): ?>
                                                 <tr>
                                                     <td>
-                                                        <strong><?php echo htmlspecialchars($p['name']); ?></strong>
-                                                        <div class="text-muted small">F/Name: <?php echo htmlspecialchars($p['father_name']); ?></div>
-                                                        <div class="text-muted small print-only"><?php echo date('d-m-Y h:i A', strtotime($p['payment_date'])); ?></div>
+                                                        <span class="badge bg-success-subtle text-success fs-6 fw-bold"><i class="fas fa-hashtag me-1"></i><?php echo htmlspecialchars($r_no); ?></span>
                                                     </td>
-                                                    <td><?php echo htmlspecialchars($p['class'] . '-' . $p['section']); ?></td>
-                                                    <td><?php echo htmlspecialchars($p['paid_for_month']); ?></td>
+                                                    <td>
+                                                        <strong><?php echo date('d-m-Y h:i A', strtotime($r['payment_date'])); ?></strong>
+                                                    </td>
                                                     <td>
                                                         <?php 
-                                                        $mode_lower = strtolower($p['payment_mode']);
+                                                        $mode_lower = strtolower($r['payment_mode']);
                                                         if ($mode_lower === 'cash') {
                                                             echo '<span class="badge bg-success-subtle text-success no-print"><i class="fas fa-coins me-1"></i>Cash</span>';
                                                             echo '<span class="print-only">CASH</span>';
                                                         } else {
-                                                            echo '<span class="badge bg-primary-subtle text-primary no-print"><i class="fas fa-university me-1"></i>' . htmlspecialchars($p['payment_mode']) . '</span>';
-                                                            echo '<span class="print-only">' . strtoupper(htmlspecialchars($p['payment_mode'])) . '</span>';
+                                                            echo '<span class="badge bg-primary-subtle text-primary no-print"><i class="fas fa-university me-1"></i>' . htmlspecialchars($r['payment_mode']) . '</span>';
+                                                            echo '<span class="print-only">' . strtoupper(htmlspecialchars($r['payment_mode'])) . '</span>';
                                                         }
                                                         ?>
                                                     </td>
-                                                    <td><?php echo format_currency($p['amount']); ?></td>
+                                                    <td><strong><?php echo format_currency($r['total_amount']); ?></strong></td>
+                                                    <td class="text-end no-print">
+                                                        <a href="../master/receipt.php?payment_ids=<?php echo implode(',', $r['payment_ids']); ?>" target="_blank" class="btn btn-sm btn-outline-success">
+                                                            <i class="fas fa-print"></i> Receipt
+                                                        </a>
+                                                    </td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
                                         <tfoot>
                                             <tr class="table-light">
-                                                <td colspan="4" class="text-end text-success"><strong>Cash Subtotal:</strong></td>
-                                                <td class="text-success"><strong><?php echo format_currency($total_cash); ?></strong></td>
+                                                <td colspan="3" class="text-end text-success"><strong>Cash Subtotal:</strong></td>
+                                                <td colspan="2" class="text-success"><strong><?php echo format_currency($total_cash); ?></strong></td>
                                             </tr>
                                             <tr class="table-light">
-                                                <td colspan="4" class="text-end text-primary"><strong>Bank Subtotal:</strong></td>
-                                                <td class="text-primary"><strong><?php echo format_currency($total_bank_account); ?></strong></td>
+                                                <td colspan="3" class="text-end text-primary"><strong>Bank Subtotal:</strong></td>
+                                                <td colspan="2" class="text-primary"><strong><?php echo format_currency($total_bank_account); ?></strong></td>
                                             </tr>
                                             <tr class="table-dark">
-                                                <td colspan="4" class="text-end"><strong>Gross Sum:</strong></td>
-                                                <td><strong><?php echo format_currency($total_received); ?></strong></td>
+                                                <td colspan="3" class="text-end"><strong>Gross Sum:</strong></td>
+                                                <td colspan="2"><strong><?php echo format_currency($total_received); ?></strong></td>
                                             </tr>
                                         </tfoot>
                                     </table>

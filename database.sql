@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS `fee_records` (
 CREATE TABLE IF NOT EXISTS `payments` (
   `id` INT PRIMARY KEY AUTO_INCREMENT,
   `student_id` INT NOT NULL,
+  `receipt_number` VARCHAR(50) DEFAULT NULL,
   `amount` DECIMAL(10, 2) NOT NULL,
   `paid_for_month` VARCHAR(20) NOT NULL,
   `payment_date` DATETIME NOT NULL,

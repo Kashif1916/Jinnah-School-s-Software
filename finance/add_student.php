@@ -134,8 +134,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <a href="defaulter_list.php" class="module-nav-btn ">
                             <i class="fas fa-list"></i> Pending List
                         </a>
+                        <a href="paid_students.php" class="module-nav-btn">
+                            <i class="fas fa-check-circle text-success"></i> Paid Students
+                        </a>
                         <a href="payment_analytics.php" class="module-nav-btn">
                             <i class="fas fa-chart-line"></i> Analytics
+                        </a>
+                         <a href="receipt_analysis.php" class="module-nav-btn">
+                            <i class="fas fa-receipt"></i> Receipt Analysis
                         </a>
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses

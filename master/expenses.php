@@ -203,8 +203,14 @@ $stmt->close();
                         <a href="defaulter_list.php" class="module-nav-btn">
                             <i class="fas fa-list"></i> Pending List
                         </a>
+                        <a href="paid_students.php" class="module-nav-btn">
+                            <i class="fas fa-check-circle text-success"></i> Paid Students
+                        </a>
                         <a href="payment_analytics.php" class="module-nav-btn">
                             <i class="fas fa-chart-line"></i> Analytics
+                        </a>
+                        <a href="receipt_analysis.php" class="module-nav-btn">
+                            <i class="fas fa-receipt"></i> Receipt Analysis
                         </a>
                         <a href="expenses.php" class="module-nav-btn active">
                             <i class="fas fa-wallet"></i> Expenses
@@ -225,7 +231,7 @@ $stmt->close();
                             <i class="fas fa-users-cog"></i> Users
                         </a>
                         <a href="receipt_note.php" class="module-nav-btn">
-                            <i class="fas fa-sticky-note"></i> Receipt Note
+                            <i class="fas fa-sticky-note"></i> Custom Note
                         </a>
                         <a href="../help.php" class="module-nav-btn">
                             <i class="fas fa-question-circle text-success"></i> Help & About

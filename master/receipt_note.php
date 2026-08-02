@@ -1,6 +1,6 @@
 <?php
 /**
- * Receipt Note Settings
+ * Receipt & Challan Note Settings
  * School Finance Management System
  */
 
@@ -15,17 +15,30 @@ $success = '';
 $error = '';
 
 // Handle Form Submission
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_receipt_note'])) {
-    $receipt_note = $_POST['receipt_note'] ?? '';
-    
-    $stmt = $conn->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('receipt_note', ?) ON DUPLICATE KEY UPDATE setting_value = ?");
-    $stmt->bind_param('ss', $receipt_note, $receipt_note);
-    if ($stmt->execute()) {
-        $success = "Receipt Note updated successfully!";
-    } else {
-        $error = "Failed to update Receipt Note: " . $stmt->error;
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (isset($_POST['update_receipt_note'])) {
+        $receipt_note = $_POST['receipt_note'] ?? '';
+        
+        $stmt = $conn->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('receipt_note', ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+        $stmt->bind_param('ss', $receipt_note, $receipt_note);
+        if ($stmt->execute()) {
+            $success = "Receipt Note updated successfully!";
+        } else {
+            $error = "Failed to update Receipt Note: " . $stmt->error;
+        }
+        $stmt->close();
+    } elseif (isset($_POST['update_challan_note'])) {
+        $challan_note = $_POST['challan_note'] ?? '';
+        
+        $stmt = $conn->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('challan_note', ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+        $stmt->bind_param('ss', $challan_note, $challan_note);
+        if ($stmt->execute()) {
+            $success = "Challan Note updated successfully!";
+        } else {
+            $error = "Failed to update Challan Note: " . $stmt->error;
+        }
+        $stmt->close();
     }
-    $stmt->close();
 }
 
 // Fetch current Receipt Note
@@ -34,13 +47,20 @@ $res = $conn->query("SELECT setting_value FROM settings WHERE setting_key = 'rec
 if ($res && $row = $res->fetch_assoc()) {
     $receipt_note = $row['setting_value'];
 }
+
+// Fetch current Challan Note
+$challan_note = '';
+$res_c = $conn->query("SELECT setting_value FROM settings WHERE setting_key = 'challan_note'");
+if ($res_c && $row_c = $res_c->fetch_assoc()) {
+    $challan_note = $row_c['setting_value'];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receipt Note Settings - <?php echo SITE_NAME; ?></title>
+    <title>Receipt & Challan Note Settings - <?php echo SITE_NAME; ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
@@ -53,7 +73,7 @@ if ($res && $row = $res->fetch_assoc()) {
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
                     <div class="panel-brand">
-                        <h2>Receipt Note</h2>
+                        <h2>Receipt & Challan Note</h2>
                         <span>Principal Panel</span>
                     </div>
                 </div>
@@ -90,10 +110,19 @@ if ($res && $row = $res->fetch_assoc()) {
                             <i class="fas fa-money-bill-wave"></i> Fee Management
                         </a>
                         <a href="defaulter_list.php" class="module-nav-btn">
-                            <i class="fas fa-list"></i> Defaulters
+                            <i class="fas fa-list"></i> Pending List
+                        </a>
+                        <a href="paid_students.php" class="module-nav-btn">
+                            <i class="fas fa-check-circle text-success"></i> Paid Students
                         </a>
                         <a href="payment_analytics.php" class="module-nav-btn">
                             <i class="fas fa-chart-line"></i> Analytics
+                        </a>
+                        <a href="receipt_analysis.php" class="module-nav-btn">
+                            <i class="fas fa-receipt"></i> Receipt Analysis
+                        </a>
+                        <a href="receipt_analysis.php" class="module-nav-btn">
+                            <i class="fas fa-receipt"></i> Receipt Analysis
                         </a>
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
@@ -114,7 +143,7 @@ if ($res && $row = $res->fetch_assoc()) {
                             <i class="fas fa-users-cog"></i> Users
                         </a>
                         <a href="receipt_note.php" class="module-nav-btn active">
-                            <i class="fas fa-sticky-note"></i> Receipt Note
+                            <i class="fas fa-sticky-note"></i> Custom Note
                         </a>
                         <a href="../help.php" class="module-nav-btn">
                             <i class="fas fa-question-circle text-success"></i> Help & About
@@ -137,17 +166,34 @@ if ($res && $row = $res->fetch_assoc()) {
                         </div>
                     <?php endif; ?>
 
-                    <div class="card p-4 border rounded shadow-sm bg-white">
-                        <h4 class="text-success mb-3" style="color: #1f5f46 !important;"><i class="fas fa-sticky-note"></i> Receipt Note Settings</h4>
+                    <!-- Receipt Note Section -->
+                    <div class="card p-4 border rounded shadow-sm bg-white mb-4">
+                        <h4 class="text-success mb-3" style="color: #1f5f46 !important;"><i class="fas fa-receipt"></i> Receipt Note Settings</h4>
                         <p class="text-muted">Enter a custom note in English or Urdu. This note will appear at the bottom of every printed receipt.</p>
                         
                         <form method="POST">
                             <div class="mb-3">
-                                <label for="receipt_note" class="form-label fw-bold">Note Content</label>
-                                <textarea id="receipt_note" name="receipt_note" class="form-control" rows="5" placeholder="e.g. فیس جمع کروانے کی آخری تاریخ ہر ماہ کی 10 ہے۔" style="font-size: 16px; border: 1px solid #ced4da;"><?php echo htmlspecialchars($receipt_note); ?></textarea>
+                                <label for="receipt_note" class="form-label fw-bold">Receipt Note Content</label>
+                                <textarea id="receipt_note" name="receipt_note" class="form-control" rows="4" placeholder="e.g. فیس جمع کروانے کی آخری تاریخ ہر ماہ کی 10 ہے۔" style="font-size: 16px; border: 1px solid #ced4da;"><?php echo htmlspecialchars($receipt_note); ?></textarea>
                             </div>
                             <button type="submit" name="update_receipt_note" class="btn btn-primary" style="background: linear-gradient(135deg, #1f5f46 0%, #10161b 100%); border: none; padding: 10px 25px;">
-                                <i class="fas fa-save"></i> Save Receipt Note
+                                <i class="fas fa-save me-1"></i> Save Receipt Note
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Challan Note Section -->
+                    <div class="card p-4 border rounded shadow-sm bg-white">
+                        <h4 class="text-success mb-3" style="color: #1f5f46 !important;"><i class="fas fa-file-invoice"></i> Defaulter Challan Note Settings</h4>
+                        <p class="text-muted">Enter a custom note in English or Urdu. This note will appear at the bottom of every printed defaulter fee challan slip.</p>
+                        
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label for="challan_note" class="form-label fw-bold">Challan Note Content</label>
+                                <textarea id="challan_note" name="challan_note" class="form-control" rows="4" placeholder="e.g. برائے مہربانی بقایا جات جلد از جلد دفتر میں جمع کروائیں۔" style="font-size: 16px; border: 1px solid #ced4da;"><?php echo htmlspecialchars($challan_note); ?></textarea>
+                            </div>
+                            <button type="submit" name="update_challan_note" class="btn btn-primary" style="background: linear-gradient(135deg, #1f5f46 0%, #10161b 100%); border: none; padding: 10px 25px;">
+                                <i class="fas fa-save me-1"></i> Save Challan Note
                             </button>
                         </form>
                     </div>

@@ -67,28 +67,71 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $whatsapp_number = sanitize_input($_POST['whatsapp_number'] ?? '');
         $concession_amount = floatval($_POST['concession_amount'] ?? 0);
         $concession_reason = sanitize_input($_POST['concession_reason'] ?? '');
+        $selected_months = $_POST['concession_months'] ?? [];
         
         if (!empty($name) && !empty($father_name) && $fixed_monthly_fee > 0) {
-            $net_fee = $fixed_monthly_fee - $concession_amount;
-            if ($net_fee < 0) $net_fee = 0;
-            
-            $query = "UPDATE students SET name = ?, father_name = ?, class = ?, section = ?, 
-                      fixed_monthly_fee = ?, monthly_fee = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ? WHERE id = ?";
-            $stmt = $conn->prepare($query);
-            $stmt->bind_param('ssssddsssdsi', $name, $father_name, $class, $section, $fixed_monthly_fee, $net_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
-            
-            if ($stmt->execute()) {
-                $success = 'Student updated successfully!';
-                $student = get_student($student_id);
-                
-                // Automatically sync future unpaid records with new fee
-                sync_unpaid_fee_amounts($student_id, $net_fee);
-                auto_generate_fee_buffer($student_id, $net_fee);
-                
-            } else {
-                $error = 'Error updating student: ' . $stmt->error;
+            $paid_months_selected = [];
+            if (!empty($selected_months)) {
+                foreach ($selected_months as $m_val) {
+                    $stmt_chk = $conn->prepare("SELECT status FROM fee_records WHERE student_id = ? AND month = ?");
+                    $stmt_chk->bind_param('is', $student_id, $m_val);
+                    $stmt_chk->execute();
+                    $res_chk = $stmt_chk->get_result()->fetch_assoc();
+                    $stmt_chk->close();
+                    
+                    if ($res_chk && strtolower($res_chk['status']) === 'paid') {
+                        $paid_months_selected[] = $m_val;
+                    }
+                }
             }
-            $stmt->close();
+            
+            if (!empty($paid_months_selected)) {
+                $error = 'Error: Fee for month(s) (' . implode(', ', $paid_months_selected) . ') is already paid for this student! Please uncheck paid month(s) before applying concession.';
+                $student = get_student($student_id);
+            } else {
+                $net_fee = $fixed_monthly_fee - $concession_amount;
+                if ($net_fee < 0) $net_fee = 0;
+                
+                $query = "UPDATE students SET name = ?, father_name = ?, class = ?, section = ?, 
+                          fixed_monthly_fee = ?, monthly_fee = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ? WHERE id = ?";
+                $stmt = $conn->prepare($query);
+                $stmt->bind_param('ssssddsssdsi', $name, $father_name, $class, $section, $fixed_monthly_fee, $net_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
+                
+                if ($stmt->execute()) {
+                    // Update fee_records for selected unpaid previous months
+                    foreach ($selected_months as $m_val) {
+                        $stmt_m = $conn->prepare("SELECT id, status FROM fee_records WHERE student_id = ? AND month = ?");
+                        $stmt_m->bind_param('is', $student_id, $m_val);
+                        $stmt_m->execute();
+                        $rec_m = $stmt_m->get_result()->fetch_assoc();
+                        $stmt_m->close();
+                        
+                        if ($rec_m) {
+                            if (strtolower($rec_m['status']) === 'unpaid') {
+                                $stmt_upd = $conn->prepare("UPDATE fee_records SET amount = ? WHERE id = ?");
+                                $stmt_upd->bind_param('di', $net_fee, $rec_m['id']);
+                                $stmt_upd->execute();
+                                $stmt_upd->close();
+                            }
+                        } else {
+                            $stmt_ins = $conn->prepare("INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')");
+                            $stmt_ins->bind_param('isd', $student_id, $m_val, $net_fee);
+                            $stmt_ins->execute();
+                            $stmt_ins->close();
+                        }
+                    }
+
+                    // Automatically sync current & future unpaid records with new fee
+                    sync_unpaid_fee_amounts($student_id, $net_fee);
+                    auto_generate_fee_buffer($student_id, $net_fee);
+                    
+                    $success = 'Student info and concession updated successfully!';
+                    $student = get_student($student_id);
+                } else {
+                    $error = 'Error updating student: ' . $stmt->error;
+                }
+                $stmt->close();
+            }
         } else {
             $error = 'All required fields must be filled!';
         }
@@ -156,8 +199,14 @@ if (isset($_GET['id'])) {
                         <a href="defaulter_list.php" class="module-nav-btn">
                             <i class="fas fa-list"></i> Pending List
                         </a>
+                        <a href="paid_students.php" class="module-nav-btn">
+                            <i class="fas fa-check-circle text-success"></i> Paid Students
+                        </a>
                         <a href="payment_analytics.php" class="module-nav-btn">
                             <i class="fas fa-chart-line"></i> Analytics
+                        </a>
+                        <a href="receipt_analysis.php" class="module-nav-btn">
+                            <i class="fas fa-receipt"></i> Receipt Analysis
                         </a>
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
@@ -178,7 +227,7 @@ if (isset($_GET['id'])) {
                             <i class="fas fa-users-cog"></i> Users
                         </a>
                         <a href="receipt_note.php" class="module-nav-btn">
-                            <i class="fas fa-sticky-note"></i> Receipt Note
+                            <i class="fas fa-sticky-note"></i> Custom Note
                         </a>
                         <a href="../help.php" class="module-nav-btn">
                             <i class="fas fa-question-circle text-success"></i> Help & About
@@ -326,22 +375,75 @@ if (isset($_GET['id'])) {
                                 </div>
                                 
                                 <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label" for="concession_amount">Concession Amount</label>
-                                    <input type="number" id="concession_amount" name="concession_amount" class="form-control" value="<?php echo $student['concession_amount'] ?? 0; ?>" step="0.01" min="0">
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="concession_amount">Concession Amount</label>
+                                        <input type="number" id="concession_amount" name="concession_amount" class="form-control" value="<?php echo $student['concession_amount'] ?? 0; ?>" step="0.01" min="0">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="concession_reason">Concession Reason</label>
+                                        <select id="concession_reason" name="concession_reason" class="form-select">
+                                            <option value="" <?php echo ($student['concession_reason'] ?? '') === '' ? 'selected' : ''; ?>>None</option>
+                                            <option value="Sibling" <?php echo ($student['concession_reason'] ?? '') === 'Sibling' ? 'selected' : ''; ?>>Sibling</option>
+                                            <option value="Hafiz" <?php echo ($student['concession_reason'] ?? '') === 'Hafiz' ? 'selected' : ''; ?>>Hafiz</option>
+                                            <option value="Orphan" <?php echo ($student['concession_reason'] ?? '') === 'Orphan' ? 'selected' : ''; ?>>Orphan</option>
+                                            <option value="S.C" <?php echo ($student['concession_reason'] ?? '') === 'S.C' ? 'selected' : ''; ?>>S.C</option>
+                                            <option value="EMP" <?php echo ($student['concession_reason'] ?? '') === 'EMP' ? 'selected' : ''; ?>>EMP</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="concession_reason">Concession Reason</label>
-                                    <select id="concession_reason" name="concession_reason" class="form-select">
-                                        <option value="" <?php echo ($student['concession_reason'] ?? '') === '' ? 'selected' : ''; ?>>None</option>
-                                        <option value="Sibling" <?php echo ($student['concession_reason'] ?? '') === 'Sibling' ? 'selected' : ''; ?>>Sibling</option>
-                                        <option value="Hafiz" <?php echo ($student['concession_reason'] ?? '') === 'Hafiz' ? 'selected' : ''; ?>>Hafiz</option>
-                                        <option value="Orphan" <?php echo ($student['concession_reason'] ?? '') === 'Orphan' ? 'selected' : ''; ?>>Orphan</option>
-                                        <option value="S.C" <?php echo ($student['concession_reason'] ?? '') === 'S.C' ? 'selected' : ''; ?>>S.C</option>
-                                        <option value="EMP" <?php echo ($student['concession_reason'] ?? '') === 'EMP' ? 'selected' : ''; ?>>EMP</option>
-                                    </select>
+
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <label class="form-label fw-bold"><i class="fas fa-calendar-check me-1"></i> Select Previous Unpaid Month(s) to Apply Concession</label>
+                                        <div class="months-checkbox-container p-3 border rounded bg-light" style="max-height: 180px; overflow-y: auto;">
+                                            <div class="row">
+                                                <?php 
+                                                // Fetch ONLY unpaid months from database
+                                                $stmt_unpaid = $conn->prepare("SELECT DISTINCT month FROM fee_records WHERE student_id = ? AND LOWER(status) = 'unpaid' ORDER BY id ASC");
+                                                $stmt_unpaid->bind_param('i', $student['id']);
+                                                $stmt_unpaid->execute();
+                                                $res_unpaid = $stmt_unpaid->get_result();
+
+                                                $current_first_day = date('Y-m-01'); // Current month starting date (e.g., 2026-07-01)
+                                                $previous_unpaid_found = false;
+
+                                                if ($res_unpaid && $res_unpaid->num_rows > 0):
+                                                    while ($row_u = $res_unpaid->fetch_assoc()):
+                                                        $m_name = $row_u['month'];
+                                                        $m_time = strtotime($m_name);
+                                                        
+                                                        // Filter: Show only months strictly BEFORE current month
+                                                        if ($m_time !== false && date('Y-m-01', $m_time) < $current_first_day):
+                                                            $previous_unpaid_found = true;
+                                                ?>
+                                                    <div class="col-md-3 col-6 mb-2">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input concession-month-cb" type="checkbox" name="concession_months[]" value="<?php echo htmlspecialchars($m_name); ?>" id="m_cb_<?php echo htmlspecialchars($m_name); ?>">
+                                                            <label class="form-check-label" for="m_cb_<?php echo htmlspecialchars($m_name); ?>">
+                                                                <?php echo htmlspecialchars($m_name); ?>
+                                                                <span class="badge bg-danger ms-1">Unpaid</span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                <?php 
+                                                        endif;
+                                                    endwhile;
+                                                endif;
+
+                                                if (!$previous_unpaid_found):
+                                                ?>
+                                                    <div class="col-12">
+                                                        <p class="text-muted mb-0"><i class="fas fa-info-circle me-1"></i> No previous unpaid months available for this student.</p>
+                                                    </div>
+                                                <?php 
+                                                endif; 
+                                                $stmt_unpaid->close();
+                                                ?>
+                                            </div>
+                                        </div>
+                                        <small class="text-muted"><i class="fas fa-info-circle"></i> Note: Concession automatically applies to current & future unpaid months. Check boxes above only if you want to apply concession on <strong>previous unpaid months</strong>.</small>
+                                    </div>
                                 </div>
-                            </div>
                                 
                                 <div class="form-actions mt-4">
                                     <button type="submit" class="btn-primary me-2">

@@ -1,6 +1,6 @@
 <?php
 /**
- * Defaulter List - Finance Module
+ * Paid Students List - Finance Module
  * School Finance Management System
  */
 
@@ -25,20 +25,20 @@ $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] :
 if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
 
-// Get defaulters
-$defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter);
-$all_defaulter_list = [];
-if ($defaulters) {
-    $all_defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
+// Get paid students
+$paid_res = get_paid_students($class_filter, $section_filter, $months_filter, $name_filter);
+$all_paid_list = [];
+if ($paid_res) {
+    $all_paid_list = $paid_res->fetch_all(MYSQLI_ASSOC);
 }
-$total_defaulters = count($all_defaulter_list);
-$total_pages = ceil($total_defaulters / $limit);
+$total_paid_students = count($all_paid_list);
+$total_pages = ceil($total_paid_students / $limit);
 
 // ONLY APPLY LIMIT 20 IF NO FILTER IS ACTIVE
 if (!$is_filtered) {
-    $defaulter_list = array_slice($all_defaulter_list, $offset, $limit);
+    $paid_list = array_slice($all_paid_list, $offset, $limit);
 } else {
-    $defaulter_list = $all_defaulter_list;
+    $paid_list = $all_paid_list;
 }
 ?>
 <!DOCTYPE html>
@@ -46,7 +46,7 @@ if (!$is_filtered) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pending List - <?php echo SITE_NAME; ?></title>
+    <title>Paid Students List - <?php echo SITE_NAME; ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
@@ -56,7 +56,7 @@ if (!$is_filtered) {
             border: 1px solid #dee2e6;
             border-radius: 6px;
             padding: 10px;
-            max-height: 150px; /* Thoda height behter kar di taake scroll smooth ho */
+            max-height: 150px;
             overflow-y: auto;
             background-color: #fff;
         }
@@ -77,6 +77,19 @@ if (!$is_filtered) {
             width: 16px;
             height: 16px;
         }
+        @media print {
+            .topbar, .module-nav-panel, .filter-section, .btn, .pagination, .no-print {
+                display: none !important;
+            }
+            .wrapper, .main-content, .content, .table-section {
+                padding: 0 !important;
+                margin: 0 !important;
+                background: white !important;
+            }
+            table {
+                width: 100% !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -86,7 +99,7 @@ if (!$is_filtered) {
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
                     <div class="panel-brand">
-                        <h2>Pending List</h2>
+                        <h2>Paid Students List</h2>
                         <span>Finance / Clerk Panel</span>
                     </div>
                 </div>
@@ -107,7 +120,7 @@ if (!$is_filtered) {
                         <a href="dashboard.php" class="module-nav-btn">
                             <i class="fas fa-chart-bar"></i> Dashboard
                         </a>
-                        <a href="add_student.php" class="module-nav-btn ">
+                        <a href="add_student.php" class="module-nav-btn">
                             <i class="fas fa-list"></i> Add Student
                         </a>
                         <a href="student_record.php" class="module-nav-btn">
@@ -116,10 +129,10 @@ if (!$is_filtered) {
                         <a href="fee_payment.php" class="module-nav-btn">
                             <i class="fas fa-money-bill-wave"></i> Fee Payment
                         </a>
-                        <a href="defaulter_list.php" class="module-nav-btn active">
+                        <a href="defaulter_list.php" class="module-nav-btn">
                             <i class="fas fa-list"></i> Pending List
                         </a>
-                        <a href="paid_students.php" class="module-nav-btn">
+                        <a href="paid_students.php" class="module-nav-btn active">
                             <i class="fas fa-check-circle text-success"></i> Paid Students
                         </a>
                         <a href="payment_analytics.php" class="module-nav-btn">
@@ -131,7 +144,7 @@ if (!$is_filtered) {
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
                         </a>
-                         <a href="drop_student.php" class="module-nav-btn ">
+                         <a href="drop_student.php" class="module-nav-btn">
                             <i class="fas fa-trash text-success"></i> Drop Student
                         </a>
                         <a href="account_close.php" class="module-nav-btn">
@@ -145,7 +158,7 @@ if (!$is_filtered) {
 
                 <div class="form-section">
                     <div class="filter-section">
-                        <h4>Filter Pending List</h4>
+                        <h4>Filter Paid Students</h4>
                         <form method="POST" class="filter-form">
                             <div class="form-grid">
                                 <div class="form-group">
@@ -183,14 +196,13 @@ if (!$is_filtered) {
                                     <label>Select Month(s)</label>
                                     <div class="months-checkbox-container">
                                         <?php
-                                        // Current month se pichle 11 mahine loop me generate karne ka dynamic logic
                                          $start_date = new DateTime('first day of this month');
                                          for ($i = 0; $i < 12; $i++) {
                                              $date = clone $start_date;
                                              $date->modify("-$i month");
                                              
-                                             $month_name = $date->format('M'); // E.g., 'Jan'
-                                             $year_val   = $date->format('Y'); // E.g., '2026'
+                                             $month_name = $date->format('M');
+                                             $year_val   = $date->format('Y');
                                              $month_str  = $month_name . '-' . $year_val;
 
                                             $checked = (in_array($month_str, (array)$months_filter)) ? 'checked' : '';
@@ -223,85 +235,66 @@ if (!$is_filtered) {
                     </div>
                     
                     <div class="table-section">
-                        <form method="POST" action="../master/export_defaulter_challan.php" target="_blank" id="defaulterChallanForm">
-                            <input type="hidden" name="class" value="<?php echo htmlspecialchars($class_filter); ?>">
-                            <input type="hidden" name="section" value="<?php echo htmlspecialchars($section_filter); ?>">
-                            <input type="hidden" name="name" value="<?php echo htmlspecialchars($name_filter); ?>">
-                            <?php foreach ((array)$months_filter as $m_f): ?>
-                                <input type="hidden" name="months[]" value="<?php echo htmlspecialchars($m_f); ?>">
-                            <?php endforeach; ?>
-
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h4 class="mb-0">Pending Fees (<?php echo $total_defaulters; ?>)</h4>
-                                <div class="d-flex gap-2">
-                                    <button type="submit" class="btn btn-success">
-                                        <i class="fas fa-file-pdf me-1"></i> Export Selected Challans (PDF)
-                                    </button>
-                                    <?php 
-                                        $query_data = ['class' => $class_filter, 'section' => $section_filter, 'name' => $name_filter, 'months' => $months_filter];
-                                        $report_url = "../master/defaulter_report.php?" . http_build_query($query_data);
-                                    ?>
-                                    <a href="<?php echo $report_url; ?>" class="btn-primary" target="_blank">
-                                        <i class="fas fa-list-alt me-1"></i> Export Summary PDF
-                                    </a>
-                                </div>
-                            </div>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="mb-0 text-success"><i class="fas fa-check-double me-2"></i>Paid Fee Records (<?php echo $total_paid_students; ?> Students)</h4>
                             
-                            <?php if (count($defaulter_list) > 0): ?>
-                                <table class="table table-striped table-hover align-middle">
-                                    <thead>
+                        </div>
+                        
+                        <?php if (count($paid_list) > 0): ?>
+                            <table class="table table-striped table-hover align-middle">
+                                <thead class="table-success">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Father Name</th>
+                                        <th>Contact Number(s)</th>
+                                        <th>Class-Sec</th>
+                                        <th>Paid Month(s)</th>
+                                        <th>Monthly Fee</th>
+                                        <th>Last Payment Date</th>
+                                       
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($paid_list as $student): ?>
                                         <tr>
-                                            <th style="width: 40px;">
-                                                <input type="checkbox" id="selectAllStudents" title="Select All">
-                                            </th>
-                                            <th>Name</th>
-                                            <th>Father Name</th>
-                                            <th>Contact Number(s)</th>
-                                            <th>Class-Sec</th>
-                                            <th>Pending Month(s)</th>
-                                            <th>Monthly Fee</th>
-                                            <th>Action</th>
+                                            <td><strong><?php echo str_pad($student['id'], 5, '0', STR_PAD_LEFT); ?></strong></td>
+                                            <td><?php echo htmlspecialchars($student['name']); ?></td>
+                                            <td><?php echo htmlspecialchars($student['father_name']); ?></td>
+                                            <td>
+                                                <?php echo !empty($student['contact_number']) ? '<i class="fas fa-phone"></i> ' . htmlspecialchars($student['contact_number']) . '<br>' : ''; ?>
+                                                <?php echo !empty($student['whatsapp_number']) ? '<i class="fab fa-whatsapp"></i> ' . htmlspecialchars($student['whatsapp_number']) : ''; ?>
+                                            </td>
+                                            <td><span class="badge bg-secondary"><?php echo htmlspecialchars($student['class']) . '-' . htmlspecialchars($student['section']); ?></span></td>
+                                            <td style="max-width: 220px; font-size: 12px;">
+                                                <strong class="text-success">(<?php echo htmlspecialchars($student['paid_count']); ?> Paid)</strong><br>
+                                                <?php echo htmlspecialchars(str_replace(',', ', ', $student['paid_months'])); ?>
+                                            </td>
+                                            <td><?php echo format_currency($student['monthly_fee']); ?></td>
+                                            <td>
+                                                <?php 
+                                                if (!empty($student['last_payment_date'])) {
+                                                    echo date('d M Y, h:i A', strtotime($student['last_payment_date']));
+                                                } else {
+                                                    echo '<span class="text-muted">N/A</span>';
+                                                }
+                                                ?>
+                                            </td>
+                                            
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($defaulter_list as $defaulter): ?>
-                                            <?php 
-                                            $single_challan_url = "../master/export_defaulter_challan.php?student_id=" . $defaulter['id'] . "&" . http_build_query(['class' => $class_filter, 'section' => $section_filter, 'name' => $name_filter, 'months' => $months_filter]);
-                                            ?>
-                                            <tr>
-                                                <td>
-                                                    <input type="checkbox" name="student_ids[]" value="<?php echo $defaulter['id']; ?>" class="student-cb">
-                                                </td>
-                                                <td><?php echo htmlspecialchars($defaulter['name']); ?></td>
-                                                <td><?php echo htmlspecialchars($defaulter['father_name']); ?></td>
-                                                <td>
-                                                    <?php echo !empty($defaulter['contact_number']) ? '<i class="fas fa-phone"></i> ' . htmlspecialchars($defaulter['contact_number']) . '<br>' : ''; ?>
-                                                    <?php echo !empty($defaulter['whatsapp_number']) ? '<i class="fab fa-whatsapp"></i> ' . htmlspecialchars($defaulter['whatsapp_number']) : ''; ?>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($defaulter['class']) . '-' . htmlspecialchars($defaulter['section']); ?></td>
-                                                <td style="max-width: 200px; font-size: 11px;">
-                                                    <strong>(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Month)</strong><br>
-                                                    <?php echo htmlspecialchars(str_replace(',', ', ', $defaulter['pending_months'])); ?>
-                                                </td>
-                                                <td><?php echo format_currency($defaulter['monthly_fee']); ?></td>
-                                                <td>
-                                                    <a href="<?php echo $single_challan_url; ?>" class="btn btn-sm btn-outline-success text-nowrap" target="_blank">
-                                                        <i class="fas fa-file-pdf"></i> Print Challan
-                                                    </a>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                                
-                                <!-- PAGINATION BUTTONS -->
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                            
+                            <!-- PAGINATION BUTTONS -->
+                            <div class="no-print">
                                 <?php render_pagination($page, $total_pages, '', $is_filtered); ?>
-                            <?php else: ?>
-                                <div class="alert alert-info">
-                                    <i class="fas fa-info-circle"></i> No pending fees found with the selected filters!
-                                </div>
-                            <?php endif; ?>
-                        </form>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i> No paid students found matching the selected filter criteria!
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -310,18 +303,5 @@ if (!$is_filtered) {
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/script.js"></script>
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var selectAll = document.getElementById('selectAllStudents');
-        if (selectAll) {
-            selectAll.addEventListener('change', function() {
-                var checkboxes = document.querySelectorAll('.student-cb');
-                checkboxes.forEach(function(cb) {
-                    cb.checked = selectAll.checked;
-                });
-            });
-        }
-    });
-    </script>
 </body>
 </html>

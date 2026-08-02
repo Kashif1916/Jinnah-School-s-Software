@@ -84,7 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     
     $conn->begin_transaction();
     try {
-        $payment_date = date('Y-m-d H:i:s');
+        // FIXED: Pichle mahine ki last date set kar di taakay current month ke analytics affect na hon
+        $payment_date = date('Y-m-t 23:59:59', strtotime('last day of previous month'));
         $received_by = get_username() ?? 'System';
         
         // 1. Update the monthly_fee and admission_fee (pending_amount) columns in students table
@@ -111,6 +112,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
         $conn->query("DELETE FROM fee_records WHERE student_id = $student_id AND month = 'Admission'");
         $conn->query("DELETE FROM payments WHERE student_id = $student_id AND paid_for_month = 'Admission'");
         
+        // Fetch existing payments and fee records before loop to preserve historical dates
+        $existing_payments = [];
+        $ep_res = $conn->query("SELECT * FROM payments WHERE student_id = $student_id");
+        if ($ep_res) {
+            while ($ep_row = $ep_res->fetch_assoc()) {
+                $existing_payments[$ep_row['paid_for_month']] = $ep_row;
+            }
+        }
+        
+        $existing_fee_records = [];
+        $ef_res = $conn->query("SELECT * FROM fee_records WHERE student_id = $student_id");
+        if ($ef_res) {
+            while ($ef_row = $ef_res->fetch_assoc()) {
+                $existing_fee_records[$ef_row['month']] = $ef_row;
+            }
+        }
+        
         // 3. Process Months including Prev-Year
         foreach ($months_2026 as $month) {
             $current_month_fee = ($month === 'Prev-Year') ? $pending_amount : $net_fee;
@@ -118,47 +136,79 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
             $is_fully_paid = in_array($month, $fully_paid_months);
             $is_partial = ($month === $partial_month);
             
-            $chk = $conn->query("SELECT id FROM fee_records WHERE student_id = $student_id AND month = '$month'");
-            $exists = ($chk && $chk->num_rows > 0);
+            $has_existing_payment = isset($existing_payments[$month]);
+            $existing_pay_row = $has_existing_payment ? $existing_payments[$month] : null;
+            
+            $fee_rec = $existing_fee_records[$month] ?? null;
+            $exists_fee = ($fee_rec !== null);
             
             if ($is_fully_paid) {
                 // Fully Paid Status
-                if ($exists) {
-                    $conn->query("UPDATE fee_records SET status = 'paid', amount = 0, payment_date = '$payment_date' WHERE student_id = $student_id AND month = '$month'");
+                if ($has_existing_payment) {
+                    // PRESERVE original payment date and record for already paid months
+                    $orig_pay_date = $existing_pay_row['payment_date'];
+                    
+                    if ($exists_fee) {
+                        $conn->query("UPDATE fee_records SET status = 'paid', amount = 0, payment_date = '$orig_pay_date' WHERE student_id = $student_id AND month = '$month'");
+                    } else {
+                        $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', 0, 'paid', '$orig_pay_date')");
+                    }
                 } else {
-                    $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', 0, 'paid', '$payment_date')");
-                }
-                
-                // Payment entry
-                $conn->query("DELETE FROM payments WHERE student_id = $student_id AND paid_for_month = '$month'");
-                if ($current_month_fee > 0) {
-                    $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
-                    $stmt_pay = $conn->prepare($query_pay);
-                    $stmt_pay->bind_param('idsss', $student_id, $current_month_fee, $month, $payment_date, $received_by);
-                    $stmt_pay->execute();
-                    $stmt_pay->close();
+                    // NEW Payment (was NOT paid before) - Uses previous month date ($payment_date)
+                    $new_pay_date = ($exists_fee && !empty($fee_rec['payment_date'])) ? $fee_rec['payment_date'] : $payment_date;
+                    
+                    if ($exists_fee) {
+                        $conn->query("UPDATE fee_records SET status = 'paid', amount = 0, payment_date = '$new_pay_date' WHERE student_id = $student_id AND month = '$month'");
+                    } else {
+                        $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', 0, 'paid', '$new_pay_date')");
+                    }
+                    
+                    if ($current_month_fee > 0) {
+                        $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
+                        $stmt_pay = $conn->prepare($query_pay);
+                        $stmt_pay->bind_param('idsss', $student_id, $current_month_fee, $month, $new_pay_date, $received_by);
+                        $stmt_pay->execute();
+                        $stmt_pay->close();
+                    }
                 }
             } elseif ($is_partial) {
                 // Partially Paid: status = 'unpaid', remaining amount = $pending_amount
-                if ($exists) {
-                    $conn->query("UPDATE fee_records SET status = 'unpaid', amount = $pending_amount, payment_date = '$payment_date' WHERE student_id = $student_id AND month = '$month'");
-                } else {
-                    $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', $pending_amount, 'unpaid', '$payment_date')");
-                }
-                
-                // Payment entry for paid partial amount
-                $conn->query("DELETE FROM payments WHERE student_id = $student_id AND paid_for_month = '$month'");
                 $paid_amount = $current_month_fee - $pending_amount;
-                if ($paid_amount > 0) {
-                    $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
-                    $stmt_pay = $conn->prepare($query_pay);
-                    $stmt_pay->bind_param('idsss', $student_id, $paid_amount, $month, $payment_date, $received_by);
-                    $stmt_pay->execute();
-                    $stmt_pay->close();
+                
+                if ($has_existing_payment) {
+                    $orig_pay_date = $existing_pay_row['payment_date'];
+                    
+                    if ($exists_fee) {
+                        $conn->query("UPDATE fee_records SET status = 'unpaid', amount = $pending_amount, payment_date = '$orig_pay_date' WHERE student_id = $student_id AND month = '$month'");
+                    } else {
+                        $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', $pending_amount, 'unpaid', '$orig_pay_date')");
+                    }
+                    
+                    if ($paid_amount > 0) {
+                        $conn->query("UPDATE payments SET amount = $paid_amount WHERE id = {$existing_pay_row['id']}");
+                    } else {
+                        $conn->query("DELETE FROM payments WHERE id = {$existing_pay_row['id']}");
+                    }
+                } else {
+                    $new_pay_date = ($exists_fee && !empty($fee_rec['payment_date'])) ? $fee_rec['payment_date'] : $payment_date;
+                    
+                    if ($exists_fee) {
+                        $conn->query("UPDATE fee_records SET status = 'unpaid', amount = $pending_amount, payment_date = '$new_pay_date' WHERE student_id = $student_id AND month = '$month'");
+                    } else {
+                        $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', $pending_amount, 'unpaid', '$new_pay_date')");
+                    }
+                    
+                    if ($paid_amount > 0) {
+                        $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
+                        $stmt_pay = $conn->prepare($query_pay);
+                        $stmt_pay->bind_param('idsss', $student_id, $paid_amount, $month, $new_pay_date, $received_by);
+                        $stmt_pay->execute();
+                        $stmt_pay->close();
+                    }
                 }
             } else {
                 // Unpaid Status
-                if ($exists) {
+                if ($exists_fee) {
                     $conn->query("UPDATE fee_records SET status = 'unpaid', amount = $current_month_fee, payment_date = NULL WHERE student_id = $student_id AND month = '$month'");
                 } else {
                     $conn->query("INSERT INTO fee_records (student_id, month, amount, status) VALUES ($student_id, '$month', $current_month_fee, 'unpaid')");
@@ -302,7 +352,13 @@ if ($student_id == 0) {
                         <a href="fee_schedule.php" class="module-nav-btn"><i class="fas fa-calendar-alt"></i> Fee Schedule</a>
                         <a href="fee_management.php" class="module-nav-btn"><i class="fas fa-money-bill-wave"></i> Fee Management</a>
                         <a href="defaulter_list.php" class="module-nav-btn"><i class="fas fa-list"></i> Pending List</a>
+                        <a href="paid_students.php" class="module-nav-btn">
+                            <i class="fas fa-check-circle text-success"></i> Paid Students
+                        </a>
                         <a href="payment_analytics.php" class="module-nav-btn"><i class="fas fa-chart-line"></i> Analytics</a>
+                        <a href="receipt_analysis.php" class="module-nav-btn">
+                            <i class="fas fa-receipt"></i> Receipt Analysis
+                        </a>
                         <a href="expenses.php" class="module-nav-btn"><i class="fas fa-wallet"></i> Expenses</a>
                         <a href="data_correction.php" class="module-nav-btn active"><i class="fas fa-edit"></i> Data Correction</a>
                         <a href="promotion.php" class="module-nav-btn"><i class="fas fa-arrow-up"></i> Promotion</a>
@@ -311,7 +367,7 @@ if ($student_id == 0) {
                             <i class="fas fa-user-minus text-success"></i> Delete Student
                         </a>
                         <a href="users.php" class="module-nav-btn"><i class="fas fa-users-cog"></i> Users</a>
-                        <a href="receipt_note.php" class="module-nav-btn"><i class="fas fa-sticky-note"></i> Receipt Note</a>
+                        <a href="receipt_note.php" class="module-nav-btn"><i class="fas fa-sticky-note"></i> Custom Note</a>
                         <a href="../help.php" class="module-nav-btn"><i class="fas fa-question-circle text-success"></i> Help & About</a>
                     </div>
                 </div>

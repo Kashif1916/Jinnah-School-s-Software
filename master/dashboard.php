@@ -11,8 +11,33 @@ require_once '../includes/helpers.php';
 
 require_master();
 
+// Active students count (Excluding Passed Out Classes) - Common for both initial load and AJAX
+$total_students_query = "SELECT COUNT(*) as count FROM students WHERE status = 'active' AND class NOT IN ('Passed-10', 'Passed-12')";
+$total_students = $conn->query($total_students_query)->fetch_assoc()['count'] ?? 0;
+
+// Handle AJAX Request for Paid Students Filter (Dropdown change)
+if (isset($_GET['ajax_action']) && $_GET['ajax_action'] === 'get_paid_students') {
+    header('Content-Type: application/json');
+    $selected_month = sanitize_input($_GET['month'] ?? date('M-Y'));
+    
+    $stmt = $conn->prepare("SELECT COUNT(DISTINCT student_id) as count FROM fee_records WHERE month = ? AND status = 'paid'");
+    $stmt->bind_param('s', $selected_month);
+    $stmt->execute();
+    $count = $stmt->get_result()->fetch_assoc()['count'] ?? 0;
+    $stmt->close();
+
+    // Calculate Percentage
+    $percentage = ($total_students > 0) ? round(($count / $total_students) * 100, 1) : 0;
+
+    echo json_encode([
+        'success' => true, 
+        'count' => $count,
+        'percentage' => $percentage
+    ]);
+    exit();
+}
+
 // Get Statistics
-$total_students = $conn->query("SELECT COUNT(*) as count FROM students WHERE status = 'active' AND class NOT IN ('Passed-10', 'Passed-12')")->fetch_assoc()['count'];
 $paid_students = $conn->query("SELECT COUNT(DISTINCT fr.student_id) as count FROM fee_records fr JOIN students s ON s.id = fr.student_id WHERE fr.status = 'paid' AND s.status = 'active'")->fetch_assoc()['count'] ?? 0;
 $remaining_students = max(0, $total_students - $paid_students);
 $paid_percentage = $total_students > 0 ? round(($paid_students / $total_students) * 100) : 0;
@@ -28,9 +53,9 @@ $today_collection = get_daily_collection(date('Y-m-d'));
 // Fetch Monthly Stats for Current Month
 $start_of_month = date('Y-m-01 00:00:00');
 $end_of_month = date('Y-m-t 23:59:59');
-$current_month_str = date('M-Y'); // Formats current month as 'Jul-2026' to match database 'month' column
+$current_month_str = date('M-Y'); // Formats current month as 'Jul-2026'
 
-// 1. Total Received Collection for ALL payments made in this month (for overall stats card)
+// 1. Total Received Collection for ALL payments made in this month
 $this_month_collection = 0.00;
 $month_coll_res = $conn->query("SELECT SUM(amount) as total FROM payments WHERE payment_date >= '$start_of_month' AND payment_date <= '$end_of_month'");
 if ($month_coll_res) {
@@ -38,30 +63,46 @@ if ($month_coll_res) {
 }
 
 // ---------------------------------------------------------------------
-// GRAPH METRICS: EXACT CURRENT MONTH (e.g. 'Jul-2026') FEE BREAKDOWN
+// GRAPH METRICS: EXACT CURRENT MONTH FEE BREAKDOWN
 // ---------------------------------------------------------------------
 
-// Current Month Received Fees (Only for current month's fee payments from active students)
+// Current Month Received Fees
 $graph_month_collected = 0.00;
 $graph_coll_res = $conn->query("SELECT SUM(p.amount) as total FROM payments p JOIN students s ON s.id = p.student_id WHERE p.paid_for_month = '$current_month_str' AND s.status = 'active'");
 if ($graph_coll_res) {
     $graph_month_collected = floatval($graph_coll_res->fetch_assoc()['total'] ?? 0);
 }
 
-// Current Month Unpaid/Pending Fees (Only for current month's fee records of active students)
+// Current Month Unpaid/Pending Fees
 $graph_month_unpaid = 0.00;
 $graph_unpaid_res = $conn->query("SELECT SUM(fr.amount) as total FROM fee_records fr JOIN students s ON s.id = fr.student_id WHERE fr.month = '$current_month_str' AND fr.status = 'unpaid' AND s.status = 'active'");
 if ($graph_unpaid_res) {
     $graph_month_unpaid = floatval($graph_unpaid_res->fetch_assoc()['total'] ?? 0);
 }
 
-// Graph Percentage Calculations for Current Month Fee
+// Graph Percentage Calculations
 $graph_month_total_expected = $graph_month_collected + $graph_month_unpaid;
 $month_paid_percentage = $graph_month_total_expected > 0 ? round(($graph_month_collected / $graph_month_total_expected) * 100) : 0;
 $month_remaining_percentage = 100 - $month_paid_percentage;
 
-// ---------------------------------------------------------------------
+// Default Current Month Paid Students Filter Data
+$stmt_paid_curr = $conn->prepare("SELECT COUNT(DISTINCT student_id) as count FROM fee_records WHERE month = ? AND status = 'paid'");
+$stmt_paid_curr->bind_param('s', $current_month_str);
+$stmt_paid_curr->execute();
+$total_students_paid_current = $stmt_paid_curr->get_result()->fetch_assoc()['count'] ?? 0;
+$stmt_paid_curr->close();
 
+$current_paid_percentage = ($total_students > 0) ? round(($total_students_paid_current / $total_students) * 100, 1) : 0;
+
+// Dynamic Month List (Current Month + Previous 11 Months)
+$month_options = [];
+for ($i = 0; $i < 12; $i++) {
+    $m_key = date('M-Y', strtotime("-$i month"));
+    $m_label = date('F Y', strtotime("-$i month"));
+    $month_options[$m_key] = $m_label;
+}
+
+// Expenses & Net Profit
 $this_month_expenses = 0.00;
 $month_exp_res = $conn->query("SELECT SUM(amount) as total FROM expenses WHERE created_at >= '$start_of_month' AND created_at <= '$end_of_month'");
 if ($month_exp_res) {
@@ -79,6 +120,41 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
+    <style>
+        .stat-card--dropdown {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .stat-card__content-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-grow: 1;
+            min-width: 0;
+        }
+        .stat-card__dropdown-btn {
+            background: #ffffff;
+            border: 1px solid #ced4da;
+            color: #495057;
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            white-space: nowrap;
+        }
+        .stat-card__dropdown-btn:hover, .stat-card__dropdown-btn:focus {
+            background: #f8f9fa;
+            color: #198754;
+        }
+        .stat-percentage {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #198754;
+            margin-left: 6px;
+        }
+    </style>
 </head>
 <body>
     <div class="wrapper dashboard-shell">
@@ -129,8 +205,14 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                         <a href="defaulter_list.php" class="module-nav-btn">
                             <i class="fas fa-list"></i> Pending List
                         </a>
+                        <a href="paid_students.php" class="module-nav-btn">
+                            <i class="fas fa-check-circle text-success"></i> Paid Students
+                        </a>
                         <a href="payment_analytics.php" class="module-nav-btn">
                             <i class="fas fa-chart-line"></i> Analytics
+                        </a>
+                        <a href="receipt_analysis.php" class="module-nav-btn">
+                            <i class="fas fa-receipt"></i> Receipt Analysis
                         </a>
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
@@ -151,7 +233,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             <i class="fas fa-users-cog"></i> Users
                         </a>
                         <a href="receipt_note.php" class="module-nav-btn">
-                            <i class="fas fa-sticky-note"></i> Receipt Note
+                            <i class="fas fa-sticky-note"></i> Custom Note
                         </a>
                     </div>
                 </div>
@@ -170,10 +252,10 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                              <i class="fas fa-calendar-alt"></i> Monthly Report
                              </span>
         
-                                 <!-- Yearly Report Span -->
-                                 <span class="hero-tag" role="button" style="cursor:pointer;" data-bs-toggle="modal" data-bs-target="#yearlyReportModal">
-                                      <i class="fas fa-chart-bar"></i> Yearly Report
-                                 </span>
+                             <!-- Yearly Report Span -->
+                             <span class="hero-tag" role="button" style="cursor:pointer;" data-bs-toggle="modal" data-bs-target="#yearlyReportModal">
+                                  <i class="fas fa-chart-bar"></i> Yearly Report
+                             </span>
                         </div>
                     </section>
 
@@ -217,9 +299,8 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                     </aside>
                 </div>
 
-                <!-- Statistics Cards -->
+                <!-- Statistics Cards Grid -->
                 <div class="stats-grid-container" style="width: 100%;">
-                    <!-- 4 Columns Grid Layout for both rows -->
                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; width: 100%;">
                         
                         <!-- CARD 1: Active Students -->
@@ -266,7 +347,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             </div>
                         </div>
 
-                        <!-- CARD 5 (Row 2): This Month Collection - Placed under Card 1 -->
+                        <!-- CARD 5 (Row 2): This Month Collection -->
                         <div class="stat-card" style="width: 100%; min-width: 0;">
                             <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
                                 <i class="fas fa-coins"></i>
@@ -277,7 +358,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             </div>
                         </div>
 
-                        <!-- CARD 6 (Row 2): This Month Expenses - Placed under Card 2 -->
+                        <!-- CARD 6 (Row 2): This Month Expenses -->
                         <div class="stat-card" style="width: 100%; min-width: 0;">
                             <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
                                 <i class="fas fa-file-invoice-dollar"></i>
@@ -288,7 +369,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             </div>
                         </div>
 
-                        <!-- CARD 7 (Row 2): This Month Profit - Placed under Card 3 -->
+                        <!-- CARD 7 (Row 2): This Month Profit -->
                         <div class="stat-card" style="width: 100%; min-width: 0;">
                             <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
                                 <i class="fas fa-chart-line"></i>
@@ -299,8 +380,36 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             </div>
                         </div>
 
-                        <!-- Empty Slot under Card 4 -->
-                        <div></div>
+                        <!-- CARD 8 (Row 2): Paid Students (With Dropdown & Realtime Percentage) -->
+                        <div class="stat-card stat-card--dropdown" style="width: 100%; min-width: 0;">
+                            <div class="stat-card__content-wrapper">
+                                <div class="stat-icon" style="background: #e3f1ea;">
+                                    <i class="fas fa-user-check" style="color: #198754;"></i>
+                                </div>
+                                <div class="stat-content" style="min-width: 0;">
+                                    <h3>
+                                        <span id="paid_students_count"><?php echo $total_students_paid_current; ?></span>
+                                        <span class="stat-percentage" id="paid_students_percentage">(<?php echo $current_paid_percentage; ?>%)</span>
+                                    </h3>
+                                    <p id="paid_students_label" class="mb-0" style="white-space: nowrap;">Students Paid (<?php echo date('M Y'); ?>)</p>
+                                </div>
+                            </div>
+
+                            <div class="dropdown">
+                                <button class="btn dropdown-toggle stat-card__dropdown-btn" type="button" id="monthDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="monthDropdown">
+                                    <?php foreach ($month_options as $m_val => $m_text): ?>
+                                        <li>
+                                            <a class="dropdown-item month-select-item" href="#" data-month="<?php echo $m_val; ?>" data-label="<?php echo date('M Y', strtotime("01-$m_val")); ?>">
+                                                <?php echo $m_text; ?>
+                                            </a>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        </div>
 
                     </div>
                 </div>
@@ -368,6 +477,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
             </div>
         </div>
     </div>
+    
     <script>
         function submitYearlyReportForm(e) {
             const checkboxes = document.querySelectorAll('.year-checkbox:checked');
@@ -380,6 +490,26 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
             document.getElementById('selected_years_hidden').value = years;
             bootstrap.Modal.getInstance(document.getElementById('yearlyReportModal')).hide();
         }
+
+        // Paid Students Dynamic AJAX Dropdown Listener
+        document.querySelectorAll('.month-select-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                const selectedMonth = this.getAttribute('data-month');
+                const displayLabel = this.getAttribute('data-label');
+
+                fetch(`dashboard.php?ajax_action=get_paid_students&month=${encodeURIComponent(selectedMonth)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            document.getElementById('paid_students_count').innerText = data.count;
+                            document.getElementById('paid_students_percentage').innerText = `(${data.percentage}%)`;
+                            document.getElementById('paid_students_label').innerText = `Students Paid (${displayLabel})`;
+                        }
+                    })
+                    .catch(err => console.error("Error fetching paid students:", err));
+            });
+        });
     </script>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

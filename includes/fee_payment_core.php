@@ -108,10 +108,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $payment_mode = sanitize_input($_POST['payment_mode'] ?? 'cash');
         
         if (!empty($_SESSION['fee_cart'])) {
+            $batch_receipt_number = null;
             foreach ($_SESSION['fee_cart'] as $item) {
-                $p_id = record_payment($item['student_id'], $item['amount'], $item['month'], get_username(), $payment_mode);
+                $p_id = record_payment($item['student_id'], $item['amount'], $item['month'], get_username(), $payment_mode, $batch_receipt_number);
                 if ($p_id) {
                     $generated_payment_ids[] = $p_id;
+                    if (empty($batch_receipt_number)) {
+                        $r_stmt = $conn->prepare("SELECT receipt_number FROM payments WHERE id = ?");
+                        $r_stmt->bind_param('i', $p_id);
+                        $r_stmt->execute();
+                        $r_res = $r_stmt->get_result()->fetch_assoc();
+                        if ($r_res && !empty($r_res['receipt_number'])) {
+                            $batch_receipt_number = $r_res['receipt_number'];
+                        }
+                        $r_stmt->close();
+                    }
                 } else {
                     $error .= "Error recording fee for " . $item['name'] . " (" . $item['month'] . ") ";
                 }
@@ -226,8 +237,14 @@ if (isset($_GET['id'])) {
                         <a href="defaulter_list.php" class="module-nav-btn">
                             <i class="fas fa-list"></i> Pending List
                         </a>
+                        <a href="paid_students.php" class="module-nav-btn">
+                            <i class="fas fa-check-circle text-success"></i> Paid Students
+                        </a>
                         <a href="payment_analytics.php" class="module-nav-btn">
                             <i class="fas fa-chart-line"></i> Analytics
+                        </a>
+                        <a href="receipt_analysis.php" class="module-nav-btn">
+                            <i class="fas fa-receipt"></i> Receipt Analysis
                         </a>
                         <a href="expenses.php" class="module-nav-btn">
                             <i class="fas fa-wallet"></i> Expenses
@@ -267,11 +284,20 @@ if (isset($_GET['id'])) {
                             <a href="defaulter_list.php" class="module-nav-btn">
                                 <i class="fas fa-list"></i> Pending List
                             </a>
+                            <a href="paid_students.php" class="module-nav-btn">
+                            <i class="fas fa-check-circle text-success"></i> Paid Students
+                        </a>
                             <a href="payment_analytics.php" class="module-nav-btn">
                                 <i class="fas fa-chart-line"></i> Analytics
                             </a>
+                            <a href="receipt_analysis.php" class="module-nav-btn">
+                                <i class="fas fa-receipt"></i> Receipt Analysis
+                            </a>
                             <a href="expenses.php" class="module-nav-btn">
                                 <i class="fas fa-wallet"></i> Expenses
+                            </a>
+                             <a href="drop_student.php" class="module-nav-btn ">
+                            <i class="fas fa-trash text-success"></i> Drop Student
                             </a>
                             <a href="account_close.php" class="module-nav-btn">
                                 <i class="fas fa-lock"></i> Close Account

@@ -256,6 +256,69 @@ function get_defaulters($class = '', $section = '', $months = [], $name = '') {
 }
 
 /**
+ * Get paid students list
+ */
+function get_paid_students($class = '', $section = '', $months = [], $name = '') {
+    global $conn;
+    
+    // If no months are specified, default to previous 12 months (inclusive of current month) plus Admission and Pre_Year
+    if (empty($months)) {
+        $months = [];
+        $start_date = strtotime(date('Y-m-01'));
+        for ($i = 0; $i < 12; $i++) {
+            $months[] = date('M-Y', strtotime("-$i months", $start_date));
+        }
+        $months[] = 'Admission';
+        $months[] = 'Pre_Year';
+        $months[] = 'Prev-Year';
+        $months[] = 'Pre-Year';
+    }
+    
+    $query = "SELECT s.id, s.name, s.father_name, s.class, s.section, s.fixed_monthly_fee, s.monthly_fee, 
+                     s.contact_number, s.contact_number2, s.whatsapp_number,
+                     GROUP_CONCAT(f.month ORDER BY CASE WHEN f.month = 'Admission' THEN 1 WHEN f.month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 ELSE 3 END, STR_TO_DATE(CONCAT('01-', f.month), '%d-%b-%Y')) as paid_months,
+                     COUNT(f.id) as paid_count,
+                     MAX(f.payment_date) as last_payment_date
+              FROM students s 
+              INNER JOIN fee_records f ON s.id = f.student_id 
+              WHERE s.status = 'active' AND f.status = 'paid'";
+    
+    if (!empty($class)) {
+        $query .= " AND s.class = '" . $conn->real_escape_string($class) . "'";
+    }
+    
+    if (!empty($section)) {
+        $query .= " AND s.section = '" . $conn->real_escape_string($section) . "'";
+    }
+
+    if (!empty($name)) {
+        $query .= " AND s.name LIKE '%" . $conn->real_escape_string($name) . "%'";
+    }
+    
+    if (!empty($months)) {
+        if (!is_array($months)) $months = [$months];
+        $expanded_months = [];
+        foreach ($months as $m) {
+            $expanded_months[] = $m;
+            if ($m === 'Pre_Year' || $m === 'Prev-Year' || $m === 'Pre-Year') {
+                $expanded_months[] = 'Pre_Year';
+                $expanded_months[] = 'Prev-Year';
+                $expanded_months[] = 'Pre-Year';
+            }
+        }
+        $expanded_months = array_unique($expanded_months);
+        $escaped_months = array_map(function($m) use ($conn) { 
+            return "'" . $conn->real_escape_string($m) . "'"; 
+        }, $expanded_months);
+        $query .= " AND f.month IN (" . implode(',', $escaped_months) . ")";
+    }
+    
+    $query .= " GROUP BY s.id ORDER BY s.class, s.section, s.name";
+    
+    return $conn->query($query);
+}
+
+/**
  * Get daily collection
  */
 function get_daily_collection($date) {
@@ -284,7 +347,7 @@ function get_monthly_collection($month_year) {
 /**
  * Record payment
  */
-function record_payment($student_id, $amount, $month, $received_by, $payment_mode = 'cash') {
+function record_payment($student_id, $amount, $month, $received_by, $payment_mode = 'cash', $receipt_number = null) {
     global $conn;
     
     // Start transaction
@@ -310,13 +373,18 @@ function record_payment($student_id, $amount, $month, $received_by, $payment_mod
         $payment_date = date('Y-m-d H:i:s');
 
         // Record payment
-        $query = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) 
-                 VALUES (?, ?, ?, ?, ?, ?)";
+        $query = "INSERT INTO payments (student_id, receipt_number, amount, paid_for_month, payment_date, received_by, payment_mode) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($query);
-        $stmt->bind_param('idssss', $student_id, $amount, $month, $payment_date, $received_by, $payment_mode);
+        $stmt->bind_param('isdssss', $student_id, $receipt_number, $amount, $month, $payment_date, $received_by, $payment_mode);
         $stmt->execute();
         $payment_id = $conn->insert_id;
         $stmt->close();
+
+        if (empty($receipt_number)) {
+            $auto_receipt = sprintf('%06d', $payment_id);
+            $conn->query("UPDATE payments SET receipt_number = '$auto_receipt' WHERE id = $payment_id");
+        }
         
         // Update fee record: if balance is 0 or less, mark as paid. Otherwise update remaining amount.
         if ($new_balance <= 0) {
@@ -342,6 +410,44 @@ function record_payment($student_id, $amount, $month, $received_by, $payment_mod
         $conn->rollback();
         return false;
     }
+}
+
+/**
+ * Get 12 months (current + past 11 months) status for a student
+ */
+function get_student_concession_months_status($student_id) {
+    global $conn;
+    $result = [];
+    $start_date = strtotime(date('Y-m-01'));
+    
+    // Fetch fee records for this student
+    $fee_records = [];
+    $stmt = $conn->prepare("SELECT month, status, amount FROM fee_records WHERE student_id = ?");
+    $stmt->bind_param('i', $student_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $fee_records[$row['month']] = $row;
+    }
+    $stmt->close();
+
+    for ($i = 0; $i < 12; $i++) {
+        $month_str = date('M-Y', strtotime("-$i month", $start_date));
+        $is_paid = false;
+        $status = 'unpaid';
+        if (isset($fee_records[$month_str])) {
+            $status = $fee_records[$month_str]['status'];
+            if (strtolower($status) === 'paid') {
+                $is_paid = true;
+            }
+        }
+        $result[] = [
+            'month' => $month_str,
+            'status' => $status,
+            'is_paid' => $is_paid
+        ];
+    }
+    return $result;
 }
 
 /**

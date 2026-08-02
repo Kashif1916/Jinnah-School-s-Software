@@ -11,6 +11,43 @@ require_once '../includes/helpers.php';
 
 require_master();
 
+$success = '';
+$error = '';
+
+// Handle Close Account Action for specific clerk
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['close_clerk_account'])) {
+    $target_clerk = isset($_POST['target_clerk']) ? sanitize_input($_POST['target_clerk']) : '';
+    
+    if (empty($target_clerk) || $target_clerk === 'all') {
+        $error = "Please select a specific clerk first from the filter option above to close their account!";
+    } else {
+        // Get user ID of the selected clerk
+        $user_query = $conn->prepare("SELECT id FROM users WHERE username = ?");
+        $user_query->bind_param('s', $target_clerk);
+        $user_query->execute();
+        $user_res = $user_query->get_result();
+        
+        if ($user_res && $user_res->num_rows > 0) {
+            $user_data = $user_res->fetch_assoc();
+            $clerk_user_id = $user_data['id'];
+            $next_midnight = date('Y-m-d 00:00:00', strtotime('tomorrow'));
+            
+            $query = "UPDATE users SET is_frozen = 1, frozen_until = ? WHERE id = ?";
+            $stmt = $conn->prepare($query);
+            $stmt->bind_param('si', $next_midnight, $clerk_user_id);
+            if ($stmt->execute()) {
+                $success = "Account for clerk <strong>" . htmlspecialchars($target_clerk) . "</strong> has been successfully received and closed for today. It will unfreeze at midnight!";
+            } else {
+                $error = 'Failed to close clerk account: ' . $conn->error;
+            }
+            $stmt->close();
+        } else {
+            $error = "Selected clerk user was not found in database.";
+        }
+        $user_query->close();
+    }
+}
+
 // Get date and time filters. Default to today's start and end if not set.
 $start_date = isset($_GET['start_date']) && !empty($_GET['start_date']) ? sanitize_input($_GET['start_date']) : date('Y-m-d\T00:00');
 $end_date = isset($_GET['end_date']) && !empty($_GET['end_date']) ? sanitize_input($_GET['end_date']) : date('Y-m-d\T15:00');
@@ -77,10 +114,11 @@ $stmt_exp->execute();
 $expenses = $stmt_exp->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt_exp->close();
 
-// Calculations
+// Calculations & Receipt Grouping
 $total_received = 0;
 $total_cash = 0;
 $total_bank_account = 0;
+$receipts_summary = [];
 
 foreach ($payments as $p) {
     $amount = floatval($p['amount']);
@@ -92,6 +130,20 @@ foreach ($payments as $p) {
     } else {
         $total_bank_account += $amount;
     }
+
+    $r_num = !empty($p['receipt_number']) ? $p['receipt_number'] : sprintf('%06d', $p['id']);
+    if (!isset($receipts_summary[$r_num])) {
+        $receipts_summary[$r_num] = [
+            'receipt_number' => $r_num,
+            'payment_date'  => $p['payment_date'],
+            'received_by'   => $p['received_by'],
+            'payment_mode'  => $p['payment_mode'],
+            'total_amount'  => 0,
+            'payment_ids'   => []
+        ];
+    }
+    $receipts_summary[$r_num]['total_amount'] += $amount;
+    $receipts_summary[$r_num]['payment_ids'][] = $p['id'];
 }
 
 $total_expenses = 0;
@@ -398,7 +450,13 @@ $cash_remaining = $total_cash - $total_expenses;
                         <a href="fee_schedule.php" class="module-nav-btn"><i class="fas fa-calendar-alt"></i> Fee Schedule</a>
                         <a href="fee_management.php" class="module-nav-btn"><i class="fas fa-money-bill-wave"></i> Fee Management</a>
                         <a href="defaulter_list.php" class="module-nav-btn"><i class="fas fa-list"></i> Pending List</a>
+                        <a href="paid_students.php" class="module-nav-btn">
+                            <i class="fas fa-check-circle text-success"></i> Paid Students
+                        </a>
                         <a href="payment_analytics.php" class="module-nav-btn active"><i class="fas fa-chart-line"></i> Analytics</a>
+                        <a href="receipt_analysis.php" class="module-nav-btn">
+                            <i class="fas fa-receipt"></i> Receipt Analysis
+                        </a>
                         <a href="expenses.php" class="module-nav-btn"><i class="fas fa-wallet"></i> Expenses</a>
                         <a href="data_correction.php" class="module-nav-btn"><i class="fas fa-edit"></i> Data Correction</a>
                         <a href="promotion.php" class="module-nav-btn"><i class="fas fa-arrow-up"></i> Promotion</a>
@@ -407,12 +465,26 @@ $cash_remaining = $total_cash - $total_expenses;
                             <i class="fas fa-user-minus text-success"></i> Delete Student
                         </a>
                         <a href="users.php" class="module-nav-btn"><i class="fas fa-users-cog"></i> Users</a>
-                        <a href="receipt_note.php" class="module-nav-btn"><i class="fas fa-sticky-note"></i> Receipt Note</a>
+                        <a href="receipt_note.php" class="module-nav-btn"><i class="fas fa-sticky-note"></i> Custom Note</a>
                         <a href="../help.php" class="module-nav-btn">
                             <i class="fas fa-question-circle text-success"></i> Help & About
                         </a>
                     </div>
                 </div>
+
+                <?php if (!empty($error)): ?>
+                    <div class="alert alert-danger alert-dismissible fade show no-print" role="alert">
+                        <i class="fas fa-exclamation-circle me-2"></i> <?php echo $error; ?>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                <?php endif; ?>
+
+                <?php if (!empty($success)): ?>
+                    <div class="alert alert-success alert-dismissible fade show no-print" role="alert">
+                        <i class="fas fa-check-circle me-2"></i> <?php echo $success; ?>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                <?php endif; ?>
 
                 <div class="alert alert-success d-flex align-items-center justify-content-between mb-4 no-print">
                     <div>
@@ -507,68 +579,74 @@ $cash_remaining = $total_cash - $total_expenses;
                                 Fee Payments Received (<?php echo $clerk_filter === 'all' ? 'All Clerks Consolidated' : htmlspecialchars($clerk_filter); ?>)
                             </h5>
                             <div class="table-responsive">
-                                <?php if (count($payments) > 0): ?>
+                                <?php if (count($receipts_summary) > 0): ?>
                                     <table class="table table-hover align-middle">
                                         <thead>
                                             <tr>
-                                                <th>Student</th>
-                                                <th>Class</th>
-                                                <th>Month</th>
+                                                <th>Receipt #</th>
+                                                <th>Date & Time</th>
                                                 <th>Mode</th>
                                                 <?php if ($clerk_filter === 'all'): ?>
                                                     <th>Received By</th>
                                                 <?php endif; ?>
                                                 <th>Amount</th>
+                                                <th class="text-end no-print">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <?php foreach ($payments as $p): ?>
+                                            <?php foreach ($receipts_summary as $r_no => $r): ?>
                                                 <tr>
                                                     <td>
-                                                        <strong><?php echo htmlspecialchars($p['name']); ?></strong>
-                                                        <div class="text-muted small">F/Name: <?php echo htmlspecialchars($p['father_name']); ?></div>
-                                                        <div class="text-muted small print-only"><?php echo date('d-m-Y h:i A', strtotime($p['payment_date'])); ?></div>
+                                                        <span class="badge bg-success-subtle text-success fs-6 fw-bold">
+                                                            <i class="fas fa-hashtag me-1"></i><?php echo htmlspecialchars($r_no); ?>
+                                                        </span>
                                                     </td>
-                                                    <td><?php echo htmlspecialchars($p['class'] . '-' . $p['section']); ?></td>
-                                                    <td><?php echo htmlspecialchars($p['paid_for_month']); ?></td>
+                                                    <td>
+                                                        <strong><?php echo date('d-m-Y h:i A', strtotime($r['payment_date'])); ?></strong>
+                                                    </td>
                                                     <td>
                                                         <?php 
-                                                        $mode_lower = strtolower($p['payment_mode']);
+                                                        $mode_lower = strtolower($r['payment_mode']);
                                                         if ($mode_lower === 'cash') {
                                                             echo '<span class="badge bg-success-subtle text-success no-print"><i class="fas fa-coins me-1"></i>Cash</span>';
                                                             echo '<span class="print-only">CASH</span>';
                                                         } else {
-                                                            echo '<span class="badge bg-primary-subtle text-primary no-print"><i class="fas fa-university me-1"></i>' . htmlspecialchars($p['payment_mode']) . '</span>';
-                                                            echo '<span class="print-only">' . strtoupper(htmlspecialchars($p['payment_mode'])) . '</span>';
+                                                            echo '<span class="badge bg-primary-subtle text-primary no-print"><i class="fas fa-university me-1"></i>' . htmlspecialchars($r['payment_mode']) . '</span>';
+                                                            echo '<span class="print-only">' . strtoupper(htmlspecialchars($r['payment_mode'])) . '</span>';
                                                         }
                                                         ?>
                                                     </td>
                                                     <?php if ($clerk_filter === 'all'): ?>
                                                         <td>
                                                             <span class="badge bg-dark-subtle text-dark no-print">
-                                                                <i class="fas fa-user me-1"></i><?php echo htmlspecialchars($p['received_by']); ?>
+                                                                <i class="fas fa-user me-1"></i><?php echo htmlspecialchars($r['received_by']); ?>
                                                             </span>
                                                             <span class="print-only" style="font-weight: 600; text-transform: uppercase;">
-                                                                <?php echo htmlspecialchars($p['received_by']); ?>
+                                                                <?php echo htmlspecialchars($r['received_by']); ?>
                                                             </span>
                                                         </td>
                                                     <?php endif; ?>
-                                                    <td><strong><?php echo format_currency($p['amount']); ?></strong></td>
+                                                    <td><strong><?php echo format_currency($r['total_amount']); ?></strong></td>
+                                                    <td class="text-end no-print">
+                                                        <a href="receipt.php?payment_ids=<?php echo implode(',', $r['payment_ids']); ?>" target="_blank" class="btn btn-sm btn-outline-success">
+                                                            <i class="fas fa-print"></i> Receipt
+                                                        </a>
+                                                    </td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
                                         <tfoot>
                                             <tr class="table-light">
-                                                <td colspan="<?php echo $clerk_filter === 'all' ? '5' : '4'; ?>" class="text-end text-success"><strong>Cash Payments Subtotal:</strong></td>
-                                                <td class="text-success"><strong><?php echo format_currency($total_cash); ?></strong></td>
+                                                <td colspan="<?php echo $clerk_filter === 'all' ? '4' : '3'; ?>" class="text-end text-success"><strong>Cash Subtotal:</strong></td>
+                                                <td colspan="2" class="text-success"><strong><?php echo format_currency($total_cash); ?></strong></td>
                                             </tr>
                                             <tr class="table-light">
-                                                <td colspan="<?php echo $clerk_filter === 'all' ? '5' : '4'; ?>" class="text-end text-primary"><strong>Bank/Account Payments Subtotal:</strong></td>
-                                                <td class="text-primary"><strong><?php echo format_currency($total_bank_account); ?></strong></td>
+                                                <td colspan="<?php echo $clerk_filter === 'all' ? '4' : '3'; ?>" class="text-end text-primary"><strong>Bank Subtotal:</strong></td>
+                                                <td colspan="2" class="text-primary"><strong><?php echo format_currency($total_bank_account); ?></strong></td>
                                             </tr>
                                             <tr class="table-dark">
-                                                <td colspan="<?php echo $clerk_filter === 'all' ? '5' : '4'; ?>" class="text-end"><strong>Gross Sum:</strong></td>
-                                                <td><strong><?php echo format_currency($total_received); ?></strong></td>
+                                                <td colspan="<?php echo $clerk_filter === 'all' ? '4' : '3'; ?>" class="text-end"><strong>Gross Sum:</strong></td>
+                                                <td colspan="2"><strong><?php echo format_currency($total_received); ?></strong></td>
                                             </tr>
                                         </tfoot>
                                     </table>
@@ -679,6 +757,26 @@ $cash_remaining = $total_cash - $total_expenses;
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Button under Drawer Reconciliation Statement -->
+                            <div class="mt-4 pt-3 border-top text-center no-print">
+                                <form method="POST" onsubmit="return handleCloseAccountSubmit(event, '<?php echo $clerk_filter; ?>')">
+                                    <input type="hidden" name="target_clerk" value="<?php echo htmlspecialchars($clerk_filter); ?>">
+                                    <button type="submit" name="close_clerk_account" class="btn btn-danger btn-lg w-100 py-3 fw-bold" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);">
+                                        <i class="fas fa-lock me-2"></i> Received and Close Account
+                                    </button>
+                                </form>
+                                <?php if ($clerk_filter === 'all'): ?>
+                                    <small class="text-danger d-block mt-2">
+                                        <i class="fas fa-info-circle"></i> Select a specific clerk above to enable close action.
+                                    </small>
+                                <?php else: ?>
+                                    <small class="text-muted d-block mt-2">
+                                        Closing account for clerk: <strong><?php echo htmlspecialchars($clerk_filter); ?></strong> until midnight.
+                                    </small>
+                                <?php endif; ?>
+                            </div>
+
                         </div>
                     </div>
                 </div>
@@ -686,7 +784,17 @@ $cash_remaining = $total_cash - $total_expenses;
         </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.js"></script>
     <script src="../assets/js/script.js"></script>
+    <script>
+    function handleCloseAccountSubmit(event, currentClerk) {
+        if (!currentClerk || currentClerk === 'all') {
+            alert('Please select a specific clerk first from the top filter!');
+            event.preventDefault();
+            return false;
+        }
+        return confirm('Are you sure you want to receive cash and close the account for clerk (' + currentClerk + ')? The account will remain frozen until 12:00 AM midnight.');
+    }
+    </script>
 </body>
 </html>

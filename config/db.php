@@ -48,6 +48,14 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
         $conn->query("ALTER TABLE `payments` ADD COLUMN `payment_mode` VARCHAR(20) DEFAULT 'cash'");
     }
 
+    // Dynamically ensure receipt_number column exists
+    $colCheckReceipt = $conn->query("SHOW COLUMNS FROM `payments` LIKE 'receipt_number'");
+    if ($colCheckReceipt && $colCheckReceipt->num_rows == 0) {
+        $conn->query("ALTER TABLE `payments` ADD COLUMN `receipt_number` VARCHAR(50) DEFAULT NULL AFTER `student_id`");
+        $conn->query("UPDATE `payments` SET `receipt_number` = LPAD(id, 6, '0') WHERE `receipt_number` IS NULL OR `receipt_number` = ''");
+        $conn->query("CREATE INDEX `idx_receipt_number` ON `payments`(`receipt_number`)");
+    }
+
     // Dynamically ensure expenses table exists
     $tableCheck = $conn->query("SHOW TABLES LIKE 'expenses'");
     if ($tableCheck && $tableCheck->num_rows == 0) {
@@ -88,7 +96,7 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
             `setting_value` TEXT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         
-        $conn->query("INSERT IGNORE INTO `settings` (`setting_key`, `setting_value`) VALUES ('receipt_note', '')");
+        $conn->query("INSERT IGNORE INTO `settings` (`setting_key`, `setting_value`) VALUES ('receipt_note', ''), ('challan_note', '')");
     }
 
     // Dynamically ensure fee_schedule table exists

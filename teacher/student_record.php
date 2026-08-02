@@ -130,11 +130,14 @@ $stmt->close();
             <div class="content">
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
-                        <a href="defaulter_list.php" class="module-nav-btn">
+                        <a href="defaulter_list.php" class="module-nav-btn ">
                             <i class="fas fa-list"></i> Pending List
                         </a>
                         <a href="student_record.php" class="module-nav-btn active">
                             <i class="fas fa-address-book"></i> Student Record
+                        </a>
+                         <a href="drop_student.php" class="module-nav-btn ">
+                            <i class="fas fa-trash text-success"></i> Drop Student
                         </a>
                         <a href="../help.php" class="module-nav-btn">
                             <i class="fas fa-question-circle text-success"></i> Help & About
@@ -193,6 +196,7 @@ $stmt->close();
                                     <th>Monthly Fee (Fixed)</th>
                                     <th>Concession</th>
                                     <th>Monthly Fee (Net)</th>
+                                    <th>Concession Reason</th>
                                     <th>Contact Number(s)</th>
                                     <th>Action</th>
                                 </tr>
@@ -209,6 +213,7 @@ $stmt->close();
                                             <td><?php echo format_currency($s['fixed_monthly_fee']); ?></td>
                                             <td><?php echo format_currency($s['concession_amount']); ?></td>
                                             <td><?php echo format_currency($s['monthly_fee']); ?></td>
+                                            <td><?php echo htmlspecialchars($s['concession_reason'] ?? ''); ?></td>
                                             <td>
                                                 <?php echo !empty($s['contact_number']) ? '<i class="fas fa-phone"></i> ' . htmlspecialchars($s['contact_number']) . '<br>' : ''; ?>
                                                 <?php echo !empty($s['contact_number2']) ? '<i class="fas fa-phone"></i> ' . htmlspecialchars($s['contact_number2']) . '<br>' : ''; ?>
@@ -230,7 +235,7 @@ $stmt->close();
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="10" class="text-center">No students found.</td>
+                                        <td colspan="11" class="text-center">No students found.</td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
