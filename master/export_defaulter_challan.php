@@ -51,6 +51,22 @@ if (empty($defaulter_list)) {
     die('<div style="padding: 20px; font-family: sans-serif; text-align: center;"><h3>No pending fee records found for the selected student(s).</h3><a href="javascript:history.back()">Go Back</a></div>');
 }
 
+// DIRECT DB FETCH: Har defaulter student ka exact fee structure fetch kar rahe hain
+foreach ($defaulter_list as $key => $student_data) {
+    $s_id = intval($student_data['id']);
+    $stmt_fee = $conn->prepare("SELECT fixed_monthly_fee, concession_amount, monthly_fee FROM students WHERE id = ?");
+    $stmt_fee->bind_param('i', $s_id);
+    $stmt_fee->execute();
+    $fee_res = $stmt_fee->get_result()->fetch_assoc();
+    $stmt_fee->close();
+
+    if ($fee_res) {
+        $defaulter_list[$key]['fixed_monthly_fee'] = $fee_res['fixed_monthly_fee'];
+        $defaulter_list[$key]['concession_amount'] = $fee_res['concession_amount'];
+        $defaulter_list[$key]['monthly_fee']      = $fee_res['monthly_fee'];
+    }
+}
+
 // Get custom notes from settings
 $receipt_note = '';
 $challan_note = '';
@@ -309,10 +325,6 @@ if ($setting_res) {
             <?php
             $student_id = intval($student['id']);
 
-            // Robust Fee & Concession Key Detection
-            $fixed_monthly = floatval($student['fixed_monthly_fee'] ?? $student['class_fee'] ?? $student['monthly_fee'] ?? 0);
-            $concession = floatval($student['concession_amount'] ?? $student['concession'] ?? $student['discount'] ?? 0);
-
             // Fetch detailed unpaid records
             $unpaid_query = "SELECT id, month, amount FROM fee_records 
                              WHERE student_id = ? 
@@ -443,23 +455,18 @@ if ($setting_res) {
                                     if ($group['type'] === 'regular_months') {
                                         $month_count = count($group['months']);
                                         if ($month_count > 0) {
-                                            $actual_per_month = $group['total_amount'] / $month_count;
-                                            
-                                            // Dynamic Fallback: Concession calculation from actual record amount vs fixed fee
-                                            if ($concession <= 0 && $fixed_monthly > $actual_per_month) {
-                                                $calculated_concession = $fixed_monthly - $actual_per_month;
-                                            } else {
-                                                $calculated_concession = $concession;
-                                            }
+                                            $fixed_fee  = floatval($student['fixed_monthly_fee'] ?? 0);
+                                            $concession = floatval($student['concession_amount'] ?? 0);
 
-                                            if ($calculated_concession > 0) {
-                                                $base_fee = ($fixed_monthly > 0) ? $fixed_monthly : ($actual_per_month + $calculated_concession);
+                                            if ($concession > 0) {
+                                                $payable_per_month = $fixed_fee - $concession;
                                                 echo "<br><small style='font-size: 9px; color: #555;'>" 
-                                                     . number_format($base_fee, 0) . " - " . number_format($calculated_concession, 0) . " = " . number_format($actual_per_month, 0) 
-                                                     . "</small>";
+                                                     . number_format($fixed_fee, 0) . " - " . number_format($concession, 0) . " = " . number_format($payable_per_month, 0) 
+                                                     . " (Per Month)</small>";
                                             } else {
-                                                echo "<br><small style='font-size: 9px; color: #555;'>Monthly Fee: Rs. " 
-                                                     . number_format($actual_per_month, 0) 
+                                                $monthly_val = ($fixed_fee > 0) ? $fixed_fee : ($group['total_amount'] / $month_count);
+                                                echo "<br><small style='font-size: 9px; color: #555;'>Fee Per Month = " 
+                                                     . number_format($monthly_val, 0) 
                                                      . "</small>";
                                             }
                                         }
