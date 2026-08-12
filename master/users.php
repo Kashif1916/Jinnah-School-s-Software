@@ -152,8 +152,7 @@ if (isset($_GET['toggle_freeze'])) {
         if ($res->num_rows > 0) {
             $user_row = $res->fetch_assoc();
             $new_frozen_status = intval($user_row['is_frozen']) === 1 ? 0 : 1;
-            $new_frozen_until = $new_frozen_status === 1 ? date('Y-m-d 00:00:00', strtotime('tomorrow')) : null;
-            
+            $new_frozen_until = null; //
             $update_stmt = $conn->prepare("UPDATE users SET is_frozen = ?, frozen_until = ? WHERE id = ?");
             $update_stmt->bind_param("isi", $new_frozen_status, $new_frozen_until, $toggle_id);
             if ($update_stmt->execute()) {

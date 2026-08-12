@@ -15,9 +15,10 @@ $class_filter = sanitize_input($_REQUEST['class'] ?? '');
 $section_filter = sanitize_input($_REQUEST['section'] ?? '');
 $name_filter = sanitize_input($_REQUEST['name'] ?? '');
 $months_filter = $_REQUEST['months'] ?? [];
+$min_3_months = isset($_REQUEST['min_3_months']) ? 1 : 0; // Checkbox value
 
 // Check if user has applied any filter
-$is_filtered = (!empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($months_filter));
+$is_filtered = (!empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($months_filter) || $min_3_months === 1);
 
 // Pagination Configuration (Only applies when NO filter is used)
 $limit = 20; // Default items per page
@@ -31,6 +32,14 @@ $all_defaulter_list = [];
 if ($defaulters) {
     $all_defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
 }
+
+// Checkbox Logic: Filter out students with less than 3 pending months if checked
+if ($min_3_months === 1) {
+    $all_defaulter_list = array_values(array_filter($all_defaulter_list, function($d) {
+        return isset($d['pending_count']) && intval($d['pending_count']) >= 3;
+    }));
+}
+
 $total_defaulters = count($all_defaulter_list);
 $total_pages = ceil($total_defaulters / $limit);
 
@@ -58,10 +67,11 @@ if (!$is_filtered) {
             border: 1px solid #dee2e6;
             border-radius: 6px;
             padding: 10px;
-            max-height: 150px; /* Thoda height barha di taake list saaf dikhe */
+            max-height: 150px;
             overflow-y: auto;
             background-color: #fff;
         }
+        
         .month-tick-item {
             display: flex;
             align-items: center;
@@ -77,6 +87,18 @@ if (!$is_filtered) {
             cursor: pointer;
             width: 16px;
             height: 16px;
+        }
+        .checkbox-card {
+            background-color: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #dc3545;
         }
     </style>
 </head>
@@ -195,15 +217,13 @@ if (!$is_filtered) {
                                     <label>Select Month(s)</label>
                                     <div class="months-checkbox-container">
                                         <?php
-                                        // Current month se shuru karke pichle 11 mahine (Total 12) generate karne ka naya logic
                                          $start_date = new DateTime('first day of this month');
                                          for ($i = 0; $i < 12; $i++) {
                                              $date = clone $start_date;
                                              $date->modify("-$i month");
                                              
-                                             // Aapke system format ke mutabiq (e.g., 'Jan-2026') string banayega
-                                             $month_name = $date->format('M'); // 'Jan', 'Feb' etc.
-                                             $year_val   = $date->format('Y'); // '2026' etc.
+                                             $month_name = $date->format('M');
+                                             $year_val   = $date->format('Y');
                                              $month_str  = $month_name . '-' . $year_val;
 
                                             $checked = (in_array($month_str, (array)$months_filter)) ? 'checked' : '';
@@ -227,7 +247,15 @@ if (!$is_filtered) {
                                 </div>
 
                                 <div class="form-group">
-                                    <button type="submit" class="btn-primary" style="margin-top: 30px;">
+                                    <label>Pending Filter</label>
+                                    <label class="checkbox-card">
+                                        <input type="checkbox" name="min_3_months" value="1" style="width: 18px; height: 18px;" <?php echo ($min_3_months === 1) ? 'checked' : ''; ?>>
+                                        <span><i class="fas fa-exclamation-circle me-1"></i> 3+ Months Pending Only</span>
+                                    </label>
+                                </div>
+
+                               <div class="form-group">
+                                    <button type="submit" class="btn-primary" style="margin-top: 30px; width: 80%;">
                                         <i class="fas fa-filter"></i> Filter
                                     </button>
                                 </div>
@@ -240,6 +268,9 @@ if (!$is_filtered) {
                             <input type="hidden" name="class" value="<?php echo htmlspecialchars($class_filter); ?>">
                             <input type="hidden" name="section" value="<?php echo htmlspecialchars($section_filter); ?>">
                             <input type="hidden" name="name" value="<?php echo htmlspecialchars($name_filter); ?>">
+                            <?php if ($min_3_months === 1): ?>
+                                <input type="hidden" name="min_3_months" value="1">
+                            <?php endif; ?>
                             <?php foreach ((array)$months_filter as $m_f): ?>
                                 <input type="hidden" name="months[]" value="<?php echo htmlspecialchars($m_f); ?>">
                             <?php endforeach; ?>
@@ -251,7 +282,13 @@ if (!$is_filtered) {
                                         <i class="fas fa-file-pdf me-1"></i> Export Selected Challans (PDF)
                                     </button>
                                     <?php 
-                                        $query_data = ['class' => $class_filter, 'section' => $section_filter, 'name' => $name_filter, 'months' => $months_filter];
+                                        $query_data = [
+                                            'class' => $class_filter, 
+                                            'section' => $section_filter, 
+                                            'name' => $name_filter, 
+                                            'months' => $months_filter,
+                                            'min_3_months' => $min_3_months
+                                        ];
                                         $report_url = "defaulter_report.php?" . http_build_query($query_data);
                                     ?>
                                     <a href="<?php echo $report_url; ?>" class="btn-primary" target="_blank">
@@ -279,7 +316,13 @@ if (!$is_filtered) {
                                     <tbody>
                                         <?php foreach ($defaulter_list as $defaulter): ?>
                                             <?php 
-                                            $single_challan_url = "export_defaulter_challan.php?student_id=" . $defaulter['id'] . "&" . http_build_query(['class' => $class_filter, 'section' => $section_filter, 'name' => $name_filter, 'months' => $months_filter]);
+                                            $single_challan_url = "export_defaulter_challan.php?student_id=" . $defaulter['id'] . "&" . http_build_query([
+                                                'class' => $class_filter, 
+                                                'section' => $section_filter, 
+                                                'name' => $name_filter, 
+                                                'months' => $months_filter,
+                                                'min_3_months' => $min_3_months
+                                            ]);
                                             ?>
                                             <tr>
                                                 <td>
@@ -293,7 +336,7 @@ if (!$is_filtered) {
                                                 </td>
                                                 <td><?php echo htmlspecialchars($defaulter['class']) . '-' . htmlspecialchars($defaulter['section']); ?></td>
                                                 <td style="max-width: 200px; font-size: 11px;">
-                                                    <strong>(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Month)</strong><br>
+                                                    <strong class="text-danger">(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Month)</strong><br>
                                                     <?php echo htmlspecialchars(str_replace(',', ', ', $defaulter['pending_months'])); ?>
                                                 </td>
                                                 <td><?php echo format_currency($defaulter['monthly_fee']); ?></td>
