@@ -20,6 +20,9 @@ $search_results = [];
 if (!isset($_SESSION['fee_cart'])) {
     $_SESSION['fee_cart'] = [];
 }
+if (!isset($_SESSION['fine_amount'])) {
+    $_SESSION['fine_amount'] = 0;
+}
 
 $self_url = basename($_SERVER['PHP_SELF']);
 
@@ -28,6 +31,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Add selected months to the temporary batch list
         $selected_records = $_POST['selected_fee_records'] ?? [];
         $amounts = $_POST['paid_amount'] ?? [];
+        if (isset($_POST['fine_amount'])) {
+            $_SESSION['fine_amount'] = floatval($_POST['fine_amount']);
+        }
         
         foreach ($selected_records as $rec_id) {
             $rec_id = intval($rec_id);
@@ -62,8 +68,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
         $success = "Fees added to batch list! You can search another student now.";
+    } elseif (isset($_POST['action']) && $_POST['action'] == 'remove_item') {
+        $remove_rec_id = intval($_POST['remove_record_id'] ?? 0);
+        if (!empty($_SESSION['fee_cart'])) {
+            foreach ($_SESSION['fee_cart'] as $key => $item) {
+                if ($item['record_id'] == $remove_rec_id) {
+                    unset($_SESSION['fee_cart'][$key]);
+                    break;
+                }
+            }
+            $_SESSION['fee_cart'] = array_values($_SESSION['fee_cart']);
+        }
+        if (empty($_SESSION['fee_cart'])) {
+            $_SESSION['fine_amount'] = 0;
+        } elseif (isset($_POST['fine_amount'])) {
+            $_SESSION['fine_amount'] = floatval($_POST['fine_amount']);
+        }
+        $success = "Item removed from batch list.";
     } elseif (isset($_POST['action']) && $_POST['action'] == 'clear_cart') {
         $_SESSION['fee_cart'] = [];
+        $_SESSION['fine_amount'] = 0;
         $success = "Batch list cleared.";
     } elseif (isset($_POST['action']) && $_POST['action'] == 'search') {
         // Search students with multiple filters
@@ -106,6 +130,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Process all payments in the cart and generate one receipt
         $generated_payment_ids = [];
         $payment_mode = sanitize_input($_POST['payment_mode'] ?? 'cash');
+        $fine_amount = floatval($_POST['fine_amount'] ?? $_SESSION['fine_amount'] ?? 0);
+        $_SESSION['fine_amount'] = $fine_amount;
         
         if (!empty($_SESSION['fee_cart'])) {
             $batch_receipt_number = null;
@@ -128,8 +154,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             }
 
+            // Record fine payment if fine_amount > 0
+            if ($fine_amount > 0 && !empty($_SESSION['fee_cart'])) {
+                $fine_student_id = $_SESSION['fee_cart'][0]['student_id'];
+                $fine_p_id = record_payment($fine_student_id, $fine_amount, 'Fine', get_username(), $payment_mode, $batch_receipt_number);
+                if ($fine_p_id) {
+                    $generated_payment_ids[] = $fine_p_id;
+                } else {
+                    $error .= "Error recording fine payment. ";
+                }
+            }
+
             if (!empty($generated_payment_ids)) {
                 $_SESSION['fee_cart'] = []; // Clear cart after success
+                $_SESSION['fine_amount'] = 0; // Clear fine after success
                 $_SESSION['print_receipt_url'] = $receipt_base_url . '?payment_ids=' . implode(',', $generated_payment_ids);
                 header('Location: ' . $self_url); // Redirect to clear the search/student screen
                 exit();
@@ -327,37 +365,63 @@ if (isset($_GET['id'])) {
                     <?php if (!empty($_SESSION['fee_cart'])): ?>
                         <div class="batch-summary mb-5 p-4 border rounded shadow-sm bg-white">
                             <h4 class="text-success mb-3"><i class="fas fa-receipt"></i> Batch List for Receipt</h4>
-                            <table class="table table-bordered align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Student Name</th>
-                                        <th>Class</th>
-                                        <th>Month</th>
-                                        <th>Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php 
-                                    $batch_total = 0;
-                                    foreach ($_SESSION['fee_cart'] as $item): 
-                                        $batch_total += $item['amount'];
-                                    ?>
+                            <form method="POST" class="w-100" action="<?php echo $self_url; ?>">
+                                <table class="table table-bordered align-middle">
+                                    <thead class="table-light">
                                         <tr>
-                                            <td><strong><?php echo $item['name']; ?></strong></td>
-                                            <td><?php echo $item['class_info']; ?></td>
-                                            <td><?php echo $item['month']; ?></td>
-                                            <td><?php echo format_currency($item['amount']); ?></td>
+                                            <th>Student Name</th>
+                                            <th>Class</th>
+                                            <th>Month</th>
+                                            <th>Amount</th>
+                                            <th class="text-center" style="width: 80px;">Action</th>
                                         </tr>
-                                    <?php endforeach; ?>
-                                    <tr class="fw-bold table-light">
-                                        <td colspan="3" class="text-end">Batch Total:</td>
-                                        <td><?php echo format_currency($batch_total); ?></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            
-                            <form method="POST" class="w-100 mt-4" action="<?php echo $self_url; ?>">
-                                <div class="d-flex flex-wrap gap-4 align-items-end justify-content-between bg-light p-3 rounded border">
+                                    </thead>
+                                    <tbody>
+                                        <?php 
+                                        $batch_total = 0;
+                                        foreach ($_SESSION['fee_cart'] as $item): 
+                                            $batch_total += $item['amount'];
+                                        ?>
+                                            <tr>
+                                                <td><strong><?php echo $item['name']; ?></strong></td>
+                                                <td><?php echo $item['class_info']; ?></td>
+                                                <td><?php echo $item['month']; ?></td>
+                                                <td><?php echo format_currency($item['amount']); ?></td>
+                                                <td class="text-center">
+                                                    <button type="submit" name="action" value="remove_item" 
+                                                            onclick="document.getElementById('remove_record_id').value='<?php echo $item['record_id']; ?>'; return confirm('Remove <?php echo htmlspecialchars($item['name']); ?> (<?php echo $item['month']; ?>) from batch list?');" 
+                                                            class="btn btn-sm btn-outline-danger py-1 px-2" title="Remove Item">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                        
+                                        <input type="hidden" name="remove_record_id" id="remove_record_id" value="">
+                                        
+                                        <tr class="table-warning">
+                                            <td><strong class="text-danger"><i class="fas fa-exclamation-circle me-1"></i> Fine / Late Fee</strong></td>
+                                            <td>-</td>
+                                            <td><span class="badge bg-danger">Fine</span></td>
+                                            <td>
+                                                <div class="input-group input-group-sm" style="max-width: 170px;">
+                                                    <span class="input-group-text fw-bold">Rs.</span>
+                                                    <input type="number" name="fine_amount" id="fine_amount_input" class="form-control fw-bold text-danger" 
+                                                           min="0" step="0.01" value="<?php echo (isset($_SESSION['fine_amount']) && $_SESSION['fine_amount'] > 0) ? floatval($_SESSION['fine_amount']) : ''; ?>" placeholder="0.00">
+                                                </div>
+                                            </td>
+                                            <td></td>
+                                        </tr>
+
+                                        <tr class="fw-bold table-light">
+                                            <td colspan="3" class="text-end">Batch Total:</td>
+                                            <td id="batch_total_display"><?php echo format_currency($batch_total + floatval($_SESSION['fine_amount'] ?? 0)); ?></td>
+                                            <td></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                
+                                <div class="d-flex flex-wrap gap-4 align-items-end justify-content-between bg-light p-3 rounded border mt-3">
                                     <div class="form-group mb-0" style="min-width: 250px;">
                                         <label for="payment_mode" class="form-label fw-bold text-success mb-2">
                                             <i class="fas fa-wallet"></i> Choose Payment Method:
@@ -685,6 +749,18 @@ if (isset($_GET['id'])) {
                     }
                 });
             });
+
+            const fineInput = document.getElementById('fine_amount_input');
+            const batchTotalDisplay = document.getElementById('batch_total_display');
+            if (fineInput && batchTotalDisplay) {
+                const baseTotal = <?php echo floatval($batch_total ?? 0); ?>;
+                fineInput.addEventListener('input', function() {
+                    let fineVal = parseFloat(this.value);
+                    if (isNaN(fineVal) || fineVal < 0) fineVal = 0;
+                    const grandTotal = baseTotal + fineVal;
+                    batchTotalDisplay.textContent = 'Rs. ' + grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                });
+            }
         });
     </script>
 </body>

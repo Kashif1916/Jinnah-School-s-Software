@@ -82,7 +82,7 @@ if (!empty($payments_to_display)) {
         $p_month = $payment['paid_for_month'] ?? $payment['month'] ?? '';
         
         if ($stud_id && $p_month) {
-            // Hum student details bhi fetch kar rahy hain pending section ke liye
+            // Fetch student details for pending section
             $q = "SELECT f.amount, f.status, s.name, s.father_name 
                   FROM fee_records f 
                   JOIN students s ON f.student_id = s.id 
@@ -112,12 +112,11 @@ if (!empty($payments_to_display)) {
         $paid_month = $payment['paid_for_month'] ?? $payment['month'] ?? '';
         
         $is_admission = (trim($paid_month) === 'Admission');
-        // Check for Prev-Year case
         $is_prev_year = (trim($paid_month) === 'Prev-Year' || strpos($paid_month, 'Prev-Year') !== false);
+        $is_fine = (trim($paid_month) === 'Fine' || strpos($paid_month, 'Fine') !== false);
         
-        // Check if this payment is a pending/subsequent payment for this month
         $is_pending = false;
-        if ($paid_month && !$is_admission && !$is_prev_year) {
+        if ($paid_month && !$is_admission && !$is_prev_year && !$is_fine) {
             $stmt_check = $conn->prepare("SELECT id FROM payments WHERE student_id = ? AND paid_for_month = ? AND id < ? LIMIT 1");
             $stmt_check->bind_param("isi", $student_id, $paid_month, $payment['id']);
             $stmt_check->execute();
@@ -128,13 +127,14 @@ if (!empty($payments_to_display)) {
             $stmt_check->close();
         }
 
-        // Group key definition: Keep admission, prev-year & pending payments completely separate
         if ($is_admission) {
             $group_key = $student_id . '_admission';
         } elseif ($is_prev_year) {
             $group_key = $student_id . '_prev_year_' . $payment['id'];
         } elseif ($is_pending) {
             $group_key = $student_id . '_pending_' . $payment['id'];
+        } elseif ($is_fine) {
+            $group_key = $student_id . '_fine_' . $payment['id'];
         } else {
             $group_key = $student_id . '_months';
         }
@@ -150,6 +150,7 @@ if (!empty($payments_to_display)) {
                 'is_admission' => $is_admission,
                 'is_prev_year' => $is_prev_year,
                 'is_pending' => $is_pending,
+                'is_fine' => $is_fine,
                 'months' => [],
                 'total_amount' => 0.0,
                 'payment_mode' => $payment['payment_mode'] ?? 'cash',
@@ -158,6 +159,8 @@ if (!empty($payments_to_display)) {
         
         if ($is_pending) {
             $grouped_payments[$group_key]['months'][] = $paid_month . ' Arrears';
+        } elseif ($is_fine) {
+            $grouped_payments[$group_key]['months'][] = 'Fine / Late Fee';
         } else {
             $grouped_payments[$group_key]['months'][] = $paid_month;
         }
@@ -169,8 +172,6 @@ if (empty($payments_to_display)) {
     die('Receipt not found');
 }
 
-// Generate Receipt content
-// Start content generation
 ob_start();
 ?>
 <!DOCTYPE html>
@@ -182,15 +183,16 @@ ob_start();
             margin: 0;
             padding: 0;
             background: white;
-            width: 80mm; /* Standard Thermal Width */
+            width: 80mm;
         }
         .receipt-container {
-            width: 76mm; /* Slight margin for printer */
+            width: 76mm;
             margin: 0;
             background: white;
             padding: 2mm;
             box-sizing: border-box;
             border: none;
+            position: relative;
         }
         .header {
             text-align: center;
@@ -209,25 +211,6 @@ ob_start();
         }
         .section {
             margin-bottom: 1mm;
-        }
-        .section-title {
-            font-weight: bold;
-            color: #333;
-            border-bottom: 1px dashed #ddd;
-            padding-bottom: 1mm;
-            margin-bottom: 2mm;
-            font-size: 12px;
-        }
-        .student-info {
-            margin-bottom: 5mm;
-            font-size: 12px;
-            line-height: 1.4;
-        }
-        .info-label {
-            font-weight: bold;
-            color: #333;
-            width: 80px;
-            display: inline-block;
         }
         table {
             width: 100%;
@@ -250,28 +233,45 @@ ob_start();
             text-align: right;
             white-space: nowrap;
         }
-        .signature-section {
-            margin-top: 5mm;
-            font-size: 10px;
+        
+        /* Total Row Container for relative positioning */
+        .total-row-container {
+            position: relative;
+            font-weight: bold;
         }
-        .signature-line {
-            border-top: 1px dashed #333;
-            text-align: center;
-            padding-top: 1.5mm;
-            margin-top: 5mm;
-            width: 60%;
-            margin-left: auto;
-            margin-right: auto;
+        
+        /* PAID Stamp exactly inside Total Row Area */
+        .paid-stamp-total {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-8deg);
+            font-size: 32px;
+            font-weight: 900;
+            color: rgba(0, 0, 0, 0.22);
+            border: 3px solid rgba(0, 0, 0, 0.22);
+            padding: 1px 12px;
+            z-index: 1;
+            pointer-events: none;
+            letter-spacing: 3px;
+            white-space: nowrap;
+            line-height: 1;
+            border-radius: 4px;
         }
+
         .footer {
             text-align: center;
             font-size: 9px;
             color: #0c0c0c;
             padding-top: 1mm;
             margin-top: 0mm;
-        }.footer p {
+            position: relative;
+            z-index: 2;
+        }
+        .footer p {
             margin: 0;
-            line-height: 1.3;}
+            line-height: 1.3;
+        }
         
         .receipt-note {
             margin: 2mm auto;
@@ -285,21 +285,8 @@ ob_start();
             word-wrap: break-word;
             box-sizing: border-box;
             display: block;
-        }
-        .paid-stamp {
-            text-align: center;
-            font-size: 24px;
-            color: #1f5f46;
-            border: 2px solid #1f5f46;
-            display: inline-block;
-            padding: 1mm 5mm;
-            margin: 5mm auto;
-            font-weight: bold;
-            opacity: 0.5;
-        }
-        .amount-display {
-            font-weight: bold;
-            color: #1f5f46;
+            position: relative;
+            z-index: 2;
         }
         @media print {
             @page {
@@ -312,34 +299,17 @@ ob_start();
     </style>
 </head>
 <body>
-    <div class="receipt-container" style="position: relative;"> <div class="header">
+    <div class="receipt-container"> 
+        <div class="header">
             <img src="../images/logo.jfif" style="width: 80px !important; height: auto" alt="Logo">
             <h4> Jinnah High School & Inter College Khushab </h4>
-            
             <p> <strong>Fee Receipt</strong> </p>
         </div>
-
-        <div class="paid-stamp" style="
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-15deg);
-            font-size: 70px;
-            font-weight: bold;
-            color: rgba(0, 0, 0, 0.80); /* Bohot halka grey jo thermal print mai piche base banayega */
-            border: 5px solid rgba(0, 0, 0, 0.75);
-            padding: 10px 20px;
-            z-index: 1; /* Isko piche rakhne ke liye */
-            pointer-events: none;
-            letter-spacing: 5px;
-        ">PAID</div>
         
         <div style="position: relative; z-index: 2;">
             <div class="receipt-number">
                 <p><strong>Receipt #:</strong> <?php echo !empty($payments_to_display[0]['receipt_number']) ? htmlspecialchars($payments_to_display[0]['receipt_number']) : str_pad($payments_to_display[0]['id'], 6, '0', STR_PAD_LEFT); ?></p>
                 <p><strong>Date:</strong> <?php echo date('d-m-Y h:i A'); ?></p>
-               
-
                 <p><strong>Paid By:</strong> <?php echo htmlspecialchars($payments_to_display[0]['received_by'] ?? 'System'); ?></p>
                 <p><strong>Method:</strong> <?php echo strtoupper(str_replace('_', ' ', $payments_to_display[0]['payment_mode'] ?? 'cash')); ?></p>
                 <p><strong>Phone:</strong>03096684856</p>
@@ -347,7 +317,6 @@ ob_start();
             </div>
             
             <div class="section payment-details">
-                
                 <table>
                     <thead>
                         <tr>
@@ -359,27 +328,38 @@ ob_start();
                         <?php foreach ($grouped_payments as $stud_id => $group): ?>
                             <tr>
                                 <td>
-                                    <strong style="font-size: 14px;"><?php echo htmlspecialchars($group['name']) . ' / ' . htmlspecialchars($group['father_name']); ?></strong><br>
-                                    <?php echo htmlspecialchars($group['class']) . '-' . htmlspecialchars($group['section']); ?> | <?php echo implode(', ', $group['months']); ?>
-                                    <?php 
-                                    // If there is concession and it is not admission fee, show standard - concession = payable
-                                   if (empty($group['is_admission']) && empty($group['is_prev_year']) && isset($group['fixed_monthly_fee'])) {
-                                        if (isset($group['concession_amount']) && $group['concession_amount'] > 0) {
-                                            $payable = floatval($group['fixed_monthly_fee']) - floatval($group['concession_amount']);
-                                            echo "<br><small class='text-muted' style='font-size: 11px; color: #0c0c0c;'>Fee: " . number_format($group['fixed_monthly_fee'], 0) . " - " . number_format($group['concession_amount'], 0) . " = " . number_format($payable, 0) . " (Per Month)</small>";
-                                        } else {
-                                            // No concession, show per month standard fee
-                                            echo "<br><small class='text-muted' style='font-size: 11px; color: #0c0c0c;'>Fee Per Month = " . number_format($group['fixed_monthly_fee'], 0) . "</small>";
+                                    <?php if (!empty($group['is_fine'])): ?>
+                                        <strong style="font-size: 14px;">Fine for Late Fee</strong>
+                                    <?php else: ?>
+                                        <strong style="font-size: 14px;"><?php echo htmlspecialchars($group['name']) . ' / ' . htmlspecialchars($group['father_name']); ?></strong><br>
+                                        <?php echo htmlspecialchars($group['class']) . '-' . htmlspecialchars($group['section']); ?> | <?php echo implode(', ', $group['months']); ?>
+                                        <?php 
+                                       if (empty($group['is_admission']) && empty($group['is_prev_year']) && isset($group['fixed_monthly_fee'])) {
+                                            if (isset($group['concession_amount']) && $group['concession_amount'] > 0) {
+                                                $payable = floatval($group['fixed_monthly_fee']) - floatval($group['concession_amount']);
+                                                echo "<br><small class='text-muted' style='font-size: 11px; color: #0c0c0c;'>Fee: " . number_format($group['fixed_monthly_fee'], 0) . " - " . number_format($group['concession_amount'], 0) . " = " . number_format($payable, 0) . " (Per Month)</small>";
+                                            } else {
+                                                echo "<br><small class='text-muted' style='font-size: 11px; color: #0c0c0c;'>Fee Per Month = " . number_format($group['fixed_monthly_fee'], 0) . "</small>";
+                                            }
                                         }
-                                    }
-                                    ?>
+                                        ?>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="amount-col" style="font-size: 11px;"><?php echo number_format($group['total_amount'], 2); ?></td>
                             </tr>
                         <?php endforeach; ?>
-                        <tr style="font-weight: bold;">
-                            <td style="text-align: right; padding-top: 4mm;">TOTAL:</td>
-                            <td class="amount-col" style="padding-top: 4mm;"><?php echo format_currency($total_amount_paid); ?></td>
+                        
+                        <!-- TOTAL ROW WITH CENTERED PAID WATERMARK -->
+                        <tr class="total-row-container">
+                            <td colspan="2" style="position: relative; padding: 4mm 0;">
+                                <div class="paid-stamp-total">PAID</div>
+                                <table style="width: 100%; margin: 0; font-weight: bold; position: relative; z-index: 2;">
+                                    <tr>
+                                        <td style="border: none; text-align: left; padding: 0;">TOTAL:</td>
+                                        <td class="amount-col" style="border: none; width: auto; padding: 0;"><?php echo format_currency($total_amount_paid); ?></td>
+                                    </tr>
+                                </table>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -394,46 +374,39 @@ ob_start();
                 </div>
             <?php endif; ?>
         </div>
-    </div>
-    
-    
-    <?php
-    // Fetch Receipt Note from settings
-    $receipt_note = '';
-    $res = $conn->query("SELECT setting_value FROM settings WHERE setting_key = 'receipt_note'");
-    if ($res && $row = $res->fetch_assoc()) {
-        $receipt_note = $row['setting_value'];
-    }
-    ?>
-    
-    <?php if (!empty($receipt_note)): ?>
-        <div class="receipt-note">
-            <?php echo htmlspecialchars($receipt_note); ?>
+
+        <?php
+        $receipt_note = '';
+        $res = $conn->query("SELECT setting_value FROM settings WHERE setting_key = 'receipt_note'");
+        if ($res && $row = $res->fetch_assoc()) {
+            $receipt_note = $row['setting_value'];
+        }
+        ?>
+        
+        <?php if (!empty($receipt_note)): ?>
+            <div class="receipt-note">
+                <?php echo htmlspecialchars($receipt_note); ?>
+            </div>
+        <?php endif; ?>
+        
+        <div class="footer">
+            <p>Thank You For Your Payment!</p>
+            <p>KJ Software House Khushab</p>
         </div>
-    <?php endif; ?>
-    
-    <div class="footer">
-        <p>Thank You For Your Payment!</p>
-        <p>KJ Software House Khushab</p>
         
+        <div style="height: 5mm;"></div>
     </div>
     
-    <div style="height: 5mm;"></div>
-   
-        
     <script>
         window.onload = function() {
             window.print();
         };
     </script>
-
-    
 </body>
 </html>
 <?php
 $content = ob_get_clean();
 
-// Send as HTML - users can print as PDF using browser
 header('Content-Type: text/html; charset=utf-8');
 echo $content;
 ?>

@@ -73,9 +73,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($name) && !empty($father_name)) {
             $net_fee = max(0, $fixed_monthly_fee - $concession_amount);
 
-            $query = "UPDATE students SET name = ?, father_name = ?, class = ?, section = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ?, monthly_fee = ? WHERE id = ?";
+            // FIXED: 10 Placeholders matched with 10 Types ('sssssssdsi')
+            $query = "UPDATE students SET name = ?, father_name = ?, class = ?, section = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ? WHERE id = ?";
             $stmt = $conn->prepare($query);
-            $stmt->bind_param('ssssssssdsi', $name, $father_name, $class, $section, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $net_fee, $student_id);
+            $stmt->bind_param('sssssssdsi', $name, $father_name, $class, $section, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
             
             if ($stmt->execute()) {
                 // Update fee_records for selected unpaid previous months
@@ -95,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $success = 'Student info and concession updated successfully!';
                 $student = get_student($student_id);
             } else {
-                $error = 'Error updating student.';
+                $error = 'Error updating student: ' . $stmt->error;
             }
             $stmt->close();
         } else {

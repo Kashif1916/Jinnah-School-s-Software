@@ -354,6 +354,27 @@ function record_payment($student_id, $amount, $month, $received_by, $payment_mod
     $conn->begin_transaction();
     
     try {
+        $payment_date = date('Y-m-d H:i:s');
+
+        // Special handling for Fine / Late Fee
+        if ($month === 'Fine') {
+            $query = "INSERT INTO payments (student_id, receipt_number, amount, paid_for_month, payment_date, received_by, payment_mode) 
+                      VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $stmt = $conn->prepare($query);
+            $stmt->bind_param('isdssss', $student_id, $receipt_number, $amount, $month, $payment_date, $received_by, $payment_mode);
+            $stmt->execute();
+            $payment_id = $conn->insert_id;
+            $stmt->close();
+
+            if (empty($receipt_number)) {
+                $auto_receipt = sprintf('%06d', $payment_id);
+                $conn->query("UPDATE payments SET receipt_number = '$auto_receipt' WHERE id = $payment_id");
+            }
+            
+            $conn->commit();
+            return $payment_id;
+        }
+
         // Get current balance for the specific fee record
         // Assuming $month is in 'Mon-YYYY' format and $student_id is integer
         $query = "SELECT id, amount, month FROM fee_records WHERE student_id = ? AND month = ?";
@@ -370,7 +391,6 @@ function record_payment($student_id, $amount, $month, $received_by, $payment_mod
         $fee_record_id = $current_record['id'];
         $current_balance = floatval($current_record['amount']);
         $new_balance = $current_balance - $amount;
-        $payment_date = date('Y-m-d H:i:s');
 
         // Record payment
         $query = "INSERT INTO payments (student_id, receipt_number, amount, paid_for_month, payment_date, received_by, payment_mode) 

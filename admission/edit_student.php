@@ -59,9 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $net_fee = $fixed_monthly_fee - $concession_amount;
                 if ($net_fee < 0) $net_fee = 0;
 
-                $query = "UPDATE students SET name = ?, father_name = ?, class = ?, section = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ?, monthly_fee = ? WHERE id = ?";
+                // FIXED FOR HOSTING (MariaDB): Removed monthly_fee from UPDATE query
+                $query = "UPDATE students SET name = ?, father_name = ?, class = ?, section = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ? WHERE id = ?";
                 $stmt = $conn->prepare($query);
-                $stmt->bind_param('ssssssssdsi', $name, $father_name, $class, $section, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $net_fee, $student_id);
+                $stmt->bind_param('ssssssssdi', $name, $father_name, $class, $section, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
                 
                 if ($stmt->execute()) {
                     // Update fee_records for selected unpaid previous months

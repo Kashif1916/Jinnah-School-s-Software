@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $father_name = sanitize_input($_POST['father_name'] ?? '');
         $class = sanitize_input($_POST['class'] ?? '');
         $section = sanitize_input($_POST['section'] ?? '');
-        $fixed_monthly_fee = floatval($_POST['monthly_fee'] ?? 0); // Note: Form input is named 'monthly_fee' but contains fixed_monthly_fee
+        $fixed_monthly_fee = floatval($_POST['monthly_fee'] ?? 0); // Contains fixed_monthly_fee
         $contact_number = sanitize_input($_POST['contact_number'] ?? '');
         $contact_number2 = sanitize_input($_POST['contact_number2'] ?? '');
         $whatsapp_number = sanitize_input($_POST['whatsapp_number'] ?? '');
@@ -92,10 +92,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $net_fee = $fixed_monthly_fee - $concession_amount;
                 if ($net_fee < 0) $net_fee = 0;
                 
+                // FIXED FOR HOSTING (MariaDB): Removed monthly_fee from UPDATE query
                 $query = "UPDATE students SET name = ?, father_name = ?, class = ?, section = ?, 
-                          fixed_monthly_fee = ?, monthly_fee = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ? WHERE id = ?";
+                          fixed_monthly_fee = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ? WHERE id = ?";
                 $stmt = $conn->prepare($query);
-                $stmt->bind_param('ssssddsssdsi', $name, $father_name, $class, $section, $fixed_monthly_fee, $net_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
+                $stmt->bind_param('ssssdsssdsi', $name, $father_name, $class, $section, $fixed_monthly_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
                 
                 if ($stmt->execute()) {
                     // Update fee_records for selected unpaid previous months
@@ -178,60 +179,24 @@ if (isset($_GET['id'])) {
             <div class="content">
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
-                        <a href="dashboard.php" class="module-nav-btn">
-                            <i class="fas fa-chart-bar"></i> Dashboard
-                        </a>
-                        <a href="add_student.php" class="module-nav-btn">
-                            <i class="fas fa-user-plus"></i> Add Student
-                        </a>
-                        <a href="student_record.php" class="module-nav-btn">
-                            <i class="fas fa-address-book"></i> Student Record
-                        </a>
-                        <a href="student_add_details.php" class="module-nav-btn">
-                            <i class="fas fa-history"></i> Add Log
-                        </a>
-                        <a href="fee_schedule.php" class="module-nav-btn">
-                            <i class="fas fa-calendar-alt"></i> Fee Schedule
-                        </a>
-                        <a href="fee_management.php" class="module-nav-btn">
-                            <i class="fas fa-money-bill-wave"></i> Fee Management
-                        </a>
-                        <a href="defaulter_list.php" class="module-nav-btn">
-                            <i class="fas fa-list"></i> Pending List
-                        </a>
-                        <a href="paid_students.php" class="module-nav-btn">
-                            <i class="fas fa-check-circle text-success"></i> Paid Students
-                        </a>
-                        <a href="payment_analytics.php" class="module-nav-btn">
-                            <i class="fas fa-chart-line"></i> Analytics
-                        </a>
-                        <a href="receipt_analysis.php" class="module-nav-btn">
-                            <i class="fas fa-receipt"></i> Receipt Analysis
-                        </a>
-                        <a href="expenses.php" class="module-nav-btn">
-                            <i class="fas fa-wallet"></i> Expenses
-                        </a>
-                        <a href="data_correction.php" class="module-nav-btn">
-                            <i class="fas fa-edit"></i> Data Correction
-                        </a>
-                        <a href="promotion.php" class="module-nav-btn">
-                            <i class="fas fa-arrow-up"></i> Promotion
-                        </a>
-                        <a href="drop_student.php" class="module-nav-btn">
-                            <i class="fas fa-trash"></i> Drop Student
-                        </a>
-                        <a href="delete_student.php" class="module-nav-btn ">
-                            <i class="fas fa-user-minus text-success"></i> Delete Student
-                        </a>
-                        <a href="users.php" class="module-nav-btn">
-                            <i class="fas fa-users-cog"></i> Users
-                        </a>
-                        <a href="receipt_note.php" class="module-nav-btn">
-                            <i class="fas fa-sticky-note"></i> Custom Note
-                        </a>
-                        <a href="../help.php" class="module-nav-btn">
-                            <i class="fas fa-question-circle text-success"></i> Help & About
-                        </a>
+                        <a href="dashboard.php" class="module-nav-btn"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                        <a href="add_student.php" class="module-nav-btn"><i class="fas fa-user-plus"></i> Add Student</a>
+                        <a href="student_record.php" class="module-nav-btn"><i class="fas fa-address-book"></i> Student Record</a>
+                        <a href="student_add_details.php" class="module-nav-btn"><i class="fas fa-history"></i> Add Log</a>
+                        <a href="fee_schedule.php" class="module-nav-btn"><i class="fas fa-calendar-alt"></i> Fee Schedule</a>
+                        <a href="fee_management.php" class="module-nav-btn"><i class="fas fa-money-bill-wave"></i> Fee Management</a>
+                        <a href="defaulter_list.php" class="module-nav-btn"><i class="fas fa-list"></i> Pending List</a>
+                        <a href="paid_students.php" class="module-nav-btn"><i class="fas fa-check-circle text-success"></i> Paid Students</a>
+                        <a href="payment_analytics.php" class="module-nav-btn"><i class="fas fa-chart-line"></i> Analytics</a>
+                        <a href="receipt_analysis.php" class="module-nav-btn"><i class="fas fa-receipt"></i> Receipt Analysis</a>
+                        <a href="expenses.php" class="module-nav-btn"><i class="fas fa-wallet"></i> Expenses</a>
+                        <a href="data_correction.php" class="module-nav-btn"><i class="fas fa-edit"></i> Data Correction</a>
+                        <a href="promotion.php" class="module-nav-btn"><i class="fas fa-arrow-up"></i> Promotion</a>
+                        <a href="drop_student.php" class="module-nav-btn"><i class="fas fa-trash"></i> Drop Student</a>
+                        <a href="delete_student.php" class="module-nav-btn"><i class="fas fa-user-minus text-success"></i> Delete Student</a>
+                        <a href="users.php" class="module-nav-btn"><i class="fas fa-users-cog"></i> Users</a>
+                        <a href="receipt_note.php" class="module-nav-btn"><i class="fas fa-sticky-note"></i> Custom Note</a>
+                        <a href="../help.php" class="module-nav-btn"><i class="fas fa-question-circle text-success"></i> Help & About</a>
                     </div>
                 </div>
 
@@ -404,7 +369,7 @@ if (isset($_GET['id'])) {
                                                 $stmt_unpaid->execute();
                                                 $res_unpaid = $stmt_unpaid->get_result();
 
-                                                $current_first_day = date('Y-m-01'); // Current month starting date (e.g., 2026-07-01)
+                                                $current_first_day = date('Y-m-01'); // Current month starting date
                                                 $previous_unpaid_found = false;
 
                                                 if ($res_unpaid && $res_unpaid->num_rows > 0):
