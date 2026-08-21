@@ -23,7 +23,7 @@ if (!empty($payment_ids_str)) {
     $placeholders = implode(',', array_fill(0, count($payment_ids_arr), '?'));
     $types = str_repeat('i', count($payment_ids_arr));
 
-    $query = "SELECT p.*, s.name, s.father_name, s.class, s.section, s.contact_number, s.fixed_monthly_fee, s.concession_amount 
+    $query = "SELECT p.*, s.name, s.father_name, s.class, s.section, s.contact_number, s.fixed_monthly_fee, s.package_amount, s.is_package, s.concession_amount 
               FROM payments p 
               JOIN students s ON p.student_id = s.id 
               WHERE p.id IN ($placeholders) ORDER BY p.payment_date ASC";
@@ -41,7 +41,7 @@ if (!empty($payment_ids_str)) {
         }
     }
 } elseif ($fee_id) { // Fallback for single fee_id if payment_ids not provided
-    $query = "SELECT f.*, s.name, s.father_name, s.class, s.section, s.monthly_fee, s.fixed_monthly_fee, s.concession_amount, s.contact_number, p.amount as paid_amount, p.payment_date as payment_recorded_date, p.received_by, p.payment_mode
+    $query = "SELECT f.*, s.name, s.father_name, s.class, s.section, s.monthly_fee, s.fixed_monthly_fee, s.package_amount, s.is_package, s.concession_amount, s.contact_number, p.amount as paid_amount, p.payment_date as payment_recorded_date, p.received_by, p.payment_mode
               FROM fee_records f 
               JOIN students s ON f.student_id = s.id 
               LEFT JOIN payments p ON f.student_id = p.student_id AND f.month = p.paid_for_month AND f.payment_date = p.payment_date
@@ -68,6 +68,8 @@ if (!empty($payment_ids_str)) {
             'received_by' => $receipt_data['received_by'] ?? 'System',
             'payment_mode' => $receipt_data['payment_mode'] ?? 'cash',
             'fixed_monthly_fee' => $receipt_data['fixed_monthly_fee'],
+            'package_amount' => $receipt_data['package_amount'] ?? 0,
+            'is_package' => $receipt_data['is_package'] ?? 0,
             'concession_amount' => $receipt_data['concession_amount']
         ];
         $student_info = $receipt_data;
@@ -145,8 +147,10 @@ if (!empty($payments_to_display)) {
                 'father_name' => $payment['father_name'],
                 'class' => $payment['class'],
                 'section' => $payment['section'],
-                'fixed_monthly_fee' => $payment['fixed_monthly_fee'],
-                'concession_amount' => $payment['concession_amount'],
+                'fixed_monthly_fee' => $payment['fixed_monthly_fee'] ?? 0,
+                'package_amount' => $payment['package_amount'] ?? 0,
+                'is_package' => !empty($payment['is_package']) || is_college_class($payment['class']),
+                'concession_amount' => $payment['concession_amount'] ?? 0,
                 'is_admission' => $is_admission,
                 'is_prev_year' => $is_prev_year,
                 'is_pending' => $is_pending,
@@ -334,12 +338,37 @@ ob_start();
                                         <strong style="font-size: 14px;"><?php echo htmlspecialchars($group['name']) . ' / ' . htmlspecialchars($group['father_name']); ?></strong><br>
                                         <?php echo htmlspecialchars($group['class']) . '-' . htmlspecialchars($group['section']); ?> | <?php echo implode(', ', $group['months']); ?>
                                         <?php 
-                                       if (empty($group['is_admission']) && empty($group['is_prev_year']) && isset($group['fixed_monthly_fee'])) {
-                                            if (isset($group['concession_amount']) && $group['concession_amount'] > 0) {
-                                                $payable = floatval($group['fixed_monthly_fee']) - floatval($group['concession_amount']);
-                                                echo "<br><small class='text-muted' style='font-size: 11px; color: #0c0c0c;'>Fee: " . number_format($group['fixed_monthly_fee'], 0) . " - " . number_format($group['concession_amount'], 0) . " = " . number_format($payable, 0) . " (Per Month)</small>";
-                                            } else {
-                                                echo "<br><small class='text-muted' style='font-size: 11px; color: #0c0c0c;'>Fee Per Month = " . number_format($group['fixed_monthly_fee'], 0) . "</small>";
+                                        if (empty($group['is_admission']) && empty($group['is_prev_year'])) {
+                                            $is_pkg = (!empty($group['is_package']) || is_college_class($group['class']) || in_array('Yearly Package', $group['months']) || strpos(implode(',', $group['months']), 'Package') !== false);
+                                            if ($is_pkg) {
+                                                $raw_pkg_fee = floatval($group['package_amount'] ?? 0);
+                                                if ($raw_pkg_fee <= 0) {
+                                                    $raw_pkg_fee = floatval($group['fixed_monthly_fee'] ?? 0);
+                                                }
+                                                if ($raw_pkg_fee <= 0 && !empty($group['class'])) {
+                                                    $fs_stmt = $conn->prepare("SELECT fixed_monthly_fee FROM fee_schedule WHERE class = ?");
+                                                    $fs_stmt->bind_param('s', $group['class']);
+                                                    $fs_stmt->execute();
+                                                    $fs_res = $fs_stmt->get_result()->fetch_assoc();
+                                                    if ($fs_res) {
+                                                        $raw_pkg_fee = floatval($fs_res['fixed_monthly_fee']);
+                                                    }
+                                                    $fs_stmt->close();
+                                                }
+                                                $concession = floatval($group['concession_amount'] ?? 0);
+                                                if ($concession > 0) {
+                                                    $payable = max(0, $raw_pkg_fee - $concession);
+                                                    echo "<br><small class='text-muted' style='font-size: 11px; color: #0c0c0c;'>Fee: " . number_format($raw_pkg_fee, 0) . " - " . number_format($concession, 0) . " = " . number_format($payable, 0) . " (Yearly Package)</small>";
+                                                } else {
+                                                    echo "<br><small class='text-muted' style='font-size: 11px; color: #0c0c0c;'>Package Fee = " . number_format($raw_pkg_fee, 0) . " (Yearly Package)</small>";
+                                                }
+                                            } elseif (isset($group['fixed_monthly_fee'])) {
+                                                if (isset($group['concession_amount']) && $group['concession_amount'] > 0) {
+                                                    $payable = floatval($group['fixed_monthly_fee']) - floatval($group['concession_amount']);
+                                                    echo "<br><small class='text-muted' style='font-size: 11px; color: #0c0c0c;'>Fee: " . number_format($group['fixed_monthly_fee'], 0) . " - " . number_format($group['concession_amount'], 0) . " = " . number_format($payable, 0) . " (Per Month)</small>";
+                                                } else {
+                                                    echo "<br><small class='text-muted' style='font-size: 11px; color: #0c0c0c;'>Fee Per Month = " . number_format($group['fixed_monthly_fee'], 0) . "</small>";
+                                                }
                                             }
                                         }
                                         ?>

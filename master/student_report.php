@@ -9,7 +9,7 @@ require_once '../config/db.php';
 require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
-// Allow Master, Finance, and Admission roles to access this report
+// Allow Master, Finance, Admission, and Teacher roles to access this report
 require_login();
 if (!is_master() && !is_finance() && !is_admission() && !is_teacher()) {
     header('Location: ' . BASE_URL . 'index.php');
@@ -184,7 +184,7 @@ $stmt->close();
             <div style="display: flex; align-items: center; gap: 15px;">
                 <?php echo render_system_logo('report-logo'); ?>
                 <div style="text-align: left;">
-                    <h2 style="margin: 0; color: #1f5f46; font-size: 20px; font-weight: bold;">Jinnah School And Intermediate College Khushab</h2>
+                    <h2 style="margin: 0; color: #1f5f46; font-size: 20px; font-weight: bold;"><?php echo SITE_NAME; ?></h2>
                     <p style="margin: 5px 0 0 0; color: #666; font-size: 13px;">Student Records Report</p>
                 </div>
             </div>

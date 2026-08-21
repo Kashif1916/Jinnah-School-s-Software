@@ -11,6 +11,10 @@ require_once '../includes/helpers.php';
 
 // Allow Master, Finance, Admission, and Teacher roles
 require_login();
+if (!is_master() && !is_finance() && !is_admission() && !is_teacher()) {
+    header('Location: ' . BASE_URL . 'index.php');
+    exit();
+}
 
 $class_filter = isset($_REQUEST['class']) ? sanitize_input($_REQUEST['class']) : '';
 $section_filter = isset($_REQUEST['section']) ? sanitize_input($_REQUEST['section']) : '';
@@ -329,10 +333,11 @@ if ($setting_res) {
             $unpaid_query = "SELECT id, month, amount FROM fee_records 
                              WHERE student_id = ? 
                              AND status = 'unpaid' 
-                             AND (
-                                 month IN ('Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year') 
-                                 OR STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y') <= LAST_DAY(CURRENT_DATE())
-                             )";
+                              AND (
+                                  month IN ('Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year') 
+                                  OR month LIKE '%Package%'
+                                  OR STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y') <= LAST_DAY(CURRENT_DATE())
+                              )";
             
             if (!empty($months_filter)) {
                 $expanded_months = [];
@@ -343,15 +348,25 @@ if ($setting_res) {
                         $expanded_months[] = 'Prev-Year';
                         $expanded_months[] = 'Pre-Year';
                     }
+                    if ($m === 'Yearly Package' || $m === 'Package') {
+                        $expanded_months[] = 'Yearly Package';
+                        $expanded_months[] = 'Package';
+                    }
                 }
                 $expanded_months = array_unique($expanded_months);
                 $escaped_months = array_map(function($m) use ($conn) { 
                     return "'" . $conn->real_escape_string($m) . "'"; 
                 }, $expanded_months);
-                $unpaid_query .= " AND month IN (" . implode(',', $escaped_months) . ")";
+                
+                $has_pkg = in_array('Yearly Package', $expanded_months) || in_array('Package', $expanded_months);
+                if ($has_pkg) {
+                    $unpaid_query .= " AND (month IN (" . implode(',', $escaped_months) . ") OR month LIKE '%Package%')";
+                } else {
+                    $unpaid_query .= " AND month IN (" . implode(',', $escaped_months) . ")";
+                }
             }
             
-            $unpaid_query .= " ORDER BY CASE WHEN month = 'Admission' THEN 1 WHEN month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 ELSE 3 END, STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y')";
+            $unpaid_query .= " ORDER BY CASE WHEN month = 'Admission' THEN 1 WHEN month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 WHEN month LIKE '%Package%' THEN 3 ELSE 4 END, STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y')";
             
             $stmt_unpaid = $conn->prepare($unpaid_query);
             $stmt_unpaid->bind_param('i', $student_id);
@@ -370,11 +385,14 @@ if ($setting_res) {
 
                 $is_admission = ($paid_month === 'Admission');
                 $is_prev_year = (in_array($paid_month, ['Pre_Year', 'Prev-Year', 'Pre-Year']) || strpos($paid_month, 'Prev-Year') !== false);
+                $is_package = (strpos($paid_month, 'Package') !== false);
                 
                 if ($is_admission) {
                     $group_key = 'admission';
                 } elseif ($is_prev_year) {
                     $group_key = 'prev_year_' . $rec['id'];
+                } elseif ($is_package) {
+                    $group_key = 'package_' . $rec['id'];
                 } else {
                     $group_key = 'regular_months';
                 }
@@ -392,6 +410,8 @@ if ($setting_res) {
                     $grouped_challan[$group_key]['title'] = 'Admission Fee';
                 } elseif ($is_prev_year) {
                     $grouped_challan[$group_key]['title'] = 'Previous Year Pending Fee (' . $paid_month . ')';
+                } elseif ($is_package) {
+                    $grouped_challan[$group_key]['title'] = $paid_month . ' (Balance Due)';
                 } else {
                     $grouped_challan[$group_key]['months'][] = $paid_month;
                 }
@@ -407,9 +427,9 @@ if ($setting_res) {
             <div class="challan-card">
                 <div class="challan-header">
                     <div class="header-logo-title">
-                        <img src="../images/logo.jfif" alt="Logo" class="challan-logo">
+                        <?php echo render_system_logo('challan-logo'); ?>
                         <div class="school-info">
-                            <h3>Jinnah High School & Intermediate College Khushab</h3>
+                            <h3><?php echo SITE_NAME; ?></h3>
                             <p>Fee Pending Slip / Challan | Issued Date: <?php echo date('d-m-Y'); ?></p>
                         </div>
                     </div>

@@ -39,32 +39,61 @@ for ($m = 1; $m <= 12; $m++) {
 if ($student_id > 0) {
     $student = get_student($student_id);
     if ($student) {
+        $is_college_student = (is_college_class($student['class']) || !empty($student['is_package']));
+        
         $paid_months_in_db = [];
         $fee_records_db = [];
         $pending_amount_val = floatval($student['admission_fee']);
         
-        // Fetch months with payment records
-        $months_with_payments = [];
-        $pay_res = $conn->query("SELECT DISTINCT paid_for_month FROM payments WHERE student_id = $student_id AND amount > 0");
-        if ($pay_res) {
-            while ($p_row = $pay_res->fetch_assoc()) {
-                $months_with_payments[] = $p_row['paid_for_month'];
+        if ($is_college_student) {
+            $pkg_amount = floatval($student['package_amount'] > 0 ? $student['package_amount'] : $student['fixed_monthly_fee']);
+            if ($pkg_amount <= 0 && !empty($student['class'])) {
+                $fs_stmt = $conn->prepare("SELECT fixed_monthly_fee FROM fee_schedule WHERE class = ?");
+                $fs_stmt->bind_param('s', $student['class']);
+                $fs_stmt->execute();
+                $fs_res = $fs_stmt->get_result()->fetch_assoc();
+                if ($fs_res) {
+                    $pkg_amount = floatval($fs_res['fixed_monthly_fee']);
+                }
+                $fs_stmt->close();
             }
-        }
-        
-        // Fetch current fee_records status and amount
-        $res = $conn->query("SELECT month, status, amount FROM fee_records WHERE student_id = $student_id");
-        if ($res) {
-            while ($row = $res->fetch_assoc()) {
-                if ($row['month'] === 'Admission') {
-                    $pending_amount_val = floatval($row['amount']);
-                } else {
-                    $fee_records_db[$row['month']] = [
-                        'status' => $row['status'],
-                        'amount' => floatval($row['amount'])
-                    ];
-                    if ($row['status'] === 'paid') {
-                        $paid_months_in_db[] = $row['month'];
+            $pkg_concession = floatval($student['concession_amount'] ?? 0);
+            $net_pkg = max(0, $pkg_amount - $pkg_concession);
+
+            $pkg_rec_res = $conn->query("SELECT id, amount, status FROM fee_records WHERE student_id = $student_id AND (month LIKE '%Package%' OR month = 'Yearly Package') ORDER BY id DESC LIMIT 1");
+            $pkg_rec = ($pkg_rec_res && $pkg_rec_res->num_rows > 0) ? $pkg_rec_res->fetch_assoc() : null;
+            if ($pkg_rec) {
+                $pkg_pending_fee = ($pkg_rec['status'] === 'paid') ? 0 : floatval($pkg_rec['amount']);
+            } else {
+                $pkg_pending_fee = $net_pkg;
+            }
+
+            $pay_res = $conn->query("SELECT SUM(amount) as total_paid FROM payments WHERE student_id = $student_id");
+            $pkg_total_paid = ($pay_res && $pay_row = $pay_res->fetch_assoc()) ? floatval($pay_row['total_paid'] ?? 0) : 0;
+        } else {
+            // Fetch months with payment records
+            $months_with_payments = [];
+            $pay_res = $conn->query("SELECT DISTINCT paid_for_month FROM payments WHERE student_id = $student_id AND amount > 0");
+            if ($pay_res) {
+                while ($p_row = $pay_res->fetch_assoc()) {
+                    $months_with_payments[] = $p_row['paid_for_month'];
+                }
+            }
+            
+            // Fetch current fee_records status and amount
+            $res = $conn->query("SELECT month, status, amount FROM fee_records WHERE student_id = $student_id");
+            if ($res) {
+                while ($row = $res->fetch_assoc()) {
+                    if ($row['month'] === 'Admission') {
+                        $pending_amount_val = floatval($row['amount']);
+                    } else {
+                        $fee_records_db[$row['month']] = [
+                            'status' => $row['status'],
+                            'amount' => floatval($row['amount'])
+                        ];
+                        if ($row['status'] === 'paid') {
+                            $paid_months_in_db[] = $row['month'];
+                        }
                     }
                 }
             }
@@ -73,188 +102,218 @@ if ($student_id > 0) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'correct' && $student) {
-    $pending_amount = floatval($_POST['pending_amount'] ?? 0);
-    $paid_months = $_POST['paid_months'] ?? []; // Checked months array
-    
-    // Calculate net fee from student fixed_monthly_fee and concession_amount
-    $fixed_monthly_fee = floatval($student['fixed_monthly_fee']);
-    $concession_amount = floatval($student['concession_amount']);
-    $net_fee = $fixed_monthly_fee - $concession_amount;
-    if ($net_fee < 0) $net_fee = 0;
-    
-    $conn->begin_transaction();
-    try {
-        // FIXED: Pichle mahine ki last date set kar di taakay current month ke analytics affect na hon
-        $payment_date = date('Y-m-t 23:59:59', strtotime('last day of previous month'));
-        $received_by = get_username() ?? 'System';
-        
-        // 1. Update the monthly_fee and admission_fee (pending_amount) columns in students table
-        $stmt_update_student = $conn->prepare("UPDATE students SET monthly_fee = ?, admission_fee = ? WHERE id = ?");
-        $stmt_update_student->bind_param('ddi', $net_fee, $pending_amount, $student_id);
-        $stmt_update_student->execute();
-        $stmt_update_student->close();
-        
-        // Determine partial month and fully paid months if pending_amount > 0
-        $partial_month = null;
-        $fully_paid_months = $paid_months;
-        
-        if ($pending_amount > 0) {
-            if (!empty($paid_months)) {
-                $partial_month = $paid_months[count($paid_months) - 1];
-                $fully_paid_months = array_diff($paid_months, [$partial_month]);
-            } else {
-                $partial_month = 'Prev-Year';
-                $fully_paid_months = [];
-            }
-        }
-        
-        // 2. Clear old 'Admission' month alias entries if present
-        $conn->query("DELETE FROM fee_records WHERE student_id = $student_id AND month = 'Admission'");
-        $conn->query("DELETE FROM payments WHERE student_id = $student_id AND paid_for_month = 'Admission'");
-        
-        // Fetch existing payments and fee records before loop to preserve historical dates
-        $existing_payments = [];
-        $ep_res = $conn->query("SELECT * FROM payments WHERE student_id = $student_id");
-        if ($ep_res) {
-            while ($ep_row = $ep_res->fetch_assoc()) {
-                $existing_payments[$ep_row['paid_for_month']] = $ep_row;
-            }
-        }
-        
-        $existing_fee_records = [];
-        $ef_res = $conn->query("SELECT * FROM fee_records WHERE student_id = $student_id");
-        if ($ef_res) {
-            while ($ef_row = $ef_res->fetch_assoc()) {
-                $existing_fee_records[$ef_row['month']] = $ef_row;
-            }
-        }
-        
-        // 3. Process Months including Prev-Year
-        foreach ($months_2026 as $month) {
-            $current_month_fee = ($month === 'Prev-Year') ? $pending_amount : $net_fee;
+    $is_college_student = (is_college_class($student['class']) || !empty($student['is_package']));
+
+    // Common previous month end date timestamp for both school & college corrections
+    $previous_month_date = date('Y-m-t 23:59:59', strtotime('last day of previous month'));
+    $received_by = get_username() ?? 'System';
+
+    if ($is_college_student) {
+        $new_package_pending = floatval($_POST['package_pending_fee'] ?? 0);
+        $conn->begin_transaction();
+        try {
+            $pkg_amount = floatval($student['package_amount'] > 0 ? $student['package_amount'] : $student['fixed_monthly_fee']);
+            $pkg_concession = floatval($student['concession_amount'] ?? 0);
+            $net_pkg = max(0, $pkg_amount - $pkg_concession);
             
-            $is_fully_paid = in_array($month, $fully_paid_months);
-            $is_partial = ($month === $partial_month);
-            
-            $has_existing_payment = isset($existing_payments[$month]);
-            $existing_pay_row = $has_existing_payment ? $existing_payments[$month] : null;
-            
-            $fee_rec = $existing_fee_records[$month] ?? null;
-            $exists_fee = ($fee_rec !== null);
-            
-            if ($is_fully_paid) {
-                // Fully Paid Status
-                if ($has_existing_payment) {
-                    // PRESERVE original payment date and record for already paid months
-                    $orig_pay_date = $existing_pay_row['payment_date'];
-                    
-                    if ($exists_fee) {
-                        $conn->query("UPDATE fee_records SET status = 'paid', amount = 0, payment_date = '$orig_pay_date' WHERE student_id = $student_id AND month = '$month'");
-                    } else {
-                        $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', 0, 'paid', '$orig_pay_date')");
-                    }
+            $calculated_paid_amount = max(0, $net_pkg - $new_package_pending);
+
+            $chk = $conn->query("SELECT id FROM fee_records WHERE student_id = $student_id AND (month LIKE '%Package%' OR month = 'Yearly Package')");
+            if ($chk && $chk->num_rows > 0) {
+                $rec_id = $chk->fetch_assoc()['id'];
+                if ($new_package_pending <= 0) {
+                    $conn->query("UPDATE fee_records SET amount = 0, status = 'paid', payment_date = '$previous_month_date' WHERE id = $rec_id");
                 } else {
-                    // NEW Payment (was NOT paid before) - Uses previous month date ($payment_date)
-                    $new_pay_date = ($exists_fee && !empty($fee_rec['payment_date'])) ? $fee_rec['payment_date'] : $payment_date;
-                    
-                    if ($exists_fee) {
-                        $conn->query("UPDATE fee_records SET status = 'paid', amount = 0, payment_date = '$new_pay_date' WHERE student_id = $student_id AND month = '$month'");
-                    } else {
-                        $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', 0, 'paid', '$new_pay_date')");
-                    }
-                    
-                    if ($current_month_fee > 0) {
-                        $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
-                        $stmt_pay = $conn->prepare($query_pay);
-                        $stmt_pay->bind_param('idsss', $student_id, $current_month_fee, $month, $new_pay_date, $received_by);
-                        $stmt_pay->execute();
-                        $stmt_pay->close();
-                    }
-                }
-            } elseif ($is_partial) {
-                // Partially Paid: status = 'unpaid', remaining amount = $pending_amount
-                $paid_amount = $current_month_fee - $pending_amount;
-                
-                if ($has_existing_payment) {
-                    $orig_pay_date = $existing_pay_row['payment_date'];
-                    
-                    if ($exists_fee) {
-                        $conn->query("UPDATE fee_records SET status = 'unpaid', amount = $pending_amount, payment_date = '$orig_pay_date' WHERE student_id = $student_id AND month = '$month'");
-                    } else {
-                        $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', $pending_amount, 'unpaid', '$orig_pay_date')");
-                    }
-                    
-                    if ($paid_amount > 0) {
-                        $conn->query("UPDATE payments SET amount = $paid_amount WHERE id = {$existing_pay_row['id']}");
-                    } else {
-                        $conn->query("DELETE FROM payments WHERE id = {$existing_pay_row['id']}");
-                    }
-                } else {
-                    $new_pay_date = ($exists_fee && !empty($fee_rec['payment_date'])) ? $fee_rec['payment_date'] : $payment_date;
-                    
-                    if ($exists_fee) {
-                        $conn->query("UPDATE fee_records SET status = 'unpaid', amount = $pending_amount, payment_date = '$new_pay_date' WHERE student_id = $student_id AND month = '$month'");
-                    } else {
-                        $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', $pending_amount, 'unpaid', '$new_pay_date')");
-                    }
-                    
-                    if ($paid_amount > 0) {
-                        $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
-                        $stmt_pay = $conn->prepare($query_pay);
-                        $stmt_pay->bind_param('idsss', $student_id, $paid_amount, $month, $new_pay_date, $received_by);
-                        $stmt_pay->execute();
-                        $stmt_pay->close();
-                    }
+                    $conn->query("UPDATE fee_records SET amount = $new_package_pending, status = 'unpaid' WHERE id = $rec_id");
                 }
             } else {
-                // Unpaid Status
-                if ($exists_fee) {
-                    $conn->query("UPDATE fee_records SET status = 'unpaid', amount = $current_month_fee, payment_date = NULL WHERE student_id = $student_id AND month = '$month'");
+                $status = ($new_package_pending <= 0) ? 'paid' : 'unpaid';
+                $stmt = $conn->prepare("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES (?, 'Yearly Package', ?, ?, ?)");
+                $stmt->bind_param('idss', $student_id, $new_package_pending, $status, $previous_month_date);
+                $stmt->execute();
+                $stmt->close();
+            }
+
+            // Sync with payments table using previous month timestamp
+            $conn->query("DELETE FROM payments WHERE student_id = $student_id AND (paid_for_month = 'Yearly Package' OR paid_for_month LIKE '%Package%')");
+            if ($calculated_paid_amount > 0) {
+                $stmt_pay = $conn->prepare("INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, 'Yearly Package', ?, ?, 'cash')");
+                $stmt_pay->bind_param('idss', $student_id, $calculated_paid_amount, $previous_month_date, $received_by);
+                $stmt_pay->execute();
+                $stmt_pay->close();
+            }
+
+            $conn->commit();
+            $success = "Package student pending fee & historical payment record corrected successfully!";
+            $pkg_pending_fee = $new_package_pending;
+
+            $pay_res = $conn->query("SELECT SUM(amount) as total_paid FROM payments WHERE student_id = $student_id");
+            $pkg_total_paid = ($pay_res && $pay_row = $pay_res->fetch_assoc()) ? floatval($pay_row['total_paid'] ?? 0) : 0;
+        } catch (Exception $e) {
+            $conn->rollback();
+            $error = "Error correcting package fee: " . $e->getMessage();
+        }
+    } else {
+        $pending_amount = floatval($_POST['pending_amount'] ?? 0);
+        $paid_months = $_POST['paid_months'] ?? [];
+        
+        $fixed_monthly_fee = floatval($student['fixed_monthly_fee']);
+        $concession_amount = floatval($student['concession_amount']);
+        $net_fee = $fixed_monthly_fee - $concession_amount;
+        if ($net_fee < 0) $net_fee = 0;
+        
+        $conn->begin_transaction();
+        try {
+            $stmt_update_student = $conn->prepare("UPDATE students SET monthly_fee = ?, admission_fee = ? WHERE id = ?");
+            $stmt_update_student->bind_param('ddi', $net_fee, $pending_amount, $student_id);
+            $stmt_update_student->execute();
+            $stmt_update_student->close();
+            
+            $partial_month = null;
+            $fully_paid_months = $paid_months;
+            
+            if ($pending_amount > 0) {
+                if (!empty($paid_months)) {
+                    $partial_month = $paid_months[count($paid_months) - 1];
+                    $fully_paid_months = array_diff($paid_months, [$partial_month]);
                 } else {
-                    $conn->query("INSERT INTO fee_records (student_id, month, amount, status) VALUES ($student_id, '$month', $current_month_fee, 'unpaid')");
+                    $partial_month = 'Prev-Year';
+                    $fully_paid_months = [];
                 }
+            }
+            
+            $conn->query("DELETE FROM fee_records WHERE student_id = $student_id AND month = 'Admission'");
+            $conn->query("DELETE FROM payments WHERE student_id = $student_id AND paid_for_month = 'Admission'");
+            
+            $existing_payments = [];
+            $ep_res = $conn->query("SELECT * FROM payments WHERE student_id = $student_id");
+            if ($ep_res) {
+                while ($ep_row = $ep_res->fetch_assoc()) {
+                    $existing_payments[$ep_row['paid_for_month']] = $ep_row;
+                }
+            }
+            
+            $existing_fee_records = [];
+            $ef_res = $conn->query("SELECT * FROM fee_records WHERE student_id = $student_id");
+            if ($ef_res) {
+                while ($ef_row = $ef_res->fetch_assoc()) {
+                    $existing_fee_records[$ef_row['month']] = $ef_row;
+                }
+            }
+            
+            foreach ($months_2026 as $month) {
+                $current_month_fee = ($month === 'Prev-Year') ? $pending_amount : $net_fee;
                 
-                // Delete payment record if unpaid
-                $conn->query("DELETE FROM payments WHERE student_id = $student_id AND paid_for_month = '$month'");
-            }
-        }
-        
-        $conn->commit();
-        $success = "Student payment logs corrected successfully!";
-        
-        // Refresh local student info
-        $student = get_student($student_id);
-        $paid_months_in_db = [];
-        $fee_records_db = [];
-        $pending_amount_val = floatval($student['admission_fee']);
-        
-        $months_with_payments = [];
-        $pay_res = $conn->query("SELECT DISTINCT paid_for_month FROM payments WHERE student_id = $student_id AND amount > 0");
-        if ($pay_res) {
-            while ($p_row = $pay_res->fetch_assoc()) {
-                $months_with_payments[] = $p_row['paid_for_month'];
-            }
-        }
-        
-        $res = $conn->query("SELECT month, status, amount FROM fee_records WHERE student_id = $student_id");
-        if ($res) {
-            while ($row = $res->fetch_assoc()) {
-                if ($row['month'] === 'Admission') {
-                    $pending_amount_val = floatval($row['amount']);
+                $is_fully_paid = in_array($month, $fully_paid_months);
+                $is_partial = ($month === $partial_month);
+                
+                $has_existing_payment = isset($existing_payments[$month]);
+                $existing_pay_row = $has_existing_payment ? $existing_payments[$month] : null;
+                
+                $fee_rec = $existing_fee_records[$month] ?? null;
+                $exists_fee = ($fee_rec !== null);
+                
+                if ($is_fully_paid) {
+                    if ($has_existing_payment) {
+                        $orig_pay_date = $existing_pay_row['payment_date'];
+                        if ($exists_fee) {
+                            $conn->query("UPDATE fee_records SET status = 'paid', amount = 0, payment_date = '$orig_pay_date' WHERE student_id = $student_id AND month = '$month'");
+                        } else {
+                            $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', 0, 'paid', '$orig_pay_date')");
+                        }
+                    } else {
+                        $new_pay_date = ($exists_fee && !empty($fee_rec['payment_date'])) ? $fee_rec['payment_date'] : $previous_month_date;
+                        if ($exists_fee) {
+                            $conn->query("UPDATE fee_records SET status = 'paid', amount = 0, payment_date = '$new_pay_date' WHERE student_id = $student_id AND month = '$month'");
+                        } else {
+                            $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', 0, 'paid', '$new_pay_date')");
+                        }
+                        
+                        if ($current_month_fee > 0) {
+                            $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
+                            $stmt_pay = $conn->prepare($query_pay);
+                            $stmt_pay->bind_param('idsss', $student_id, $current_month_fee, $month, $new_pay_date, $received_by);
+                            $stmt_pay->execute();
+                            $stmt_pay->close();
+                        }
+                    }
+                } elseif ($is_partial) {
+                    $paid_amount = $current_month_fee - $pending_amount;
+                    if ($has_existing_payment) {
+                        $orig_pay_date = $existing_pay_row['payment_date'];
+                        if ($exists_fee) {
+                            $conn->query("UPDATE fee_records SET status = 'unpaid', amount = $pending_amount, payment_date = '$orig_pay_date' WHERE student_id = $student_id AND month = '$month'");
+                        } else {
+                            $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', $pending_amount, 'unpaid', '$orig_pay_date')");
+                        }
+                        
+                        if ($paid_amount > 0) {
+                            $conn->query("UPDATE payments SET amount = $paid_amount WHERE id = {$existing_pay_row['id']}");
+                        } else {
+                            $conn->query("DELETE FROM payments WHERE id = {$existing_pay_row['id']}");
+                        }
+                    } else {
+                        $new_pay_date = ($exists_fee && !empty($fee_rec['payment_date'])) ? $fee_rec['payment_date'] : $previous_month_date;
+                        if ($exists_fee) {
+                            $conn->query("UPDATE fee_records SET status = 'unpaid', amount = $pending_amount, payment_date = '$new_pay_date' WHERE student_id = $student_id AND month = '$month'");
+                        } else {
+                            $conn->query("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES ($student_id, '$month', $pending_amount, 'unpaid', '$new_pay_date')");
+                        }
+                        
+                        if ($paid_amount > 0) {
+                            $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
+                            $stmt_pay = $conn->prepare($query_pay);
+                            $stmt_pay->bind_param('idsss', $student_id, $paid_amount, $month, $new_pay_date, $received_by);
+                            $stmt_pay->execute();
+                            $stmt_pay->close();
+                        }
+                    }
                 } else {
-                    $fee_records_db[$row['month']] = [
-                        'status' => $row['status'],
-                        'amount' => floatval($row['amount'])
-                    ];
-                    if ($row['status'] === 'paid') {
-                        $paid_months_in_db[] = $row['month'];
+                    if ($exists_fee) {
+                        $conn->query("UPDATE fee_records SET status = 'unpaid', amount = $current_month_fee, payment_date = NULL WHERE student_id = $student_id AND month = '$month'");
+                    } else {
+                        $conn->query("INSERT INTO fee_records (student_id, month, amount, status) VALUES ($student_id, '$month', $current_month_fee, 'unpaid')");
+                    }
+                    $conn->query("DELETE FROM payments WHERE student_id = $student_id AND paid_for_month = '$month'");
+                }
+            }
+            
+            $conn->commit();
+            $success = "Student payment logs corrected successfully!";
+            
+            $student = get_student($student_id);
+            $paid_months_in_db = [];
+            $fee_records_db = [];
+            $pending_amount_val = floatval($student['admission_fee']);
+            
+            $months_with_payments = [];
+            $pay_res = $conn->query("SELECT DISTINCT paid_for_month FROM payments WHERE student_id = $student_id AND amount > 0");
+            if ($pay_res) {
+                while ($p_row = $pay_res->fetch_assoc()) {
+                    $months_with_payments[] = $p_row['paid_for_month'];
+                }
+            }
+            
+            $res = $conn->query("SELECT month, status, amount FROM fee_records WHERE student_id = $student_id");
+            if ($res) {
+                while ($row = $res->fetch_assoc()) {
+                    if ($row['month'] === 'Admission') {
+                        $pending_amount_val = floatval($row['amount']);
+                    } else {
+                        $fee_records_db[$row['month']] = [
+                            'status' => $row['status'],
+                            'amount' => floatval($row['amount'])
+                        ];
+                        if ($row['status'] === 'paid') {
+                            $paid_months_in_db[] = $row['month'];
+                        }
                     }
                 }
             }
+        } catch (Exception $e) {
+            $conn->rollback();
+            $error = "Error correcting logs: " . $e->getMessage();
         }
-    } catch (Exception $e) {
-        $conn->rollback();
-        $error = "Error correcting logs: " . $e->getMessage();
     }
 }
 
@@ -265,7 +324,7 @@ $search_section = sanitize_input($_GET['search_section'] ?? '');
 $students_list = [];
 
 if ($student_id == 0) {
-    $q = "SELECT id, name, father_name, class, section, monthly_fee FROM students WHERE 1=1";
+    $q = "SELECT * FROM students WHERE 1=1";
     $params = [];
     $param_types = '';
     
@@ -440,18 +499,32 @@ if ($student_id == 0) {
                                             <th>Student Name</th>
                                             <th>Father Name</th>
                                             <th>Class - Section</th>
-                                            <th>Net Monthly Fee</th>
+                                            <th>Net Monthly Fee / Package</th>
                                             <th>Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <?php foreach ($students_list as $st): ?>
+                                            <?php 
+                                            $is_st_pkg = (!empty($st['is_package']) || floatval($st['package_amount'] ?? 0) > 0 || is_college_class($st['class']));
+                                            ?>
                                             <tr>
                                                 <td><strong><?php echo str_pad($st['id'], 5, '0', STR_PAD_LEFT); ?></strong></td>
                                                 <td><?php echo htmlspecialchars($st['name']); ?></td>
                                                 <td><?php echo htmlspecialchars($st['father_name']); ?></td>
                                                 <td><span class="badge bg-secondary"><?php echo htmlspecialchars($st['class'] . ' - ' . $st['section']); ?></span></td>
-                                                <td><?php echo format_currency($st['monthly_fee']); ?></td>
+                                                <td>
+                                                    <?php 
+                                                    if ($is_st_pkg) {
+                                                        $raw_pkg = floatval($st['package_amount'] > 0 ? $st['package_amount'] : $st['fixed_monthly_fee']);
+                                                        $net_pkg = max(0, $raw_pkg - floatval($st['concession_amount'] ?? 0));
+                                                        echo '<strong class="text-primary">' . format_currency($net_pkg) . '</strong> <span class="badge bg-primary text-white ms-1">Yearly Pkg</span>';
+                                                    } else {
+                                                        $net_fee = floatval($st['monthly_fee'] > 0 ? $st['monthly_fee'] : (floatval($st['fixed_monthly_fee']) - floatval($st['concession_amount'] ?? 0)));
+                                                        echo '<strong class="text-success">' . format_currency($net_fee) . '</strong>';
+                                                    }
+                                                    ?>
+                                                </td>
                                                 <td>
                                                     <a href="data_correction.php?id=<?php echo $st['id']; ?>" class="btn btn-sm btn-success text-white px-3">
                                                         <i class="fas fa-check-double"></i> Select Student
@@ -473,6 +546,7 @@ if ($student_id == 0) {
                         </div>
 
                         <?php
+                        $is_college_student = (is_college_class($student['class']) || !empty($student['is_package']));
                         $net_monthly_fee_display = floatval($student['monthly_fee']);
                         if ($net_monthly_fee_display <= 0) {
                             $net_monthly_fee_display = floatval($student['fixed_monthly_fee']) - floatval($student['concession_amount']);
@@ -493,57 +567,83 @@ if ($student_id == 0) {
                                 <p class="m-0 text-dark fs-5"><?php echo htmlspecialchars($student['class'] . ' (' . $student['section'] . ')'); ?></p>
                             </div>
                             <div class="col-md-3">
-                                <strong>Net Monthly Fee:</strong>
-                                <p class="m-0 text-success fs-5 fw-bold"><?php echo format_currency($net_monthly_fee_display); ?></p>
+                                <?php if ($is_college_student): ?>
+                                    <strong>Net Package Fee:</strong>
+                                    <p class="m-0 text-primary fs-5 fw-bold"><?php echo format_currency($net_pkg); ?> <span class="badge bg-primary text-white ms-1 fs-6">Yearly Pkg</span></p>
+                                <?php else: ?>
+                                    <strong>Net Monthly Fee:</strong>
+                                    <p class="m-0 text-success fs-5 fw-bold"><?php echo format_currency($net_monthly_fee_display); ?></p>
+                                <?php endif; ?>
                             </div>
                         </div>
 
                         <form method="POST">
                             <input type="hidden" name="action" value="correct">
                             
-                            <div class="row mb-4 mt-3">
-                                <div class="col-md-6">
-                                    <label class="form-label fw-bold text-success" for="pending_amount">
-                                        <i class="fas fa-money-bill-wave me-1"></i> Previous Pending Fee (if any)
-                                    </label>
-                                    <input type="number" id="pending_amount" name="pending_amount" class="form-control" value="<?php echo htmlspecialchars($pending_amount_val); ?>" step="0.01" min="0">
-                                    <div class="form-text text-muted">This amount will show as Previous Year Fee in fee records.</div>
-                                </div>
-                            </div>
-                            
-                            <!-- Fee Paid Months Block -->
-                            <div class="card p-4 mb-4 border-0 shadow-sm" style="background: rgba(31, 95, 70, 0.05); border-radius: 12px;">
-                                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                                    <h5 class="text-success mb-0" style="font-weight: 600;">
-                                        <i class="fas fa-calendar-check me-2"></i> Fee Paid Status (Previous Year & Monthly Schedule)
-                                    </h5>
-                                    <div class="btn-group btn-group-sm">
-                                        <button type="button" class="btn btn-outline-success" id="selectAll">Select All</button>
-                                        <button type="button" class="btn btn-outline-secondary" id="deselectAll">Deselect All</button>
+                            <?php if ($is_college_student): ?>
+                                <!-- College Package Students Pending Fee UI -->
+                                <div class="row mb-4 mt-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold text-success fs-5" for="package_pending_fee">
+                                            <i class="fas fa-money-bill-wave me-1"></i> Pending Fee (Rs.)
+                                        </label>
+                                        <input type="number" id="package_pending_fee" name="package_pending_fee" class="form-control form-control-lg" value="<?php echo htmlspecialchars($pkg_pending_fee); ?>" step="0.01" min="0" required>
+                                        <div class="form-text text-muted">Current remaining pending fee of this student (0 if fully paid).</div>
+                                    </div>
+                                    <div class="col-md-6 d-flex align-items-center">
+                                        <div class="p-3 bg-light rounded w-100 border">
+                                            <p class="mb-1"><strong>Total Package Fee:</strong> <?php echo format_currency($pkg_amount); ?></p>
+                                            <p class="mb-1"><strong>Concession Amount:</strong> <?php echo format_currency($pkg_concession); ?> (Net: <?php echo format_currency($net_pkg); ?>)</p>
+                                            
+                                        </div>
                                     </div>
                                 </div>
-                                <p class="text-muted small mb-3">Check the options/months for which the student has already paid. Unchecked items will remain pending (unpaid).</p>
-                                <div class="row g-3">
-                                    <?php foreach ($months_2026 as $m): ?>
-                                        <?php 
-                                        $is_paid_db = in_array($m, $paid_months_in_db);
-                                        $has_payment = in_array($m, $months_with_payments);
-                                        $is_partial_unpaid_month = (isset($fee_records_db[$m]) && $fee_records_db[$m]['status'] === 'unpaid' && $fee_records_db[$m]['amount'] === $pending_amount_val && $pending_amount_val > 0);
-                                        $is_paid = ($is_paid_db || $has_payment || $is_partial_unpaid_month);
-                                        
-                                        $label = $months_list_labels[$m] ?? $m;
-                                        ?>
-                                        <div class="col-6 col-md-3">
-                                            <div class="form-check p-2 border rounded bg-white shadow-xs" style="transition: all 0.2s;">
-                                                <input class="form-check-input ms-1 me-2 month-check" type="checkbox" name="paid_months[]" value="<?php echo $m; ?>" id="check_<?php echo $m; ?>" <?php echo $is_paid ? 'checked' : ''; ?>>
-                                                <label class="form-check-label text-dark small cursor-pointer" for="check_<?php echo $m; ?>">
-                                                    <?php echo $label; ?>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
+                            <?php else: ?>
+                                <!-- Standard School Classes 12-Month Grid UI -->
+                                <div class="row mb-4 mt-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold text-success" for="pending_amount">
+                                            <i class="fas fa-money-bill-wave me-1"></i> Previous Pending Fee (if any)
+                                        </label>
+                                        <input type="number" id="pending_amount" name="pending_amount" class="form-control" value="<?php echo htmlspecialchars($pending_amount_val); ?>" step="0.01" min="0">
+                                        <div class="form-text text-muted">This amount will show as Previous Year Fee in fee records.</div>
+                                    </div>
                                 </div>
-                            </div>
+                                
+                                <!-- Fee Paid Months Block -->
+                                <div class="card p-4 mb-4 border-0 shadow-sm" style="background: rgba(31, 95, 70, 0.05); border-radius: 12px;">
+                                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                        <h5 class="text-success mb-0" style="font-weight: 600;">
+                                            <i class="fas fa-calendar-check me-2"></i> Fee Paid Status (Previous Year & Monthly Schedule)
+                                        </h5>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-success" id="selectAll">Select All</button>
+                                            <button type="button" class="btn btn-outline-secondary" id="deselectAll">Deselect All</button>
+                                        </div>
+                                    </div>
+                                    <p class="text-muted small mb-3">Check the options/months for which the student has already paid. Unchecked items will remain pending (unpaid).</p>
+                                    <div class="row g-3">
+                                        <?php foreach ($months_2026 as $m): ?>
+                                            <?php 
+                                            $is_paid_db = in_array($m, $paid_months_in_db);
+                                            $has_payment = in_array($m, $months_with_payments);
+                                            $is_partial_unpaid_month = (isset($fee_records_db[$m]) && $fee_records_db[$m]['status'] === 'unpaid' && $fee_records_db[$m]['amount'] === $pending_amount_val && $pending_amount_val > 0);
+                                            $is_paid = ($is_paid_db || $has_payment || $is_partial_unpaid_month);
+                                            
+                                            $label = $months_list_labels[$m] ?? $m;
+                                            ?>
+                                            <div class="col-6 col-md-3">
+                                                <div class="form-check p-2 border rounded bg-white shadow-xs" style="transition: all 0.2s;">
+                                                    <input class="form-check-input ms-1 me-2 month-check" type="checkbox" name="paid_months[]" value="<?php echo $m; ?>" id="check_<?php echo $m; ?>" <?php echo $is_paid ? 'checked' : ''; ?>>
+                                                    <label class="form-check-label text-dark small cursor-pointer" for="check_<?php echo $m; ?>">
+                                                        <?php echo $label; ?>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
 
                             <div class="form-actions mt-5 text-end">
                                 <button type="submit" class="btn btn-success btn-lg px-5 text-white"><i class="fas fa-save"></i> Save & Apply Corrections</button>

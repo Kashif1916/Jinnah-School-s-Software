@@ -88,6 +88,16 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
         $conn->query("ALTER TABLE `students` ADD COLUMN `created_by` VARCHAR(50) DEFAULT NULL");
     }
 
+    // Dynamically ensure package_amount and is_package columns exist in students table
+    $colCheckPkg = $conn->query("SHOW COLUMNS FROM `students` LIKE 'package_amount'");
+    if ($colCheckPkg && $colCheckPkg->num_rows == 0) {
+        $conn->query("ALTER TABLE `students` ADD COLUMN `package_amount` DECIMAL(10, 2) DEFAULT 0.00 AFTER fixed_monthly_fee");
+    }
+    $colCheckIsPkg = $conn->query("SHOW COLUMNS FROM `students` LIKE 'is_package'");
+    if ($colCheckIsPkg && $colCheckIsPkg->num_rows == 0) {
+        $conn->query("ALTER TABLE `students` ADD COLUMN `is_package` TINYINT(1) DEFAULT 0 AFTER package_amount");
+    }
+
     // Dynamically ensure settings table exists
     $tableCheckSettings = $conn->query("SHOW TABLES LIKE 'settings'");
     if ($tableCheckSettings && $tableCheckSettings->num_rows == 0) {

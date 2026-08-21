@@ -144,6 +144,7 @@ if ($res) {
                 <?php endif; ?>
 
                 <?php if (!empty($error)): ?>
+
                     <div class="alert alert-danger alert-dismissible fade show" role="alert">
                         <i class="fas fa-exclamation-circle"></i> <?php echo $error; ?>
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -169,7 +170,7 @@ if ($res) {
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label for="fixed_monthly_fee" class="form-label">Fixed Monthly Fee (Rs.) <span class="text-danger">*</span></label>
+                                    <label for="fixed_monthly_fee" class="form-label" id="feeLabel">Fixed Monthly Fee (Rs.) <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <span class="input-group-text">Rs.</span>
                                         <input type="number" step="0.01" min="0.01" class="form-control" id="fixed_monthly_fee" name="fixed_monthly_fee" required placeholder="0.00">
@@ -192,21 +193,33 @@ if ($res) {
                                     <thead>
                                         <tr>
                                             <th>Class</th>
-                                            <th>Fixed Monthly Fee</th>
+                                            <th>Default Fee</th>
+                                            <th>Type</th>
                                             <th>Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <?php foreach ($CLASSES as $cls): 
                                             $fee = isset($schedules[$cls]) ? $schedules[$cls] : null;
+                                            $is_pkg = is_college_class($cls);
                                         ?>
                                             <tr>
                                                 <td><strong><?php echo $cls; ?></strong></td>
                                                 <td>
                                                     <?php if ($fee !== null): ?>
                                                         <strong class="text-success"><?php echo format_currency($fee); ?></strong>
+                                                        <?php if ($is_pkg): ?>
+                                                            <small class="text-muted d-block">(Yearly Package)</small>
+                                                        <?php endif; ?>
                                                     <?php else: ?>
                                                         <span class="text-muted italic">Not Configured</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td>
+                                                    <?php if ($is_pkg): ?>
+                                                        <span class="badge bg-primary"><i class="fas fa-box"></i> Yearly Package</span>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-secondary">Monthly Fee</span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
@@ -235,11 +248,25 @@ if ($res) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/script.js"></script>
     <script>
+        const collegeClasses = ['11', '12', 'passed-12', '11th', '12th'];
         function editFee(className, feeAmount) {
             document.getElementById('class').value = className;
             document.getElementById('fixed_monthly_fee').value = feeAmount > 0 ? feeAmount : '';
+            updateFeeLabel();
             document.getElementById('fixed_monthly_fee').focus();
         }
+
+        function updateFeeLabel() {
+            const cls = document.getElementById('class').value;
+            const label = document.getElementById('feeLabel');
+            if (cls && collegeClasses.includes(cls.toString().trim().toLowerCase())) {
+                label.innerHTML = 'Package Fee (Yearly Rs.) <span class="text-danger">*</span>';
+            } else {
+                label.innerHTML = 'Fixed Monthly Fee (Rs.) <span class="text-danger">*</span>';
+            }
+        }
+
+        document.getElementById('class').addEventListener('change', updateFeeLabel);
     </script>
 </body>
 </html>

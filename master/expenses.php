@@ -318,7 +318,7 @@ $stmt->close();
                                     <button type="submit" class="btn btn-sm btn-primary flex-grow-1" style="padding: 7px 10px;">
                                         <i class="fas fa-search"></i> Search
                                     </button>
-                                    <a href="../master/expenses_report.php?start_date=<?php echo urlencode($start_date); ?>&end_date=<?php echo urlencode($end_date); ?>&user_id=<?php echo $selected_user_id; ?>" target="_blank" class="btn btn-sm btn-success" style="padding: 7px 10px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
+                                    <a href="expenses_report.php?start_date=<?php echo urlencode($start_date); ?>&end_date=<?php echo urlencode($end_date); ?>&user_id=<?php echo $selected_user_id; ?>" target="_blank" class="btn btn-sm btn-success" style="padding: 7px 10px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none;">
                                         <i class="fas fa-print"></i> Print
                                     </a>
                                     <?php if (!empty($start_date) || !empty($end_date) || $selected_user_id > 0): ?>

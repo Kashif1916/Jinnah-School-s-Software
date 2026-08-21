@@ -4,8 +4,6 @@
  * School Finance Management System
  */
 
-// Double check permission check is already done by the wrapper files,
-// but let's make sure $panel_role is defined.
 if (!isset($panel_role)) {
     die("Access denied: panel role not specified.");
 }
@@ -16,7 +14,6 @@ $student_fees = [];
 $student = null;
 $search_results = [];
 
-// Initialize Session Cart for Batch Payments if not exists
 if (!isset($_SESSION['fee_cart'])) {
     $_SESSION['fee_cart'] = [];
 }
@@ -28,7 +25,6 @@ $self_url = basename($_SERVER['PHP_SELF']);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action']) && $_POST['action'] == 'add_to_cart') {
-        // Add selected months to the temporary batch list
         $selected_records = $_POST['selected_fee_records'] ?? [];
         $amounts = $_POST['paid_amount'] ?? [];
         if (isset($_POST['fine_amount'])) {
@@ -39,13 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $rec_id = intval($rec_id);
             $paid_amt = floatval($amounts[$rec_id] ?? 0);
             
-            // Check if this record is already in the batch to avoid duplicates
             $exists = false;
             foreach ($_SESSION['fee_cart'] as $item) {
                 if ($item['record_id'] == $rec_id) { $exists = true; break; }
             }
 
-            // FIX: Changed from > 0 to >= 0 to allow zero amount entries[cite: 2]
             if (!$exists && $paid_amt >= 0) {
                 $query = "SELECT fr.*, s.name, s.class, s.section FROM fee_records fr 
                           JOIN students s ON fr.student_id = s.id WHERE fr.id = ?";
@@ -90,7 +84,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $_SESSION['fine_amount'] = 0;
         $success = "Batch list cleared.";
     } elseif (isset($_POST['action']) && $_POST['action'] == 'search') {
-        // Search students with multiple filters
         $search_name = sanitize_input($_POST['search_name'] ?? '');
         $search_class = sanitize_input($_POST['search_class'] ?? '');
         $search_section = sanitize_input($_POST['search_section'] ?? '');
@@ -127,7 +120,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->close();
         }
     } elseif (isset($_POST['action']) && $_POST['action'] == 'process_batch') {
-        // Process all payments in the cart and generate one receipt
         $generated_payment_ids = [];
         $payment_mode = sanitize_input($_POST['payment_mode'] ?? 'cash');
         $fine_amount = floatval($_POST['fine_amount'] ?? $_SESSION['fine_amount'] ?? 0);
@@ -154,7 +146,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             }
 
-            // Record fine payment if fine_amount > 0
             if ($fine_amount > 0 && !empty($_SESSION['fee_cart'])) {
                 $fine_student_id = $_SESSION['fee_cart'][0]['student_id'];
                 $fine_p_id = record_payment($fine_student_id, $fine_amount, 'Fine', get_username(), $payment_mode, $batch_receipt_number);
@@ -166,10 +157,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
 
             if (!empty($generated_payment_ids)) {
-                $_SESSION['fee_cart'] = []; // Clear cart after success
-                $_SESSION['fine_amount'] = 0; // Clear fine after success
+                $_SESSION['fee_cart'] = [];
+                $_SESSION['fine_amount'] = 0;
                 $_SESSION['print_receipt_url'] = $receipt_base_url . '?payment_ids=' . implode(',', $generated_payment_ids);
-                header('Location: ' . $self_url); // Redirect to clear the search/student screen
+                header('Location: ' . $self_url);
                 exit();
             }
         } else {
@@ -178,20 +169,37 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// If student ID is in URL, load that student's fees
 if (isset($_GET['id'])) {
     $student_id = intval($_GET['id']);
     $student = get_student($student_id);
     
     if ($student) {
-        $query = "SELECT * FROM fee_records WHERE student_id = ? ORDER BY CASE WHEN month = 'Admission' THEN 1 ELSE 2 END, STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y')";
+        $is_college = (is_college_class($student['class']) || !empty($student['is_package']));
+
+        if ($is_college) {
+            $query = "SELECT * FROM fee_records WHERE student_id = ? 
+                      ORDER BY CASE 
+                          WHEN month = 'Admission' THEN 1 
+                          WHEN month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 
+                          WHEN month LIKE '%Yearly Package%' OR month LIKE '%yearly_package%' OR month LIKE '%yearly-package%' THEN 3 
+                          WHEN month LIKE '%Package%' OR month LIKE '%yearly%' THEN 4 
+                          ELSE 5 
+                      END, id ASC";
+        } else {
+            $query = "SELECT * FROM fee_records WHERE student_id = ? 
+                      ORDER BY CASE 
+                          WHEN month = 'Admission' THEN 1 
+                          WHEN month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 
+                          ELSE 3 
+                      END, STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y'), id ASC";
+        }
+
         $stmt = $conn->prepare($query);
         $stmt->bind_param('i', $student_id);
         $stmt->execute();
         $all_fees = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
 
-        // Filter: Show all unpaid, and only the latest 2 paid months to keep the page short
         $paid_fees = [];
         $unpaid_fees = [];
         foreach ($all_fees as $fee) {
@@ -202,16 +210,42 @@ if (isset($_GET['id'])) {
             }
         }
         
-        // Take only the last 2 paid records
         if (count($paid_fees) > 2) {
             $paid_fees = array_slice($paid_fees, -2);
         }
         
-        // Merge and sort chronologically
         $student_fees = array_merge($paid_fees, $unpaid_fees);
-        usort($student_fees, function($a, $b) {
+        
+        usort($student_fees, function($a, $b) use ($is_college) {
             if ($a['month'] === 'Admission') return -1;
             if ($b['month'] === 'Admission') return 1;
+
+            $pre_years = ['Pre_Year', 'Prev-Year', 'Pre-Year'];
+            if (in_array($a['month'], $pre_years) && !in_array($b['month'], $pre_years)) return -1;
+            if (!in_array($a['month'], $pre_years) && in_array($b['month'], $pre_years)) return 1;
+
+            if ($is_college) {
+                $a_month = strtolower(trim($a['month']));
+                $b_month = strtolower(trim($b['month']));
+
+                // Priority for Class 11 Yearly Package
+                $is_a_p1 = (strpos($a_month, 'yearly package') !== false || strpos($a_month, 'yearly_package') !== false || strpos($a_month, 'yearly-package') !== false);
+                $is_b_p1 = (strpos($b_month, 'yearly package') !== false || strpos($b_month, 'yearly_package') !== false || strpos($b_month, 'yearly-package') !== false);
+
+                if ($is_a_p1 && !$is_b_p1) return -1;
+                if ($is_b_p1 && !$is_a_p1) return 1;
+
+                // Priority for Class 12 Package (Package-12)
+                $a_pkg = (strpos($a_month, 'package') !== false || strpos($a_month, 'yearly') !== false);
+                $b_pkg = (strpos($b_month, 'package') !== false || strpos($b_month, 'yearly') !== false);
+
+                if ($a_pkg && !$b_pkg) return -1;
+                if ($b_pkg && !$a_pkg) return 1;
+                if ($a_pkg && $b_pkg) {
+                    return $a['id'] - $b['id'];
+                }
+            }
+
             $t1 = strtotime("01-" . $a['month']);
             $t2 = strtotime("01-" . $b['month']);
             return $t1 - $t2;
@@ -255,64 +289,63 @@ if (isset($_GET['id'])) {
                     <div class="module-nav-row">
                         <?php if ($panel_role == 'master'): ?>
                             <a href="dashboard.php" class="module-nav-btn">
-                            <i class="fas fa-chart-bar"></i> Dashboard
-                        </a>
-                        <a href="add_student.php" class="module-nav-btn">
-                            <i class="fas fa-user-plus"></i> Add Student
-                        </a>
-                        <a href="student_record.php" class="module-nav-btn">
-                            <i class="fas fa-address-book"></i> Student Record
-                        </a>
-                        <a href="student_add_details.php" class="module-nav-btn">
-                            <i class="fas fa-history"></i> Add Log
-                        </a>
-                        <a href="fee_schedule.php" class="module-nav-btn ">
-                            <i class="fas fa-calendar-alt"></i> Fee Schedule
-                        </a>
-                        <a href="fee_management.php" class="module-nav-btn active">
-                            <i class="fas fa-money-bill-wave"></i> Fee Management
-                        </a>
-                        <a href="defaulter_list.php" class="module-nav-btn">
-                            <i class="fas fa-list"></i> Pending List
-                        </a>
-                        <a href="paid_students.php" class="module-nav-btn">
-                            <i class="fas fa-check-circle text-success"></i> Paid Students
-                        </a>
-                        <a href="payment_analytics.php" class="module-nav-btn">
-                            <i class="fas fa-chart-line"></i> Analytics
-                        </a>
-                        <a href="receipt_analysis.php" class="module-nav-btn">
-                            <i class="fas fa-receipt"></i> Receipt Analysis
-                        </a>
-                        <a href="expenses.php" class="module-nav-btn">
-                            <i class="fas fa-wallet"></i> Expenses
-                        </a>
-                        <a href="data_correction.php" class="module-nav-btn">
-                            <i class="fas fa-edit"></i> Data Correction
-                        </a>
-                        <a href="promotion.php" class="module-nav-btn">
-                            <i class="fas fa-arrow-up"></i> Promotion
-                        </a>
-                        <a href="drop_student.php" class="module-nav-btn">
-                            <i class="fas fa-trash"></i> Drop Student
-                        </a>
-                        <a href="delete_student.php" class="module-nav-btn ">
-                            <i class="fas fa-user-minus text-success"></i> Delete Student
-                        </a>
-                        <a href="users.php" class="module-nav-btn">
-                            <i class="fas fa-users-cog"></i> Users
-                        </a>
-                        <a href="receipt_note.php" class="module-nav-btn">
-                            <i class="fas fa-sticky-note"></i> Receipt Note
-                        </a>
-                        
+                                <i class="fas fa-chart-bar"></i> Dashboard
+                            </a>
+                            <a href="add_student.php" class="module-nav-btn">
+                                <i class="fas fa-user-plus"></i> Add Student
+                            </a>
+                            <a href="student_record.php" class="module-nav-btn">
+                                <i class="fas fa-address-book"></i> Student Record
+                            </a>
+                            <a href="student_add_details.php" class="module-nav-btn">
+                                <i class="fas fa-history"></i> Add Log
+                            </a>
+                            <a href="fee_schedule.php" class="module-nav-btn">
+                                <i class="fas fa-calendar-alt"></i> Fee Schedule
+                            </a>
+                            <a href="fee_management.php" class="module-nav-btn active">
+                                <i class="fas fa-money-bill-wave"></i> Fee Management
+                            </a>
+                            <a href="defaulter_list.php" class="module-nav-btn">
+                                <i class="fas fa-list"></i> Pending List
+                            </a>
+                            <a href="paid_students.php" class="module-nav-btn">
+                                <i class="fas fa-check-circle text-success"></i> Paid Students
+                            </a>
+                            <a href="payment_analytics.php" class="module-nav-btn">
+                                <i class="fas fa-chart-line"></i> Analytics
+                            </a>
+                            <a href="receipt_analysis.php" class="module-nav-btn">
+                                <i class="fas fa-receipt"></i> Receipt Analysis
+                            </a>
+                            <a href="expenses.php" class="module-nav-btn">
+                                <i class="fas fa-wallet"></i> Expenses
+                            </a>
+                            <a href="data_correction.php" class="module-nav-btn">
+                                <i class="fas fa-edit"></i> Data Correction
+                            </a>
+                            <a href="promotion.php" class="module-nav-btn">
+                                <i class="fas fa-arrow-up"></i> Promotion
+                            </a>
+                            <a href="drop_student.php" class="module-nav-btn">
+                                <i class="fas fa-trash"></i> Drop Student
+                            </a>
+                            <a href="delete_student.php" class="module-nav-btn">
+                                <i class="fas fa-user-minus text-success"></i> Delete Student
+                            </a>
+                            <a href="users.php" class="module-nav-btn">
+                                <i class="fas fa-users-cog"></i> Users
+                            </a>
+                            <a href="receipt_note.php" class="module-nav-btn">
+                                <i class="fas fa-sticky-note"></i> Receipt Note
+                            </a>
                         <?php else: ?>
                             <a href="dashboard.php" class="module-nav-btn">
                                 <i class="fas fa-chart-bar"></i> Dashboard
                             </a>
-                            <a href="add_student.php" class="module-nav-btn ">
-                            <i class="fas fa-list"></i> Add Student
-                        </a>
+                            <a href="add_student.php" class="module-nav-btn">
+                                <i class="fas fa-list"></i> Add Student
+                            </a>
                             <a href="student_record.php" class="module-nav-btn">
                                 <i class="fas fa-address-book"></i> Student Record
                             </a>
@@ -323,8 +356,8 @@ if (isset($_GET['id'])) {
                                 <i class="fas fa-list"></i> Pending List
                             </a>
                             <a href="paid_students.php" class="module-nav-btn">
-                            <i class="fas fa-check-circle text-success"></i> Paid Students
-                        </a>
+                                <i class="fas fa-check-circle text-success"></i> Paid Students
+                            </a>
                             <a href="payment_analytics.php" class="module-nav-btn">
                                 <i class="fas fa-chart-line"></i> Analytics
                             </a>
@@ -334,8 +367,8 @@ if (isset($_GET['id'])) {
                             <a href="expenses.php" class="module-nav-btn">
                                 <i class="fas fa-wallet"></i> Expenses
                             </a>
-                             <a href="drop_student.php" class="module-nav-btn ">
-                            <i class="fas fa-trash text-success"></i> Drop Student
+                            <a href="drop_student.php" class="module-nav-btn">
+                                <i class="fas fa-trash text-success"></i> Drop Student
                             </a>
                             <a href="account_close.php" class="module-nav-btn">
                                 <i class="fas fa-lock"></i> Close Account
@@ -538,9 +571,19 @@ if (isset($_GET['id'])) {
                                     <p>Father: <?php echo $student['father_name']; ?> | Contact: <?php echo $student['contact_number']; ?></p>
                                 </div>
                                 <div class="fee-summary">
-                                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#statementModal">
-                                        <i class="fas fa-print"></i> Print Statement
-                                    </button>
+                                    <?php 
+                                    $statement_target_url = ($panel_role === 'master') ? 'student_statement.php' : '../master/student_statement.php';
+                                    $is_student_package = (is_college_class($student['class']) || !empty($student['is_package']));
+                                    if ($is_student_package): 
+                                    ?>
+                                        <a href="<?php echo $statement_target_url; ?>?id=<?php echo $student['id']; ?>" target="_blank" class="btn btn-outline-primary">
+                                            <i class="fas fa-print"></i> Print Statement
+                                        </a>
+                                    <?php else: ?>
+                                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#statementModal">
+                                            <i class="fas fa-print"></i> Print Statement
+                                        </button>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <form method="POST" id="multiPaymentForm" action="<?php echo $self_url; ?>?id=<?php echo $student['id']; ?>">
@@ -581,7 +624,6 @@ if (isset($_GET['id'])) {
                                                         
                                                         <div class="input-group input-group-sm" style="width: 140px;">
                                                             <span class="input-group-text">Rs.</span>
-                                                            <!-- FIX: Changed min="0.01" to min="0" to allow zero value input[cite: 2] -->
                                                             <input type="number" name="paid_amount[<?php echo $fee['id']; ?>]" 
                                                                    class="form-control paid-amount-input" 
                                                                    data-fee-id="<?php echo $fee['id']; ?>"
@@ -621,7 +663,7 @@ if (isset($_GET['id'])) {
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                               </div>
                               <div class="modal-body text-start">
-                                <form id="statementForm" action="../master/student_statement.php" method="GET" target="_blank" onsubmit="setTimeout(function() { const modalEl = document.getElementById('statementModal'); if (modalEl) { const modalInstance = bootstrap.Modal.getInstance(modalEl); if (modalInstance) { modalInstance.hide(); } } }, 100);">
+                                <form id="statementForm" action="<?php echo $statement_target_url; ?>" method="GET" target="_blank" onsubmit="setTimeout(function() { const modalEl = document.getElementById('statementModal'); if (modalEl) { const modalInstance = bootstrap.Modal.getInstance(modalEl); if (modalInstance) { modalInstance.hide(); } } }, 100);">
                                   <input type="hidden" name="id" value="<?php echo $student['id']; ?>">
                                   
                                   <div class="mb-3">
@@ -667,7 +709,6 @@ if (isset($_GET['id'])) {
     <script src="../assets/js/script.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Check if there is a receipt to be opened in a new tab
             <?php if (isset($_SESSION['print_receipt_url'])): ?>
                 const receiptUrl = '<?php echo $_SESSION['print_receipt_url']; ?>';
                 window.open(receiptUrl, '_blank');
@@ -737,11 +778,10 @@ if (isset($_GET['id'])) {
                     const remaining = maxVal - val;
                     if (remainingSpan) {
                         if (remaining > 0 && val > 0) {
-                            remainingSpan.innerHTML = '<i ></i> <span style="color: #f50f0f; font-size: 25px; font-weight: bold;">   Remaining: Rs. ' + remaining.toFixed(0) + '</span>';
+                            remainingSpan.innerHTML = '<span style="color: #f50f0f; font-size: 25px; font-weight: bold;"> Remaining: Rs. ' + remaining.toFixed(0) + '</span>';
                         } else if (remaining === 0) {
                             remainingSpan.textContent = '';
                         } else if (val < 0) {
-                            // FIX: Changed condition from val === 0 to val < 0 to accept zero amount properly[cite: 2]
                             remainingSpan.innerHTML = '<span style="color: #f50f0f; font-size: 25px; font-weight: bold;"> Cannot be negative</span>';
                         } else {
                             remainingSpan.textContent = '';

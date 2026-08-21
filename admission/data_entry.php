@@ -45,8 +45,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     $paid_months = $_POST['paid_months'] ?? []; // Checked months array
     
+    $is_package = is_college_class($class) ? 1 : 0;
+    if ($is_package) {
+        $package_amount = floatval($_POST['package_amount'] ?? 0);
+        $fixed_monthly_fee = ($package_amount > 0) ? round($package_amount / 12, 2) : 0;
+    } else {
+        $package_amount = 0;
+    }
+
+    $fee_to_validate = $is_package ? $package_amount : $fixed_monthly_fee;
+    
     // Validation
-    if (empty($name) || empty($father_name) || empty($class) || empty($section) || $fixed_monthly_fee <= 0) {
+    if (empty($name) || empty($father_name) || empty($class) || empty($section) || $fee_to_validate <= 0) {
         $error = 'All required fields must be filled correctly!';
     } else {
         // Check if student already exists in the same class and section
@@ -63,101 +73,138 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $check_stmt->close();
             $conn->begin_transaction();
             try {
-                $monthly_fee = $fixed_monthly_fee - $concession_amount;
-                if ($monthly_fee < 0) $monthly_fee = 0;
-                
-                // Insert student with monthly_fee calculated and pending_amount stored in admission_fee
                 $created_by = get_username();
-                $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, monthly_fee, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
-                $stmt = $conn->prepare($query);
-                $stmt->bind_param('ssssdddsssdss', $name, $father_name, $class, $section, $fixed_monthly_fee, $monthly_fee, $pending_amount, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
-            
-            if ($stmt->execute()) {
-                $student_id = $conn->insert_id;
-                $stmt->close();
-                
-                // Historical Months List (Includes "Previous Year Fee" before Jan-2026)
-                $months_2026 = [
-                    'Prev-Year', 'Jan-2026', 'Feb-2026', 'Mar-2026', 'Apr-2026', 'May-2026', 'Jun-2026',
-                    'Jul-2026', 'Aug-2026', 'Sep-2026', 'Oct-2026', 'Nov-2026', 'Dec-2026'
-                ];
-                
-                $payment_date = date('Y-m-d H:i:s');
+                $payment_date = date('Y-m-t 23:59:59', strtotime('last day of previous month'));
                 $received_by = get_username() ?? 'System';
-                
-                // Determine partial month
-                $partial_month = null;
-                $fully_paid_months = $paid_months;
-                
-                if ($pending_amount > 0) {
-                    if (!empty($paid_months)) {
-                        $partial_month = $paid_months[count($paid_months) - 1];
-                        $fully_paid_months = array_diff($paid_months, [$partial_month]);
-                    } else {
-                        $partial_month = 'Prev-Year';
-                        $fully_paid_months = [];
-                    }
-                }
-                
-                foreach ($months_2026 as $month) {
-                    // Decide regular fee vs previous year fee amount calculation
-                    $current_month_fee = ($month === 'Prev-Year') ? $pending_amount : $monthly_fee;
 
-                    if (in_array($month, $fully_paid_months)) {
-                        // Mark as Paid in fee_records (amount = 0 remaining)
-                        $query_fee = "INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES (?, ?, 0, 'paid', ?)";
-                        $stmt_fee = $conn->prepare($query_fee);
-                        $stmt_fee->bind_param('iss', $student_id, $month, $payment_date);
-                        $stmt_fee->execute();
-                        $stmt_fee->close();
+                if ($is_package) {
+                    $net_package = max(0, $package_amount - $concession_amount);
+                    $fixed_fee_val = 0.00;
+                    
+                    // Removed monthly_fee column (14 parameters: ssssddidsssdss)
+                    $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, package_amount, is_package, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
+                    $stmt = $conn->prepare($query);
+                    $stmt->bind_param('ssssddidsssdss', $name, $father_name, $class, $section, $fixed_fee_val, $package_amount, $is_package, $pending_amount, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
+                    
+                    if ($stmt->execute()) {
+                        $student_id = $conn->insert_id;
+                        $stmt->close();
                         
-                        // Insert into payments table
-                        $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
-                        $stmt_pay = $conn->prepare($query_pay);
-                        $stmt_pay->bind_param('idsss', $student_id, $current_month_fee, $month, $payment_date, $received_by);
-                        $stmt_pay->execute();
-                        $stmt_pay->close();
-                    } elseif ($month === $partial_month) {
-                        // Mark as Partially Paid: status is 'unpaid', amount remaining is $pending_amount
-                        $query_fee = "INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES (?, ?, ?, 'unpaid', ?)";
-                        $stmt_fee = $conn->prepare($query_fee);
-                        $stmt_fee->bind_param('isds', $student_id, $month, $pending_amount, $payment_date);
-                        $stmt_fee->execute();
-                        $stmt_fee->close();
-                        
-                        $paid_amount = $current_month_fee - $pending_amount;
-                        if ($paid_amount > 0) {
+                        $pkg_month = 'Yearly Package';
+                        if ($pending_amount > 0 && $pending_amount < $net_package) {
+                            $paid_amount = $net_package - $pending_amount;
+                            
                             $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
                             $stmt_pay = $conn->prepare($query_pay);
-                            $stmt_pay->bind_param('idsss', $student_id, $paid_amount, $month, $payment_date, $received_by);
+                            $stmt_pay->bind_param('idsss', $student_id, $paid_amount, $pkg_month, $payment_date, $received_by);
                             $stmt_pay->execute();
                             $stmt_pay->close();
+                            
+                            $query_fee = "INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES (?, ?, ?, 'unpaid', ?)";
+                            $stmt_fee = $conn->prepare($query_fee);
+                            $stmt_fee->bind_param('isds', $student_id, $pkg_month, $pending_amount, $payment_date);
+                            $stmt_fee->execute();
+                            $stmt_fee->close();
+                        } else {
+                            $unpaid_amt = ($pending_amount >= $net_package) ? $pending_amount : $net_package;
+                            $query_fee = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')";
+                            $stmt_fee = $conn->prepare($query_fee);
+                            $stmt_fee->bind_param('isd', $student_id, $pkg_month, $unpaid_amt);
+                            $stmt_fee->execute();
+                            $stmt_fee->close();
                         }
+                        
+                        $conn->commit();
+                        $success = 'College package student added successfully via Data Entry! Yearly package fee scheduled.';
                     } else {
-                        // Mark as Unpaid in fee_records
-                        $query_fee = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')";
-                        $stmt_fee = $conn->prepare($query_fee);
-                        $stmt_fee->bind_param('isd', $student_id, $month, $current_month_fee);
-                        $stmt_fee->execute();
-                        $stmt_fee->close();
+                        throw new Exception($stmt->error);
+                    }
+                } else {
+                    $monthly_fee_calc = max(0, $fixed_monthly_fee - $concession_amount);
+                    
+                    // Removed monthly_fee column (14 parameters: ssssddidsssdss)
+                    $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, package_amount, is_package, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
+                    $stmt = $conn->prepare($query);
+                    $stmt->bind_param('ssssddidsssdss', $name, $father_name, $class, $section, $fixed_monthly_fee, $package_amount, $is_package, $pending_amount, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
+                
+                    if ($stmt->execute()) {
+                        $student_id = $conn->insert_id;
+                        $stmt->close();
+                        
+                        $months_2026 = [
+                            'Prev-Year', 'Jan-2026', 'Feb-2026', 'Mar-2026', 'Apr-2026', 'May-2026', 'Jun-2026',
+                            'Jul-2026', 'Aug-2026', 'Sep-2026', 'Oct-2026', 'Nov-2026', 'Dec-2026'
+                        ];
+                        
+                        $partial_month = null;
+                        $fully_paid_months = $paid_months;
+                        
+                        if ($pending_amount > 0) {
+                            if (!empty($paid_months)) {
+                                $partial_month = $paid_months[count($paid_months) - 1];
+                                $fully_paid_months = array_diff($paid_months, [$partial_month]);
+                            } else {
+                                $partial_month = 'Prev-Year';
+                                $fully_paid_months = [];
+                            }
+                        }
+                        
+                        foreach ($months_2026 as $month) {
+                            $current_month_fee = ($month === 'Prev-Year') ? $pending_amount : $monthly_fee_calc;
+
+                            if (in_array($month, $fully_paid_months)) {
+                                $query_fee = "INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES (?, ?, 0, 'paid', ?)";
+                                $stmt_fee = $conn->prepare($query_fee);
+                                $stmt_fee->bind_param('iss', $student_id, $month, $payment_date);
+                                $stmt_fee->execute();
+                                $stmt_fee->close();
+                                
+                                $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
+                                $stmt_pay = $conn->prepare($query_pay);
+                                $stmt_pay->bind_param('idsss', $student_id, $current_month_fee, $month, $payment_date, $received_by);
+                                $stmt_pay->execute();
+                                $stmt_pay->close();
+                            } elseif ($month === $partial_month) {
+                                $query_fee = "INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES (?, ?, ?, 'unpaid', ?)";
+                                $stmt_fee = $conn->prepare($query_fee);
+                                $stmt_fee->bind_param('isds', $student_id, $month, $pending_amount, $payment_date);
+                                $stmt_fee->execute();
+                                $stmt_fee->close();
+                                
+                                $paid_amount = $current_month_fee - $pending_amount;
+                                if ($paid_amount > 0) {
+                                    $query_pay = "INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')";
+                                    $stmt_pay = $conn->prepare($query_pay);
+                                    $stmt_pay->bind_param('idsss', $student_id, $paid_amount, $month, $payment_date, $received_by);
+                                    $stmt_pay->execute();
+                                    $stmt_pay->close();
+                                }
+                            } else {
+                                $query_fee = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')";
+                                $stmt_fee = $conn->prepare($query_fee);
+                                $stmt_fee->bind_param('isd', $student_id, $month, $current_month_fee);
+                                $stmt_fee->execute();
+                                $stmt_fee->close();
+                            }
+                        }
+                        
+                        $conn->commit();
+                        $success = 'Student added successfully via Data Entry! Fees generated including Previous Year Fee & 2026 schedule.';
+                    } else {
+                        throw new Exception($stmt->error);
                     }
                 }
-                
-                $conn->commit();
-                $success = 'Student added successfully via Data Entry! Fees generated including Previous Year Fee & 2026 schedule.';
-            } else {
-                throw new Exception($stmt->error);
+            } catch (Exception $e) {
+                $conn->rollback();
+                $error = 'Error adding student: ' . $e->getMessage();
             }
-        } catch (Exception $e) {
-            $conn->rollback();
-            $error = 'Error adding student: ' . $e->getMessage();
         }
     }
 }
-}
 
-// Checkboxes Array (Previous Year Fee is added at the top)
+// Checkboxes Array
 $months_list = [
     'Prev-Year' => 'Previous Year Pending Fee',
     'Jan-2026'  => 'January 2026',
@@ -187,7 +234,6 @@ $months_list = [
 <body>
     <div class="wrapper feature-shell">
         <main class="main-content">
-            <!-- Top Bar -->
             <div class="topbar">
                 <div class="topbar-left d-flex align-items-center gap-3">
                     <?php echo render_system_logo('topbar-logo'); ?>
@@ -206,31 +252,16 @@ $months_list = [
                 </div>
             </div>
             
-            <!-- Dashboard Content -->
             <div class="content">
                  <div class="module-nav-panel">
                     <div class="module-nav-row">
-                        <a href="add_student.php" class="module-nav-btn">
-                            <i class="fas fa-user-plus"></i> Add Student
-                        </a>
-                        <a href="data_entry.php" class="module-nav-btn active">
-                            <i class="fas fa-keyboard"></i> Data Entry
-                        </a>
-                        <a href="student_record.php" class="module-nav-btn">
-                            <i class="fas fa-address-book"></i> Student Record
-                        </a>
-                        <a href="defaulter_list.php" class="module-nav-btn">
-                            <i class="fas fa-list"></i> Pending List
-                        </a>
-                        <a href="promotion.php" class="module-nav-btn">
-                            <i class="fas fa-arrow-up"></i> Promotion
-                        </a>
-                        <a href="drop_student.php" class="module-nav-btn">
-                            <i class="fas fa-trash"></i> Drop Student
-                        </a>
-                        <a href="../help.php" class="module-nav-btn">
-                            <i class="fas fa-question-circle text-success"></i> Help & About
-                        </a>
+                        <a href="add_student.php" class="module-nav-btn"><i class="fas fa-user-plus"></i> Add Student</a>
+                        <a href="data_entry.php" class="module-nav-btn active"><i class="fas fa-keyboard"></i> Data Entry</a>
+                        <a href="student_record.php" class="module-nav-btn"><i class="fas fa-address-book"></i> Student Record</a>
+                        <a href="defaulter_list.php" class="module-nav-btn"><i class="fas fa-list"></i> Pending List</a>
+                        <a href="promotion.php" class="module-nav-btn"><i class="fas fa-arrow-up"></i> Promotion</a>
+                        <a href="drop_student.php" class="module-nav-btn"><i class="fas fa-trash"></i> Drop Student</a>
+                        <a href="../help.php" class="module-nav-btn"><i class="fas fa-question-circle text-success"></i> Help & About</a>
                     </div>
                 </div>
 
@@ -279,9 +310,17 @@ $months_list = [
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-6" id="monthlyFeeGroup">
                                 <label class="form-label" for="fixed_monthly_fee">Fixed Monthly Fee *</label>
-                                <input type="number" id="fixed_monthly_fee" name="fixed_monthly_fee" class="form-control" required step="0.01" min="0" readonly>
+                                <input type="number" id="fixed_monthly_fee" name="fixed_monthly_fee" class="form-control" step="0.01" min="0" readonly>
+                            </div>
+
+                            <div class="col-md-6 d-none" id="packageFeeGroup">
+                                <label class="form-label text-primary fw-bold" for="package_amount">
+                                    <i class="fas fa-box-open me-1"></i> Yearly Package Amount *
+                                </label>
+                                <input type="number" id="package_amount" name="package_amount" class="form-control border-primary bg-light" step="0.01" min="0" placeholder="Enter Total Package Amount" readonly>
+                                <small class="text-muted">Yearly Package Fee scheduled from Fee Schedule</small>
                             </div>
                         </div>
                         <div class="row mb-3">
@@ -315,13 +354,13 @@ $months_list = [
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label" for="pending_amount">Previous Pending Fee (if any)</label>
+                                <label class="form-label" for="pending_amount" id="pending_amount_label">Previous Pending Fee (if any)</label>
                                 <input type="number" id="pending_amount" name="pending_amount" class="form-control" value="0" step="0.01" min="0">
+                                <small class="text-muted" id="pending_help_text">Leave 0 if no pending balance exists</small>
                             </div>
                         </div>
 
-                        <!-- Fee Paid Months Block -->
-                        <div class="card p-4 mb-4 border-0 shadow-sm" style="background: rgba(31, 95, 70, 0.05); border-radius: 12px;">
+                        <div class="card p-4 mb-4 border-0 shadow-sm" id="feePaidMonthsCard" style="background: rgba(31, 95, 70, 0.05); border-radius: 12px;">
                             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                                 <h5 class="text-success mb-0" style="font-weight: 600;">
                                     <i class="fas fa-calendar-check me-2"></i> Fee Paid Status (Previous Year & 2026)
@@ -364,17 +403,79 @@ $months_list = [
     <script src="../assets/js/script.js"></script>
     <script>
         const classFees = <?php echo json_encode($class_fees); ?>;
-        document.getElementById('class').addEventListener('change', function() {
-            const selectedClass = this.value;
-            const feeInput = document.getElementById('fixed_monthly_fee');
-            if (classFees[selectedClass] !== undefined) {
-                feeInput.value = classFees[selectedClass];
-            } else {
-                feeInput.value = '';
+        const collegeClasses = ['11', '12', 'passed-12', '11th', '12th', 'f.sc', 'fa', 'ics', 'i.com'];
+
+        function checkIsCollegeClass(cls) {
+            if (!cls) return false;
+            return collegeClasses.includes(cls.toString().trim().toLowerCase());
+        }
+
+        function getFeeForClass(cls) {
+            if (!cls) return '';
+            if (classFees[cls] !== undefined) return classFees[cls];
+            const lower = cls.trim().toLowerCase();
+            for (const k in classFees) {
+                if (k.trim().toLowerCase() === lower) {
+                    return classFees[k];
+                }
             }
+            return '';
+        }
+
+        function toggleFeeMode() {
+            const selectedClass = document.getElementById('class').value;
+            const monthlyGroup = document.getElementById('monthlyFeeGroup');
+            const packageGroup = document.getElementById('packageFeeGroup');
+            const monthlyInput = document.getElementById('fixed_monthly_fee');
+            const packageInput = document.getElementById('package_amount');
+            const feePaidMonthsCard = document.getElementById('feePaidMonthsCard');
+            const pendingLabel = document.getElementById('pending_amount_label');
+            const pendingHelp = document.getElementById('pending_help_text');
+
+            if (checkIsCollegeClass(selectedClass)) {
+                monthlyGroup.classList.add('d-none');
+                packageGroup.classList.remove('d-none');
+                if (feePaidMonthsCard) feePaidMonthsCard.classList.add('d-none');
+                
+                if (pendingLabel) pendingLabel.innerText = "Remaining Pending Fee (if any)";
+                if (pendingHelp) pendingHelp.innerText = "Leave 0 or empty to schedule full package fee as unpaid";
+
+                monthlyInput.removeAttribute('required');
+                packageInput.setAttribute('required', 'required');
+
+                const autoFee = getFeeForClass(selectedClass);
+                if (autoFee !== '') {
+                    packageInput.value = autoFee;
+                } else if (!packageInput.value) {
+                    packageInput.value = '';
+                }
+                monthlyInput.value = '0';
+            } else {
+                monthlyGroup.classList.remove('d-none');
+                packageGroup.classList.add('d-none');
+                if (feePaidMonthsCard) feePaidMonthsCard.classList.remove('d-none');
+
+                if (pendingLabel) pendingLabel.innerText = "Previous Pending Fee (if any)";
+                if (pendingHelp) pendingHelp.innerText = "This amount will show as Previous Year Fee";
+
+                packageInput.removeAttribute('required');
+                monthlyInput.setAttribute('required', 'required');
+
+                const autoFee = getFeeForClass(selectedClass);
+                if (autoFee !== '') {
+                    monthlyInput.value = autoFee;
+                } else {
+                    monthlyInput.value = '';
+                }
+            }
+        }
+
+        document.getElementById('class').addEventListener('change', toggleFeeMode);
+        document.getElementById('package_amount').addEventListener('input', function() {
+            const val = parseFloat(this.value) || 0;
+            document.getElementById('fixed_monthly_fee').value = (val / 12).toFixed(2);
         });
 
-        // Select All / Deselect All
         document.getElementById('selectAll').addEventListener('click', function() {
             document.querySelectorAll('.month-check').forEach(cb => cb.checked = true);
         });
@@ -385,24 +486,41 @@ $months_list = [
         document.getElementById('dataEntryForm').addEventListener('submit', function(e) {
             const name = document.getElementById('name').value.trim();
             const fatherName = document.getElementById('father_name').value.trim();
-            const fixedMonthlyFee = parseFloat(document.getElementById('fixed_monthly_fee').value);
+            const selectedClass = document.getElementById('class').value;
             const concession = parseFloat(document.getElementById('concession_amount').value || 0);
-            
-            if (!name || !fatherName || fixedMonthlyFee <= 0) {
-                e.preventDefault();
-                alert('Please fill all required fields correctly!');
-                return;
-            }
 
-            if (concession < 0 || concession > fixedMonthlyFee) {
-                e.preventDefault();
-                alert('Concession amount must be between 0 and the monthly fee.');
+            if (checkIsCollegeClass(selectedClass)) {
+                const pkgAmt = parseFloat(document.getElementById('package_amount').value);
+                if (!name || !fatherName || !pkgAmt || pkgAmt <= 0) {
+                    e.preventDefault();
+                    alert('Please fill all required fields and enter a valid Package Amount!');
+                    return;
+                }
+                if (concession < 0 || concession > pkgAmt) {
+                    e.preventDefault();
+                    alert('Concession amount must be between 0 and the total Package Amount.');
+                    return;
+                }
+            } else {
+                const fixedMonthlyFee = parseFloat(document.getElementById('fixed_monthly_fee').value);
+                if (!name || !fatherName || !fixedMonthlyFee || fixedMonthlyFee <= 0) {
+                    e.preventDefault();
+                    alert('Please fill all required fields correctly!');
+                    return;
+                }
+                if (concession < 0 || concession > fixedMonthlyFee) {
+                    e.preventDefault();
+                    alert('Concession amount must be between 0 and the monthly fee.');
+                    return;
+                }
             }
         });
 
         <?php if (!empty($error) && strpos($error, 'already exist') !== false): ?>
         alert(<?php echo json_encode($error); ?>);
         <?php endif; ?>
+
+        toggleFeeMode();
     </script>
 </body>
 </html>

@@ -9,7 +9,7 @@ require_once '../config/db.php';
 require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
-// Allow Master, Finance, and Admission roles to access this report
+// Allow Master, Finance, Admission, and Teacher roles to access this report
 require_login();
 if (!is_master() && !is_finance() && !is_admission() && !is_teacher()) {
     header('Location: ' . BASE_URL . 'index.php');
@@ -33,6 +33,8 @@ if ($defaulters) {
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <title>Pending Fees Students Report</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
@@ -111,6 +113,16 @@ if ($defaulters) {
         .amount {
             text-align: right;
         }
+        .badge-package {
+            background-color: #0d6efd;
+            color: #ffffff;
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 3px;
+            font-weight: bold;
+        }
         @media print {
             body {
                 margin: 0;
@@ -119,6 +131,12 @@ if ($defaulters) {
             .report-container {
                 border: none;
                 box-shadow: none;
+            }
+            .badge-package {
+                background-color: #0d6efd !important;
+                color: #ffffff !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
         }
     </style>
@@ -129,11 +147,10 @@ if ($defaulters) {
             <div style="display: flex; align-items: center; gap: 15px;">
                 <?php echo render_system_logo('report-logo'); ?>
                 <div style="text-align: left;">
-                    <h2 style="margin: 0; color: #1f5f46; font-size: 20px; font-weight: bold;">Jinnah School And Intermediate College Khushab</h2>
+                    <h2 style="margin: 0; color: #1f5f46; font-size: 20px; font-weight: bold;"><?php echo SITE_NAME; ?></h2>
                     <p style="margin: 5px 0 0 0; color: #666; font-size: 13px;">Pending Fees Students Report</p>
                 </div>
             </div>
-            
         </div>
         
         <div class="report-info">
@@ -157,7 +174,7 @@ if ($defaulters) {
                         <th>Contact Number(s)</th>
                         <th>Class-Sec</th>
                         <th>Pending Month(s)</th>
-                        <th>Monthly Fee</th> 
+                        <th>Monthly Fee / Package</th> 
                     </tr>
                 </thead>
                 <tbody>
@@ -167,24 +184,38 @@ if ($defaulters) {
                     foreach ($defaulter_list as $defaulter):
                         $unpaid = get_total_unpaid_fees($defaulter['id']);
                         $total_unpaid += $unpaid;
+                        
+                        // Check if student belongs to a college package class
+                        $is_college = is_college_class($defaulter['class']) || (!empty($defaulter['is_package']) && $defaulter['is_package'] == 1);
                     ?>
                         <tr>
                             <td><?php echo $counter++; ?></td>
-                            <td><?php echo $defaulter['name']; ?></td>
-                            <td><?php echo $defaulter['father_name']; ?></td>
+                            <td><?php echo htmlspecialchars($defaulter['name']); ?></td>
+                            <td><?php echo htmlspecialchars($defaulter['father_name']); ?></td>
                             <td>
-                                <?php echo !empty($defaulter['contact_number']) ? '<i class="fas fa-phone"></i> ' . $defaulter['contact_number'] . '<br>' : ''; ?>
-                                <?php echo !empty($defaulter['whatsapp_number']) ? '<i class="fab fa-whatsapp"></i> ' . $defaulter['whatsapp_number'] : ''; ?>
+                                <?php echo !empty($defaulter['contact_number']) ? '<i class="fas fa-phone"></i> ' . htmlspecialchars($defaulter['contact_number']) . '<br>' : ''; ?>
+                                <?php echo !empty($defaulter['whatsapp_number']) ? '<i class="fab fa-whatsapp"></i> ' . htmlspecialchars($defaulter['whatsapp_number']) : ''; ?>
                             </td>
-                            <td><?php echo $defaulter['class'] . '-' . $defaulter['section']; ?></td>
+                            <td><?php echo htmlspecialchars($defaulter['class'] . '-' . $defaulter['section']); ?></td>
                             <td>
-                                <strong>(<?php echo $defaulter['pending_count']; ?> Month)</strong><br>
-                                <?php echo str_replace(',', ', ', $defaulter['pending_months']); ?>
+                                <strong>(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Month)</strong><br>
+                                <?php echo htmlspecialchars(str_replace(',', ', ', $defaulter['pending_months'])); ?>
                             </td>
-                            <td class="amount"><?php echo format_currency($defaulter['monthly_fee']); ?></td>                           
+                            <td class="amount">
+                                <?php if ($is_college): ?>
+                                    <span class="badge-package">Yearly Pkg</span><br>
+                                    <?php 
+                                        $pkg_amt = floatval($defaulter['package_amount'] ?? 0);
+                                        $concession = floatval($defaulter['concession_amount'] ?? 0);
+                                        $net_pkg = max(0, $pkg_amt - $concession);
+                                        echo format_currency($net_pkg);
+                                    ?>
+                                <?php else: ?>
+                                    <?php echo format_currency($defaulter['monthly_fee']); ?>
+                                <?php endif; ?>
+                            </td>                           
                         </tr>
                     <?php endforeach; ?>
-                    
                 </tbody>
             </table>
         <?php else: ?>

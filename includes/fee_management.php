@@ -93,7 +93,28 @@ if (isset($_GET['id'])) {
     $student = get_student($student_id);
 
     if ($student) {
-        $query = "SELECT * FROM fee_records WHERE student_id = ? ORDER BY CASE WHEN month = 'Admission' THEN 1 ELSE 2 END, STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y')";
+        $is_college = (is_college_class($student['class']) || !empty($student['is_package']));
+
+        if ($is_college) {
+            // College Students: Explicit Package Ordering (Yearly Package top par, Package-12 baad me)
+            $query = "SELECT * FROM fee_records WHERE student_id = ? 
+                      ORDER BY CASE 
+                          WHEN month = 'Admission' THEN 1 
+                          WHEN month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 
+                          WHEN month LIKE '%Yearly Package%' OR month LIKE '%yearly_package%' OR month LIKE '%yearly-package%' THEN 3 
+                          WHEN month LIKE '%Package%' OR month LIKE '%yearly%' THEN 4 
+                          ELSE 5 
+                      END, id ASC";
+        } else {
+            // Normal (School) Students: Normal Month Order
+            $query = "SELECT * FROM fee_records WHERE student_id = ? 
+                      ORDER BY CASE 
+                          WHEN month = 'Admission' THEN 1 
+                          WHEN month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 
+                          ELSE 3 
+                      END, STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y'), id ASC";
+        }
+
         $stmt = $conn->prepare($query);
         $stmt->bind_param('i', $student_id);
         $stmt->execute();
@@ -169,7 +190,7 @@ if (isset($_GET['id'])) {
                             <i class="fas fa-users-cog"></i> Users
                         </a>
                         <a href="receipt_note.php" class="module-nav-btn">
-                            <i class="fas fa-sticky-note"></i> custom Note
+                            <i class="fas fa-sticky-note"></i> Custom Note
                         </a>
                         <a href="../help.php" class="module-nav-btn">
                             <i class="fas fa-question-circle text-success"></i> Help & About
@@ -231,7 +252,7 @@ if (isset($_GET['id'])) {
                                         </button>
                                     </div>
                                 </div>
-                            </form>>
+                            </form>
                             
                             <?php if (count($search_results) > 0): ?>
                                 <div class="search-results">
@@ -356,24 +377,5 @@ if (isset($_GET['id'])) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/script.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const feeTable = document.querySelector('.table-striped');
-            if (feeTable) {
-                const checkboxes = feeTable.querySelectorAll('.fee-checkbox');
-                const paidAmountInputs = feeTable.querySelectorAll('.paid-amount-input');
-                const processPaymentsBtn = document.getElementById('processPaymentsBtn');
-
-                checkboxes.forEach(checkbox => {
-                    checkbox.addEventListener('change', function() {
-                        const input = this.closest('tr').querySelector('.paid-amount-input');
-                        input.disabled = !this.checked;
-                        // Enable/disable the main process button based on any checkbox being checked
-                        processPaymentsBtn.disabled = !Array.from(checkboxes).some(cb => cb.checked);
-                    });
-                });
-            }
-        });
-    </script>
 </body>
 </html>

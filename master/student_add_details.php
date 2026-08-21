@@ -320,9 +320,9 @@ $stmt->close();
                                     <th>Father Name</th>
                                     <th>Class</th>
                                     <th>Section</th>
-                                    <th>Monthly Fee (Fixed)</th>
+                                    <th>Monthly Fee \ Package (Fixed)</th>
                                     <th>Concession</th>
-                                    <th>Monthly Fee (Net)</th>
+                                    <th>Monthly Fee \ Package (Net)</th>
                                     <th>Contact Number(s)</th>
                                     <th>Admitted By</th>
                                     <th>Admitted At</th>
@@ -337,9 +337,29 @@ $stmt->close();
                                             <td><?php echo htmlspecialchars($s['father_name']); ?></td>
                                             <td><?php echo htmlspecialchars($s['class']); ?></td>
                                             <td><?php echo htmlspecialchars($s['section']); ?></td>
-                                            <td><?php echo format_currency($s['fixed_monthly_fee']); ?></td>
+                                            <td>
+                                                <?php 
+                                                $is_pkg = (!empty($s['is_package']) || floatval($s['package_amount'] ?? 0) > 0 || is_college_class($s['class']));
+                                                if ($is_pkg) {
+                                                    $raw_pkg = floatval($s['package_amount'] > 0 ? $s['package_amount'] : $s['fixed_monthly_fee']);
+                                                    echo '<strong>' . format_currency($raw_pkg) . '</strong> <small class="text-primary d-block fw-semibold">(Yearly Package)</small>';
+                                                } else {
+                                                    echo format_currency($s['fixed_monthly_fee']);
+                                                }
+                                                ?>
+                                            </td>
                                             <td><?php echo format_currency($s['concession_amount']); ?></td>
-                                            <td><?php echo format_currency($s['monthly_fee']); ?></td>
+                                            <td>
+                                                <?php 
+                                                if ($is_pkg) {
+                                                    $raw_pkg = floatval($s['package_amount'] > 0 ? $s['package_amount'] : $s['fixed_monthly_fee']);
+                                                    $net_pkg = max(0, $raw_pkg - floatval($s['concession_amount']));
+                                                    echo '<strong>' . format_currency($net_pkg) . '</strong> <small class="text-primary d-block fw-semibold">(Yearly Package)</small>';
+                                                } else {
+                                                    echo format_currency($s['monthly_fee']);
+                                                }
+                                                ?>
+                                            </td>
                                             <td>
                                                 <?php echo !empty($s['contact_number']) ? '<i class="fas fa-phone"></i> ' . htmlspecialchars($s['contact_number']) . '<br>' : ''; ?>
                                                 <?php echo !empty($s['contact_number2']) ? '<i class="fas fa-phone"></i> ' . htmlspecialchars($s['contact_number2']) . '<br>' : ''; ?>

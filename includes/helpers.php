@@ -78,9 +78,18 @@ function get_fee_record($student_id, $month) {
 }
 
 /**
- * Create fee records for new student for 12 months
+ * Check if a class is a College level package class (11, 12, Passed-12)
  */
-function create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount = 0, $admission_fee = 0) {
+function is_college_class($class) {
+    if (empty($class)) return false;
+    $college_classes = ['11', '12', 'passed-12', '11th', '12th', 'f.sc', 'fa', 'ics', 'i.com'];
+    return in_array(strtolower(trim($class)), $college_classes);
+}
+
+/**
+ * Create fee records for new student (Handles Monthly Fee or Single Yearly Package Fee)
+ */
+function create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount = 0, $admission_fee = 0, $package_amount = 0, $is_package = 0, $class = '') {
     global $conn;
     
     // First, schedule the admission fee if it is greater than 0
@@ -92,25 +101,46 @@ function create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount 
         $stmt->close();
     }
 
-    $monthly_fee = floatval($fixed_monthly_fee) - floatval($concession_amount);
-    if ($monthly_fee < 0) $monthly_fee = 0;
+    if ($is_package || $package_amount > 0) {
+        // College Package system: Single fee record for Yearly Package (handles partial payments)
+        $net_package = floatval($package_amount) - floatval($concession_amount);
+        if ($net_package < 0) $net_package = 0;
 
-    // Task 1: If current day is 20 or greater (>= 20), start scheduling from NEXT month.
-    // Otherwise, start scheduling from CURRENT month.
-    $day = intval(date('d'));
-    if ($day >= 20) {
-        $start_date = strtotime(date('Y-m-01', strtotime('+1 month')));
-    } else {
-        $start_date = strtotime(date('Y-m-01'));
-    }
+        $month_label = 'Yearly Package';
+        // Ensure no duplicate if already exists for this student
+        $chk = $conn->prepare("SELECT id FROM fee_records WHERE student_id = ? AND month = ?");
+        $chk->bind_param('is', $student_id, $month_label);
+        $chk->execute();
+        if ($chk->get_result()->num_rows > 0) {
+            $month_label = !empty($class) ? substr('Package-' . trim($class), 0, 20) : 'Yearly Package 2';
+        }
+        $chk->close();
 
-    for ($i = 0; $i < 12; $i++) {
-        $month = date('M-Y', strtotime("+$i months", $start_date));
         $query = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')";
         $stmt = $conn->prepare($query);
-        $stmt->bind_param('isd', $student_id, $month, $monthly_fee);
+        $stmt->bind_param('isd', $student_id, $month_label, $net_package);
         $stmt->execute();
         $stmt->close();
+    } else {
+        // Standard Monthly Fee system: 12 months
+        $day = intval(date('d'));
+        if ($day >= 20) {
+            $start_date = strtotime(date('Y-m-01', strtotime('+1 month')));
+        } else {
+            $start_date = strtotime(date('Y-m-01'));
+        }
+
+        $monthly_fee = floatval($fixed_monthly_fee) - floatval($concession_amount);
+        if ($monthly_fee < 0) $monthly_fee = 0;
+
+        for ($i = 0; $i < 12; $i++) {
+            $month = date('M-Y', strtotime("+$i months", $start_date));
+            $query = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')";
+            $stmt = $conn->prepare($query);
+            $stmt->bind_param('isd', $student_id, $month, $monthly_fee);
+            $stmt->execute();
+            $stmt->close();
+        }
     }
 }
 
@@ -120,6 +150,17 @@ function create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount 
 function auto_generate_fee_buffer($student_id, $monthly_fee) {
     global $conn;
     
+    // Check if student is in college package class (11, 12, Passed-12) or is_package
+    $student = get_student($student_id);
+    if ($student) {
+        $cls = $student['class'] ?? '';
+        $is_pkg = intval($student['is_package'] ?? 0);
+        if ($is_pkg === 1 || is_college_class($cls)) {
+            // College package classes (11, 12, Passed-12) should NOT have fees auto-scheduled!
+            return;
+        }
+    }
+
     // Count current unpaid months
     $query = "SELECT COUNT(*) as unpaid_count FROM fee_records WHERE student_id = ? AND status = 'unpaid'";
     $stmt = $conn->prepare($query);
@@ -158,7 +199,7 @@ function sync_unpaid_fee_amounts($student_id, $new_monthly_fee) {
     $current_month_start = date('Y-m-01');
     
     $query = "UPDATE fee_records SET amount = ? 
-              WHERE student_id = ? AND status = 'unpaid' AND month != 'Admission'
+              WHERE student_id = ? AND status = 'unpaid' AND month != 'Admission' AND month NOT LIKE '%Package%'
               AND STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y') >= ?";
     $stmt = $conn->prepare($query);
     $stmt->bind_param('dis', $new_monthly_fee, $student_id, $current_month_start);
@@ -198,7 +239,7 @@ function get_total_paid_fees($student_id) {
 function get_defaulters($class = '', $section = '', $months = [], $name = '') {
     global $conn;
     
-    // If no months are specified, default to previous 12 months (inclusive of current month) plus Admission and Pre_Year
+    // If no months are specified, default to previous 12 months (inclusive of current month) plus Admission, Pre_Year, and Package
     if (empty($months)) {
         $months = [];
         $start_date = strtotime(date('Y-m-01'));
@@ -209,11 +250,14 @@ function get_defaulters($class = '', $section = '', $months = [], $name = '') {
         $months[] = 'Pre_Year';
         $months[] = 'Prev-Year';
         $months[] = 'Pre-Year';
+        $months[] = 'Yearly Package';
+        $months[] = 'Package';
     }
     
     $query = "SELECT s.id, s.name, s.father_name, s.class, s.section, s.fixed_monthly_fee, s.monthly_fee, 
+                     s.package_amount, s.is_package, s.concession_amount,
                      s.contact_number, s.contact_number2, s.whatsapp_number,
-                     GROUP_CONCAT(f.month ORDER BY CASE WHEN f.month = 'Admission' THEN 1 WHEN f.month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 ELSE 3 END, STR_TO_DATE(CONCAT('01-', f.month), '%d-%b-%Y')) as pending_months,
+                     GROUP_CONCAT(f.month ORDER BY CASE WHEN f.month = 'Admission' THEN 1 WHEN f.month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 WHEN f.month LIKE '%Package%' THEN 3 ELSE 4 END, STR_TO_DATE(CONCAT('01-', f.month), '%d-%b-%Y')) as pending_months,
                      COUNT(f.id) as pending_count,
                      SUM(f.amount) as filtered_unpaid_amount
               FROM students s 
@@ -242,12 +286,22 @@ function get_defaulters($class = '', $section = '', $months = [], $name = '') {
                 $expanded_months[] = 'Prev-Year';
                 $expanded_months[] = 'Pre-Year';
             }
+            if ($m === 'Yearly Package' || $m === 'Package') {
+                $expanded_months[] = 'Yearly Package';
+                $expanded_months[] = 'Package';
+            }
         }
         $expanded_months = array_unique($expanded_months);
         $escaped_months = array_map(function($m) use ($conn) { 
             return "'" . $conn->real_escape_string($m) . "'"; 
         }, $expanded_months);
-        $query .= " AND f.month IN (" . implode(',', $escaped_months) . ")";
+        
+        $has_package_filter = in_array('Yearly Package', $expanded_months) || in_array('Package', $expanded_months);
+        if ($has_package_filter) {
+            $query .= " AND (f.month IN (" . implode(',', $escaped_months) . ") OR f.month LIKE '%Package%')";
+        } else {
+            $query .= " AND f.month IN (" . implode(',', $escaped_months) . ")";
+        }
     }
     
     $query .= " GROUP BY s.id ORDER BY s.class, s.section, s.name";
@@ -261,7 +315,7 @@ function get_defaulters($class = '', $section = '', $months = [], $name = '') {
 function get_paid_students($class = '', $section = '', $months = [], $name = '') {
     global $conn;
     
-    // If no months are specified, default to previous 12 months (inclusive of current month) plus Admission and Pre_Year
+    // If no months are specified, default to previous 12 months (inclusive of current month) plus Admission, Pre_Year, and Package
     if (empty($months)) {
         $months = [];
         $start_date = strtotime(date('Y-m-01'));
@@ -272,11 +326,13 @@ function get_paid_students($class = '', $section = '', $months = [], $name = '')
         $months[] = 'Pre_Year';
         $months[] = 'Prev-Year';
         $months[] = 'Pre-Year';
+        $months[] = 'Yearly Package';
+        $months[] = 'Package';
     }
     
     $query = "SELECT s.id, s.name, s.father_name, s.class, s.section, s.fixed_monthly_fee, s.monthly_fee, 
                      s.contact_number, s.contact_number2, s.whatsapp_number,
-                     GROUP_CONCAT(f.month ORDER BY CASE WHEN f.month = 'Admission' THEN 1 WHEN f.month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 ELSE 3 END, STR_TO_DATE(CONCAT('01-', f.month), '%d-%b-%Y')) as paid_months,
+                     GROUP_CONCAT(f.month ORDER BY CASE WHEN f.month = 'Admission' THEN 1 WHEN f.month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 WHEN f.month LIKE '%Package%' THEN 3 ELSE 4 END, STR_TO_DATE(CONCAT('01-', f.month), '%d-%b-%Y')) as paid_months,
                      COUNT(f.id) as paid_count,
                      MAX(f.payment_date) as last_payment_date
               FROM students s 
@@ -305,12 +361,22 @@ function get_paid_students($class = '', $section = '', $months = [], $name = '')
                 $expanded_months[] = 'Prev-Year';
                 $expanded_months[] = 'Pre-Year';
             }
+            if ($m === 'Yearly Package' || $m === 'Package') {
+                $expanded_months[] = 'Yearly Package';
+                $expanded_months[] = 'Package';
+            }
         }
         $expanded_months = array_unique($expanded_months);
         $escaped_months = array_map(function($m) use ($conn) { 
             return "'" . $conn->real_escape_string($m) . "'"; 
         }, $expanded_months);
-        $query .= " AND f.month IN (" . implode(',', $escaped_months) . ")";
+        
+        $has_package_filter = in_array('Yearly Package', $expanded_months) || in_array('Package', $expanded_months);
+        if ($has_package_filter) {
+            $query .= " AND (f.month IN (" . implode(',', $escaped_months) . ") OR f.month LIKE '%Package%')";
+        } else {
+            $query .= " AND f.month IN (" . implode(',', $escaped_months) . ")";
+        }
     }
     
     $query .= " GROUP BY s.id ORDER BY s.class, s.section, s.name";
@@ -554,6 +620,236 @@ function render_pagination($page, $total_pages, $extra_params = '', $is_filtered
     
     echo '</ul>';
     echo '</nav>';
+}
+
+/**
+ * Render Header Topbar and Navigation Panel dynamically based on current user role
+ */
+function render_role_topbar_and_nav($page_title, $active_page) {
+    $role = get_user_role();
+    $username = get_username();
+    
+    $role_title = 'User Panel';
+    if ($role === 'master') {
+        $role_title = 'Principal Panel';
+    } elseif ($role === 'finance') {
+        $role_title = 'Finance / Clerk Panel';
+    } elseif ($role === 'admission') {
+        $role_title = 'Admission Panel';
+    } elseif ($role === 'teacher') {
+        $role_title = 'Teacher Panel';
+    }
+    ?>
+    <div class="topbar">
+        <div class="topbar-left d-flex align-items-center gap-3">
+            <a href="dashboard.php"><?php echo render_system_logo('topbar-logo'); ?></a>
+            <div class="panel-brand">
+                <h2><?php echo htmlspecialchars($page_title); ?></h2>
+                <span><?php echo htmlspecialchars($role_title); ?></span>
+            </div>
+        </div>
+        <div class="topbar-right">
+            <span class="user-info">
+                <i class="fas fa-user-circle"></i> <?php echo htmlspecialchars($username); ?>
+            </span>
+            <a href="../logout.php" class="btn-secondary">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="module-nav-panel">
+            <div class="module-nav-row">
+                <?php if ($role === 'master'): ?>
+                    <a href="dashboard.php" class="module-nav-btn <?php echo ($active_page === 'dashboard') ? 'active' : ''; ?>">
+                        <i class="fas fa-chart-bar"></i> Dashboard
+                    </a>
+                    <a href="add_student.php" class="module-nav-btn <?php echo ($active_page === 'add_student') ? 'active' : ''; ?>">
+                        <i class="fas fa-user-plus"></i> Add Student
+                    </a>
+                    <a href="student_record.php" class="module-nav-btn <?php echo ($active_page === 'student_record') ? 'active' : ''; ?>">
+                        <i class="fas fa-address-book"></i> Student Record
+                    </a>
+                    <a href="student_add_details.php" class="module-nav-btn <?php echo ($active_page === 'student_add_details') ? 'active' : ''; ?>">
+                        <i class="fas fa-history"></i> Add Log
+                    </a>
+                    <a href="fee_schedule.php" class="module-nav-btn <?php echo ($active_page === 'fee_schedule') ? 'active' : ''; ?>">
+                        <i class="fas fa-calendar-alt"></i> Fee Schedule
+                    </a>
+                    <a href="fee_management.php" class="module-nav-btn <?php echo ($active_page === 'fee_management') ? 'active' : ''; ?>">
+                        <i class="fas fa-money-bill-wave"></i> Fee Management
+                    </a>
+                    <a href="defaulter_list.php" class="module-nav-btn <?php echo ($active_page === 'defaulter_list') ? 'active' : ''; ?>">
+                        <i class="fas fa-list"></i> Pending List
+                    </a>
+                    <a href="paid_students.php" class="module-nav-btn <?php echo ($active_page === 'paid_students') ? 'active' : ''; ?>">
+                        <i class="fas fa-check-circle text-success"></i> Paid Students
+                    </a>
+                    <a href="payment_analytics.php" class="module-nav-btn <?php echo ($active_page === 'payment_analytics') ? 'active' : ''; ?>">
+                        <i class="fas fa-chart-line"></i> Analytics
+                    </a>
+                    <a href="receipt_analysis.php" class="module-nav-btn <?php echo ($active_page === 'receipt_analysis') ? 'active' : ''; ?>">
+                        <i class="fas fa-receipt"></i> Receipt Analysis
+                    </a>
+                    <a href="expenses.php" class="module-nav-btn <?php echo ($active_page === 'expenses') ? 'active' : ''; ?>">
+                        <i class="fas fa-wallet"></i> Expenses
+                    </a>
+                    <a href="data_correction.php" class="module-nav-btn <?php echo ($active_page === 'data_correction') ? 'active' : ''; ?>">
+                        <i class="fas fa-edit"></i> Data Correction
+                    </a>
+                    <a href="promotion.php" class="module-nav-btn <?php echo ($active_page === 'promotion') ? 'active' : ''; ?>">
+                        <i class="fas fa-arrow-up"></i> Promotion
+                    </a>
+                    <a href="drop_student.php" class="module-nav-btn <?php echo ($active_page === 'drop_student') ? 'active' : ''; ?>">
+                        <i class="fas fa-trash"></i> Drop Student
+                    </a>
+                    <a href="delete_student.php" class="module-nav-btn <?php echo ($active_page === 'delete_student') ? 'active' : ''; ?>">
+                        <i class="fas fa-user-minus text-success"></i> Delete Student
+                    </a>
+                    <a href="users.php" class="module-nav-btn <?php echo ($active_page === 'users') ? 'active' : ''; ?>">
+                        <i class="fas fa-users-cog"></i> Users
+                    </a>
+                    <a href="receipt_note.php" class="module-nav-btn <?php echo ($active_page === 'receipt_note') ? 'active' : ''; ?>">
+                        <i class="fas fa-sticky-note"></i> Custom Note
+                    </a>
+                    <a href="../help.php" class="module-nav-btn">
+                        <i class="fas fa-question-circle text-success"></i> Help & About
+                    </a>
+                <?php elseif ($role === 'finance'): ?>
+                    <a href="dashboard.php" class="module-nav-btn <?php echo ($active_page === 'dashboard') ? 'active' : ''; ?>">
+                        <i class="fas fa-chart-bar"></i> Dashboard
+                    </a>
+                    <a href="add_student.php" class="module-nav-btn <?php echo ($active_page === 'add_student') ? 'active' : ''; ?>">
+                        <i class="fas fa-user-plus"></i> Add Student
+                    </a>
+                    <a href="student_record.php" class="module-nav-btn <?php echo ($active_page === 'student_record') ? 'active' : ''; ?>">
+                        <i class="fas fa-address-book"></i> Student Record
+                    </a>
+                    <a href="fee_payment.php" class="module-nav-btn <?php echo ($active_page === 'fee_payment') ? 'active' : ''; ?>">
+                        <i class="fas fa-money-bill-wave"></i> Fee Payment
+                    </a>
+                    <a href="defaulter_list.php" class="module-nav-btn <?php echo ($active_page === 'defaulter_list') ? 'active' : ''; ?>">
+                        <i class="fas fa-list"></i> Pending List
+                    </a>
+                    <a href="paid_students.php" class="module-nav-btn <?php echo ($active_page === 'paid_students') ? 'active' : ''; ?>">
+                        <i class="fas fa-check-circle text-success"></i> Paid Students
+                    </a>
+                    <a href="payment_analytics.php" class="module-nav-btn <?php echo ($active_page === 'payment_analytics') ? 'active' : ''; ?>">
+                        <i class="fas fa-chart-line"></i> Analytics
+                    </a>
+                    <a href="receipt_analysis.php" class="module-nav-btn <?php echo ($active_page === 'receipt_analysis') ? 'active' : ''; ?>">
+                        <i class="fas fa-receipt"></i> Receipt Analysis
+                    </a>
+                    <a href="expenses.php" class="module-nav-btn <?php echo ($active_page === 'expenses') ? 'active' : ''; ?>">
+                        <i class="fas fa-wallet"></i> Expenses
+                    </a>
+                    <a href="account_close.php" class="module-nav-btn <?php echo ($active_page === 'account_close') ? 'active' : ''; ?>">
+                        <i class="fas fa-lock"></i> Account Close
+                    </a>
+                    <a href="drop_student.php" class="module-nav-btn <?php echo ($active_page === 'drop_student') ? 'active' : ''; ?>">
+                        <i class="fas fa-trash"></i> Drop Student
+                    </a>
+                    <a href="../help.php" class="module-nav-btn">
+                        <i class="fas fa-question-circle text-success"></i> Help & About
+                    </a>
+                <?php elseif ($role === 'admission'): ?>
+                    <a href="add_student.php" class="module-nav-btn <?php echo ($active_page === 'add_student') ? 'active' : ''; ?>">
+                        <i class="fas fa-user-plus"></i> Add Student
+                    </a>
+                    <a href="data_entry.php" class="module-nav-btn <?php echo ($active_page === 'data_entry') ? 'active' : ''; ?>">
+                        <i class="fas fa-keyboard"></i> Data Entry
+                    </a>
+                    <a href="student_record.php" class="module-nav-btn <?php echo ($active_page === 'student_record') ? 'active' : ''; ?>">
+                        <i class="fas fa-address-book"></i> Student Record
+                    </a>
+                    <a href="defaulter_list.php" class="module-nav-btn <?php echo ($active_page === 'defaulter_list') ? 'active' : ''; ?>">
+                        <i class="fas fa-list"></i> Pending List
+                    </a>
+                    <a href="promotion.php" class="module-nav-btn <?php echo ($active_page === 'promotion') ? 'active' : ''; ?>">
+                        <i class="fas fa-arrow-up"></i> Promotion
+                    </a>
+                    <a href="drop_student.php" class="module-nav-btn <?php echo ($active_page === 'drop_student') ? 'active' : ''; ?>">
+                        <i class="fas fa-trash"></i> Drop Student
+                    </a>
+                    <a href="../help.php" class="module-nav-btn">
+                        <i class="fas fa-question-circle text-success"></i> Help & About
+                    </a>
+                <?php elseif ($role === 'teacher'): ?>
+                    <a href="student_record.php" class="module-nav-btn <?php echo ($active_page === 'student_record') ? 'active' : ''; ?>">
+                        <i class="fas fa-address-book"></i> Student Record
+                    </a>
+                    <a href="defaulter_list.php" class="module-nav-btn <?php echo ($active_page === 'defaulter_list') ? 'active' : ''; ?>">
+                        <i class="fas fa-list"></i> Pending List
+                    </a>
+                    <a href="drop_student.php" class="module-nav-btn <?php echo ($active_page === 'drop_student') ? 'active' : ''; ?>">
+                        <i class="fas fa-trash"></i> Drop Student
+                    </a>
+                    <a href="../help.php" class="module-nav-btn">
+                        <i class="fas fa-question-circle text-success"></i> Help & About
+                    </a>
+                <?php endif; ?>
+            </div>
+        </div>
+    <?php
+}
+
+/**
+ * Create fee schedule for promoted student (Single Yearly Package or 12 Monthly Fees)
+ */
+function schedule_promotion_annual_fees($student_id, $fixed_monthly_fee, $concession_amount = 0, $package_amount = 0, $is_package = 0, $to_class = '') {
+    global $conn;
+
+    if ($is_package || $package_amount > 0) {
+        $net_package = floatval($package_amount) - floatval($concession_amount);
+        if ($net_package < 0) $net_package = 0;
+
+        $month_label = 'Yearly Package';
+        // If student already has 'Yearly Package' from previous class, differentiate by class name (e.g. Package-12)
+        $chk = $conn->prepare("SELECT id FROM fee_records WHERE student_id = ? AND month = ?");
+        $chk->bind_param('is', $student_id, $month_label);
+        $chk->execute();
+        if ($chk->get_result()->num_rows > 0) {
+            $month_label = !empty($to_class) ? substr('Package-' . trim($to_class), 0, 20) : 'Yearly Package 2';
+        }
+        $chk->close();
+
+        $ins = $conn->prepare("INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')");
+        $ins->bind_param('isd', $student_id, $month_label, $net_package);
+        $ins->execute();
+        $ins->close();
+    } else {
+        // Find the latest existing fee month for this student (exclude 'Admission' and Package records)
+        $query = "SELECT month FROM fee_records WHERE student_id = ? AND month NOT LIKE '%Package%' AND month != 'Admission' AND month NOT IN ('Pre_Year', 'Prev-Year', 'Pre-Year') ORDER BY STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y') DESC LIMIT 1";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param('i', $student_id);
+        $stmt->execute();
+        $last_row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if ($last_row && !empty($last_row['month']) && strtotime("01-" . $last_row['month']) !== false) {
+            $last_date = strtotime("01-" . $last_row['month']);
+            $start_date = strtotime("+1 month", $last_date);
+        } else {
+            $day = intval(date('d'));
+            if ($day >= 20) {
+                $start_date = strtotime(date('Y-m-01', strtotime('+1 month')));
+            } else {
+                $start_date = strtotime(date('Y-m-01'));
+            }
+        }
+
+        $monthly_fee = floatval($fixed_monthly_fee) - floatval($concession_amount);
+        if ($monthly_fee < 0) $monthly_fee = 0;
+
+        for ($i = 0; $i < 12; $i++) {
+            $month = date('M-Y', strtotime("+$i months", $start_date));
+            $ins = $conn->prepare("INSERT IGNORE INTO fee_records (student_id, month, amount, status) VALUES (?, ?, ?, 'unpaid')");
+            $ins->bind_param('isd', $student_id, $month, $monthly_fee);
+            $ins->execute();
+            $ins->close();
+        }
+    }
 }
 
 ?>
