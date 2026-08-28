@@ -20,10 +20,11 @@ $class_filter = sanitize_input($_REQUEST['class'] ?? '');
 $section_filter = sanitize_input($_REQUEST['section'] ?? '');
 $name_filter = sanitize_input($_REQUEST['name'] ?? '');
 $months_filter = $_REQUEST['months'] ?? [];
-$min_3_months = isset($_REQUEST['min_3_months']) ? 1 : 0; // Checkbox value
+$min_2_months = isset($_REQUEST['min_2_months']) ? 1 : 0; // 2+ Months Checkbox value
+$min_3_months = isset($_REQUEST['min_3_months']) ? 1 : 0; // 3+ Months Checkbox value
 
 // Check if user has applied any filter
-$is_filtered = (!empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($months_filter) || $min_3_months === 1);
+$is_filtered = (!empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($months_filter) || $min_2_months === 1 || $min_3_months === 1);
 
 // Pagination Configuration (Only applies when NO filter is used)
 $limit = 20; // Default items per page
@@ -38,10 +39,14 @@ if ($defaulters) {
     $all_defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
 }
 
-// Checkbox Logic: Filter out students with less than 3 pending months if checked
+// Checkbox Logic: Filter out students based on selected minimum pending months
 if ($min_3_months === 1) {
     $all_defaulter_list = array_values(array_filter($all_defaulter_list, function($d) {
         return isset($d['pending_count']) && intval($d['pending_count']) >= 3;
+    }));
+} elseif ($min_2_months === 1) {
+    $all_defaulter_list = array_values(array_filter($all_defaulter_list, function($d) {
+        return isset($d['pending_count']) && intval($d['pending_count']) >= 2;
     }));
 }
 
@@ -96,12 +101,17 @@ if (!$is_filtered) {
             background-color: #fff;
             border: 1px solid #dee2e6;
             border-radius: 6px;
-            padding: 10px 12px;
+            padding: 8px 12px;
             display: flex;
             align-items: center;
             gap: 10px;
             cursor: pointer;
             font-weight: 600;
+        }
+        .checkbox-card.card-warning {
+            color: #fd7e14;
+        }
+        .checkbox-card.card-danger {
             color: #dc3545;
         }
     </style>
@@ -180,10 +190,19 @@ if (!$is_filtered) {
 
                             <div class="form-group">
                                 <label>Pending Filter</label>
-                                <label class="checkbox-card">
-                                    <input type="checkbox" name="min_3_months" value="1" style="width: 18px; height: 18px;" <?php echo ($min_3_months === 1) ? 'checked' : ''; ?>>
-                                    <span><i class="fas fa-exclamation-circle me-1"></i> 3+ Months Pending Only</span>
-                                </label>
+                                <div class="d-flex flex-column gap-2">
+                                    <!-- 2+ Months Pending Checkbox -->
+                                    <label class="checkbox-card card-warning">
+                                        <input type="checkbox" name="min_2_months" id="min_2_months" value="1" style="width: 18px; height: 18px;" <?php echo ($min_2_months === 1) ? 'checked' : ''; ?>>
+                                        <span><i class="fas fa-exclamation-triangle me-1"></i> 2+ Months Pending Only</span>
+                                    </label>
+
+                                    <!-- 3+ Months Pending Checkbox -->
+                                    <label class="checkbox-card card-danger">
+                                        <input type="checkbox" name="min_3_months" id="min_3_months" value="1" style="width: 18px; height: 18px;" <?php echo ($min_3_months === 1) ? 'checked' : ''; ?>>
+                                        <span><i class="fas fa-exclamation-circle me-1"></i> 3+ Months Pending Only</span>
+                                    </label>
+                                </div>
                             </div>
 
                            <div class="form-group">
@@ -200,6 +219,9 @@ if (!$is_filtered) {
                         <input type="hidden" name="class" value="<?php echo htmlspecialchars($class_filter); ?>">
                         <input type="hidden" name="section" value="<?php echo htmlspecialchars($section_filter); ?>">
                         <input type="hidden" name="name" value="<?php echo htmlspecialchars($name_filter); ?>">
+                        <?php if ($min_2_months === 1): ?>
+                            <input type="hidden" name="min_2_months" value="1">
+                        <?php endif; ?>
                         <?php if ($min_3_months === 1): ?>
                             <input type="hidden" name="min_3_months" value="1">
                         <?php endif; ?>
@@ -219,6 +241,7 @@ if (!$is_filtered) {
                                         'section' => $section_filter, 
                                         'name' => $name_filter, 
                                         'months' => $months_filter,
+                                        'min_2_months' => $min_2_months,
                                         'min_3_months' => $min_3_months
                                     ];
                                     $report_url = "../master/defaulter_report.php?" . http_build_query($query_data);
@@ -253,6 +276,7 @@ if (!$is_filtered) {
                                             'section' => $section_filter, 
                                             'name' => $name_filter, 
                                             'months' => $months_filter,
+                                            'min_2_months' => $min_2_months,
                                             'min_3_months' => $min_3_months
                                         ]);
                                         ?>
@@ -307,7 +331,6 @@ if (!$is_filtered) {
                     </form>
                 </div>
             </div>
-        </div>
         </main>
     </div>
 
@@ -322,6 +345,19 @@ if (!$is_filtered) {
                 checkboxes.forEach(function(cb) {
                     cb.checked = selectAll.checked;
                 });
+            });
+        }
+
+        // Mutual exclusion between 2+ and 3+ checkboxes
+        var min2Cb = document.getElementById('min_2_months');
+        var min3Cb = document.getElementById('min_3_months');
+
+        if (min2Cb && min3Cb) {
+            min2Cb.addEventListener('change', function() {
+                if (this.checked) min3Cb.checked = false;
+            });
+            min3Cb.addEventListener('change', function() {
+                if (this.checked) min2Cb.checked = false;
             });
         }
     });

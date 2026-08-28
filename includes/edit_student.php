@@ -346,6 +346,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         <option value="Orphan" <?php echo ($student['concession_reason'] ?? '') === 'Orphan' ? 'selected' : ''; ?>>Orphan</option>
                                         <option value="S.C" <?php echo ($student['concession_reason'] ?? '') === 'S.C' ? 'selected' : ''; ?>>S.C</option>
                                         <option value="EMP" <?php echo ($student['concession_reason'] ?? '') === 'EMP' ? 'selected' : ''; ?>>EMP</option>
+                                        <option value="T.Son" <?php echo ($student['concession_reason'] ?? '') === 'T.Son' ? 'selected' : ''; ?>>T.Son</option>
                                     </select>
                                 </div>
                             </div>

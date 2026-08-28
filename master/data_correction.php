@@ -164,8 +164,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
         
         $conn->begin_transaction();
         try {
-            $stmt_update_student = $conn->prepare("UPDATE students SET monthly_fee = ?, admission_fee = ? WHERE id = ?");
-            $stmt_update_student->bind_param('ddi', $net_fee, $pending_amount, $student_id);
+            // FIX: Removed 'monthly_fee = ?' because monthly_fee is a MySQL Generated Column
+            $stmt_update_student = $conn->prepare("UPDATE students SET admission_fee = ? WHERE id = ?");
+            $stmt_update_student->bind_param('di', $pending_amount, $student_id);
             $stmt_update_student->execute();
             $stmt_update_student->close();
             
@@ -594,7 +595,6 @@ if ($student_id == 0) {
                                         <div class="p-3 bg-light rounded w-100 border">
                                             <p class="mb-1"><strong>Total Package Fee:</strong> <?php echo format_currency($pkg_amount); ?></p>
                                             <p class="mb-1"><strong>Concession Amount:</strong> <?php echo format_currency($pkg_concession); ?> (Net: <?php echo format_currency($net_pkg); ?>)</p>
-                                            
                                         </div>
                                     </div>
                                 </div>
@@ -657,7 +657,6 @@ if ($student_id == 0) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Select All / Deselect All logic
         document.getElementById('selectAll')?.addEventListener('click', function() {
             document.querySelectorAll('.month-check').forEach(cb => cb.checked = true);
         });

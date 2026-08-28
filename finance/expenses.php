@@ -35,6 +35,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $stmt->close();
         }
+    } elseif (isset($_POST['action']) && $_POST['action'] === 'edit_expense') {
+        $expense_id = intval($_POST['expense_id'] ?? 0);
+        $amount = floatval($_POST['amount'] ?? 0);
+        $reason = sanitize_input($_POST['reason'] ?? '');
+        $my_user_id = get_user_id();
+
+        if ($expense_id <= 0 || $amount <= 0 || empty($reason)) {
+            $error = 'Invalid details provided for expense update.';
+        } else {
+            // Strict Security Check: Sirf wahi expense edit hoga jo LOGGED-IN USER ka ho AUR AJ (CURDATE) ki date ka ho!
+            $check_stmt = $conn->prepare("SELECT id FROM expenses WHERE id = ? AND user_id = ? AND DATE(created_at) = CURDATE()");
+            $check_stmt->bind_param("ii", $expense_id, $my_user_id);
+            $check_stmt->execute();
+            $check_res = $check_stmt->get_result();
+
+            if ($check_res && $check_res->num_rows > 0) {
+                $check_stmt->close();
+                $update_stmt = $conn->prepare("UPDATE expenses SET amount = ?, reason = ? WHERE id = ?");
+                $update_stmt->bind_param("dsi", $amount, $reason, $expense_id);
+                if ($update_stmt->execute()) {
+                    $success = 'Today\'s expense updated successfully!';
+                } else {
+                    $error = 'Failed to update expense: ' . $conn->error;
+                }
+                $update_stmt->close();
+            } else {
+                $check_stmt->close();
+                $error = 'Action denied! You can only edit expenses recorded TODAY.';
+            }
+        }
     }
 }
 
@@ -49,8 +79,6 @@ $params = [$my_user_id];
 $param_types = "i";
 
 // FILTER LOGIC:
-// 1. Agar koi date filter na ho, to default "CURDATE()" (Aaj ki tareekh) ke expenses dikhao
-// 2. Agar user search kare, to selected date range ke mutabiq load karo
 if (empty($start_date) && empty($end_date)) {
     $query .= " AND DATE(created_at) = CURDATE()";
 } elseif (!empty($start_date) && empty($end_date)) {
@@ -81,6 +109,8 @@ if ($result) {
     $expenses = $result->fetch_all(MYSQLI_ASSOC);
 }
 $stmt->close();
+
+$today_date = date('Y-m-d');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -243,10 +273,15 @@ $stmt->close();
                                                 <th>Amount</th>
                                                 <th>Reason</th>
                                                 <th>Recorded By</th>
+                                                <th class="text-center">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <?php foreach ($expenses as $expense): ?>
+                                                <?php 
+                                                $exp_date = date('Y-m-d', strtotime($expense['created_at']));
+                                                $is_today = ($exp_date === $today_date);
+                                                ?>
                                                 <tr>
                                                     <td>
                                                         <span class="text-muted small">
@@ -265,7 +300,7 @@ $stmt->close();
                                                         </strong>
                                                     </td>
                                                     <td>
-                                                        <div class="text-wrap" style="max-width: 300px;">
+                                                        <div class="text-wrap" style="max-width: 250px;">
                                                             <?php echo htmlspecialchars($expense['reason']); ?>
                                                         </div>
                                                     </td>
@@ -274,6 +309,20 @@ $stmt->close();
                                                             <i class="fas fa-user me-1"></i>
                                                             <?php echo htmlspecialchars($expense['username']); ?>
                                                         </span>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <?php if ($is_today): ?>
+                                                            <button type="button" 
+                                                                    class="btn btn-sm btn-outline-warning edit-expense-btn" 
+                                                                    data-id="<?php echo $expense['id']; ?>"
+                                                                    data-amount="<?php echo $expense['amount']; ?>"
+                                                                    data-reason="<?php echo htmlspecialchars($expense['reason']); ?>"
+                                                                    title="Edit Today's Expense">
+                                                                <i class="fas fa-edit"></i> Edit
+                                                            </button>
+                                                        <?php else: ?>
+                                                            <span class="text-muted small" title="Cannot edit past dates"><i class="fas fa-lock"></i> Locked</span>
+                                                        <?php endif; ?>
                                                     </td>
                                                 </tr>
                                             <?php endforeach; ?>
@@ -296,8 +345,60 @@ $stmt->close();
             </div>
         </main>
     </div>
+
+    <!-- Edit Expense Modal -->
+    <div class="modal fade" id="editExpenseModal" tabindex="-1" aria-labelledby="editExpenseModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST">
+                    <input type="hidden" name="action" value="edit_expense">
+                    <input type="hidden" name="expense_id" id="edit_expense_id">
+                    
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editExpenseModalLabel"><i class="fas fa-edit text-warning me-2"></i> Edit Today's Expense</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="edit_amount" class="form-label">Expense Amount (Rs.) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rs.</span>
+                                <input type="number" step="0.01" min="0.01" class="form-control" id="edit_amount" name="amount" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_reason" class="form-label">Expense Reason / Description <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="edit_reason" name="reason" rows="3" required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Update Expense</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const editModal = new bootstrap.Modal(document.getElementById('editExpenseModal'));
+            document.querySelectorAll('.edit-expense-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const id = this.getAttribute('data-id');
+                    const amount = this.getAttribute('data-amount');
+                    const reason = this.getAttribute('data-reason');
+
+                    document.getElementById('edit_expense_id').value = id;
+                    document.getElementById('edit_amount').value = amount;
+                    document.getElementById('edit_reason').value = reason;
+
+                    editModal.show();
+                });
+            });
+        });
+    </script>
 </body>
 </html>
