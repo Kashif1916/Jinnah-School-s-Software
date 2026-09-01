@@ -28,7 +28,18 @@ if ($defaulters) {
     $defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
 }
 
-// Generate report
+// Check if any college student (11th / 12th) exists in the report list
+$has_college_students = false;
+if (!empty($class_filter) && is_college_class($class_filter)) {
+    $has_college_students = true;
+} else {
+    foreach ($defaulter_list as $st_check) {
+        if (is_college_class($st_check['class']) || (!empty($st_check['is_package']) && $st_check['is_package'] == 1)) {
+            $has_college_students = true;
+            break;
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -161,7 +172,7 @@ if ($defaulters) {
                 Section: <?php echo !empty($section_filter) ? htmlspecialchars($section_filter) : 'All'; ?> |
                 Months: <?php echo !empty($months_filter) ? implode(', ', array_map('htmlspecialchars', $months_filter)) : 'All'; ?>
             </p>
-            <p><strong>Total Pending:</strong> <?php echo count($defaulter_list); ?></p>
+            <p><strong>Total Pending Students:</strong> <?php echo count($defaulter_list); ?></p>
         </div>
         
         <?php if (count($defaulter_list) > 0): ?>
@@ -173,8 +184,11 @@ if ($defaulters) {
                         <th>Father Name</th>
                         <th>Contact Number(s)</th>
                         <th>Class-Sec</th>
-                        <th>Pending Month(s)</th>
+                        <th>Pending</th>
                         <th>Monthly Fee / Package</th> 
+                        <?php if ($has_college_students): ?>
+                            <th>Pending Dues (11th & 12th)</th>
+                        <?php endif; ?>
                     </tr>
                 </thead>
                 <tbody>
@@ -185,7 +199,7 @@ if ($defaulters) {
                         $unpaid = get_total_unpaid_fees($defaulter['id']);
                         $total_unpaid += $unpaid;
                         
-                        // Check if student belongs to a college package class
+                        // Check if student belongs to 11th or 12th class / college package
                         $is_college = is_college_class($defaulter['class']) || (!empty($defaulter['is_package']) && $defaulter['is_package'] == 1);
                     ?>
                         <tr>
@@ -198,7 +212,9 @@ if ($defaulters) {
                             </td>
                             <td><?php echo htmlspecialchars($defaulter['class'] . '-' . $defaulter['section']); ?></td>
                             <td>
-                                <strong>(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Month)</strong><br>
+                                <?php if (!$is_college): ?>
+                                    <strong>(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Month)</strong><br>
+                                <?php endif; ?>
                                 <?php echo htmlspecialchars(str_replace(',', ', ', $defaulter['pending_months'])); ?>
                             </td>
                             <td class="amount">
@@ -206,6 +222,9 @@ if ($defaulters) {
                                     <span class="badge-package">Yearly Pkg</span><br>
                                     <?php 
                                         $pkg_amt = floatval($defaulter['package_amount'] ?? 0);
+                                        if ($pkg_amt <= 0) {
+                                            $pkg_amt = floatval($defaulter['fixed_monthly_fee'] ?? 0);
+                                        }
                                         $concession = floatval($defaulter['concession_amount'] ?? 0);
                                         $net_pkg = max(0, $pkg_amt - $concession);
                                         echo format_currency($net_pkg);
@@ -213,7 +232,17 @@ if ($defaulters) {
                                 <?php else: ?>
                                     <?php echo format_currency($defaulter['monthly_fee']); ?>
                                 <?php endif; ?>
-                            </td>                           
+                            </td>
+                            
+                            <?php if ($has_college_students): ?>
+                                <td class="amount">
+                                    <?php if ($is_college): ?>
+                                        <strong style="color: #dc3545;"><?php echo format_currency($unpaid); ?></strong>
+                                    <?php else: ?>
+                                        <span style="color: #999;">-</span>
+                                    <?php endif; ?>
+                                </td>
+                            <?php endif; ?>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>

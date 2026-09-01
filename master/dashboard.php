@@ -96,9 +96,10 @@ $current_paid_percentage = ($total_students > 0) ? round(($total_students_paid_c
 
 // Dynamic Month List (Current Month + Previous 11 Months)
 $month_options = [];
+$first_day_of_month = strtotime(date('Y-m-01'));
 for ($i = 0; $i < 12; $i++) {
-    $m_key = date('M-Y', strtotime("-$i month"));
-    $m_label = date('F Y', strtotime("-$i month"));
+    $m_key = date('M-Y', strtotime("-$i month", $first_day_of_month));
+    $m_label = date('F Y', strtotime("-$i month", $first_day_of_month));
     $month_options[$m_key] = $m_label;
 }
 

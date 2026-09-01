@@ -28,19 +28,40 @@ if (isset($_GET['ajax_action']) && $_GET['ajax_action'] === 'get_paid_students')
     header('Content-Type: application/json');
     $selected_month = sanitize_input($_GET['month'] ?? date('M-Y'));
     
+    // Total Paid Count
     $stmt = $conn->prepare("SELECT COUNT(DISTINCT student_id) as count FROM fee_records WHERE month = ? AND status = 'paid'");
     $stmt->bind_param('s', $selected_month);
     $stmt->execute();
     $count = $stmt->get_result()->fetch_assoc()['count'] ?? 0;
     $stmt->close();
 
-    // Calculate Percentage
+    // Boys Paid Count (Section B)
+    $stmt_b = $conn->prepare("SELECT COUNT(DISTINCT f.student_id) as count FROM fee_records f JOIN students s ON f.student_id = s.id WHERE f.month = ? AND f.status = 'paid' AND s.section = 'B' AND s.status = 'active' AND s.class NOT IN ('Passed-10', 'Passed-12')");
+    $stmt_b->bind_param('s', $selected_month);
+    $stmt_b->execute();
+    $boys_count = $stmt_b->get_result()->fetch_assoc()['count'] ?? 0;
+    $stmt_b->close();
+
+    // Girls Paid Count (Section G)
+    $stmt_g = $conn->prepare("SELECT COUNT(DISTINCT f.student_id) as count FROM fee_records f JOIN students s ON f.student_id = s.id WHERE f.month = ? AND f.status = 'paid' AND s.section = 'G' AND s.status = 'active' AND s.class NOT IN ('Passed-10', 'Passed-12')");
+    $stmt_g->bind_param('s', $selected_month);
+    $stmt_g->execute();
+    $girls_count = $stmt_g->get_result()->fetch_assoc()['count'] ?? 0;
+    $stmt_g->close();
+
+    // Calculate Percentages
     $percentage = ($total_students > 0) ? round(($count / $total_students) * 100, 1) : 0;
+    $boys_percentage = ($total_boys > 0) ? round(($boys_count / $total_boys) * 100, 1) : 0;
+    $girls_percentage = ($total_girls > 0) ? round(($girls_count / $total_girls) * 100, 1) : 0;
 
     echo json_encode([
         'success' => true, 
         'count' => $count,
-        'percentage' => $percentage
+        'percentage' => $percentage,
+        'boys_count' => $boys_count,
+        'boys_percentage' => $boys_percentage,
+        'girls_count' => $girls_count,
+        'girls_percentage' => $girls_percentage
     ]);
     exit();
 }
@@ -71,14 +92,31 @@ $stmt_paid_curr->execute();
 $total_students_paid_current = $stmt_paid_curr->get_result()->fetch_assoc()['count'] ?? 0;
 $stmt_paid_curr->close();
 
-// Calculate Current Month Percentage
+// Boys Paid Current Month
+$stmt_b_curr = $conn->prepare("SELECT COUNT(DISTINCT f.student_id) as count FROM fee_records f JOIN students s ON f.student_id = s.id WHERE f.month = ? AND f.status = 'paid' AND s.section = 'B' AND s.status = 'active' AND s.class NOT IN ('Passed-10', 'Passed-12')");
+$stmt_b_curr->bind_param('s', $current_month_str);
+$stmt_b_curr->execute();
+$boys_paid_current = $stmt_b_curr->get_result()->fetch_assoc()['count'] ?? 0;
+$stmt_b_curr->close();
+
+// Girls Paid Current Month
+$stmt_g_curr = $conn->prepare("SELECT COUNT(DISTINCT f.student_id) as count FROM fee_records f JOIN students s ON f.student_id = s.id WHERE f.month = ? AND f.status = 'paid' AND s.section = 'G' AND s.status = 'active' AND s.class NOT IN ('Passed-10', 'Passed-12')");
+$stmt_g_curr->bind_param('s', $current_month_str);
+$stmt_g_curr->execute();
+$girls_paid_current = $stmt_g_curr->get_result()->fetch_assoc()['count'] ?? 0;
+$stmt_g_curr->close();
+
+// Calculate Current Month Percentages
 $current_paid_percentage = ($total_students > 0) ? round(($total_students_paid_current / $total_students) * 100, 1) : 0;
+$current_boys_percentage = ($total_boys > 0) ? round(($boys_paid_current / $total_boys) * 100, 1) : 0;
+$current_girls_percentage = ($total_girls > 0) ? round(($girls_paid_current / $total_girls) * 100, 1) : 0;
 
 // Dynamic Month List (Current Month + Previous 11 Months)
 $month_options = [];
+$first_day_of_month = strtotime(date('Y-m-01'));
 for ($i = 0; $i < 12; $i++) {
-    $m_key = date('M-Y', strtotime("-$i month"));
-    $m_label = date('F Y', strtotime("-$i month"));
+    $m_key = date('M-Y', strtotime("-$i month", $first_day_of_month));
+    $m_label = date('F Y', strtotime("-$i month", $first_day_of_month));
     $month_options[$m_key] = $m_label;
 }
 ?>
@@ -282,7 +320,7 @@ for ($i = 0; $i < 12; $i++) {
                         </div>
                     </div>
 
-                    <!-- Row 2: Block 5 (Moves to next row automatically) -->
+                    <!-- Row 2: Block 5 -->
                     <div class="stat-card">
                         <div class="stat-icon" style="background: #e3f1ea;">
                             <i class="fas fa-calendar-day" style="color: #198754;"></i>
@@ -293,7 +331,35 @@ for ($i = 0; $i < 12; $i++) {
                         </div>
                     </div>
 
-                    <!-- Row 2: Block 6 -->
+                    <!-- Row 2: Block 6 (Boys Paid Card) -->
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #e3f1ea;">
+                            <i class="fas fa-mars" style="color: #198754;"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>
+                                <span id="boys_paid_count"><?php echo $boys_paid_current; ?></span>
+                                <span class="stat-percentage" id="boys_paid_percentage">(<?php echo $current_boys_percentage; ?>%)</span>
+                            </h3>
+                            <p id="boys_paid_label" class="mb-0">Boys Paid (<?php echo date('M Y'); ?>)</p>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Block 7 (Girls Paid Card) -->
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #e3f1ea;">
+                            <i class="fas fa-venus" style="color: #198754;"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3>
+                                <span id="girls_paid_count"><?php echo $girls_paid_current; ?></span>
+                                <span class="stat-percentage" id="girls_paid_percentage">(<?php echo $current_girls_percentage; ?>%)</span>
+                            </h3>
+                            <p id="girls_paid_label" class="mb-0">Girls Paid (<?php echo date('M Y'); ?>)</p>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Block 8 (Total Paid Students with Dropdown Filter) -->
                     <div class="stat-card stat-card--dropdown">
                         <div class="stat-card__content-wrapper">
                             <div class="stat-icon" style="background: #e3f1ea;">
@@ -342,9 +408,20 @@ for ($i = 0; $i < 12; $i++) {
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
+                            // Update Overall Paid Card
                             document.getElementById('paid_students_count').innerText = data.count;
                             document.getElementById('paid_students_percentage').innerText = `(${data.percentage}%)`;
                             document.getElementById('paid_students_label').innerText = `Students Paid (${displayLabel})`;
+
+                            // Update Boys Paid Card
+                            document.getElementById('boys_paid_count').innerText = data.boys_count;
+                            document.getElementById('boys_paid_percentage').innerText = `(${data.boys_percentage}%)`;
+                            document.getElementById('boys_paid_label').innerText = `Boys Paid (${displayLabel})`;
+
+                            // Update Girls Paid Card
+                            document.getElementById('girls_paid_count').innerText = data.girls_count;
+                            document.getElementById('girls_paid_percentage').innerText = `(${data.girls_percentage}%)`;
+                            document.getElementById('girls_paid_label').innerText = `Girls Paid (${displayLabel})`;
                         }
                     })
                     .catch(err => console.error("Error fetching paid students:", err));

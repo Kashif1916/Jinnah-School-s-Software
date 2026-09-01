@@ -22,9 +22,10 @@ $name_filter = sanitize_input($_REQUEST['name'] ?? '');
 $months_filter = $_REQUEST['months'] ?? [];
 $min_2_months = isset($_REQUEST['min_2_months']) ? 1 : 0; // 2+ Months Checkbox value
 $min_3_months = isset($_REQUEST['min_3_months']) ? 1 : 0; // 3+ Months Checkbox value
+$arrears_only = isset($_REQUEST['arrears_only']) ? 1 : 0; // Arrears (Partial Payment) Checkbox value
 
 // Check if user has applied any filter
-$is_filtered = (!empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($months_filter) || $min_2_months === 1 || $min_3_months === 1);
+$is_filtered = (!empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($months_filter) || $min_2_months === 1 || $min_3_months === 1 || $arrears_only === 1);
 
 // Pagination Configuration (Only applies when NO filter is used)
 $limit = 20; // Default items per page
@@ -39,8 +40,45 @@ if ($defaulters) {
     $all_defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
 }
 
-// Checkbox Logic: Filter out students based on selected minimum pending months
-if ($min_3_months === 1) {
+// Identify students with partial payment arrears & filter ONLY arrear months
+if ($arrears_only === 1) {
+    foreach ($all_defaulter_list as $k => $d) {
+        $s_id = intval($d['id']);
+        $fixed_fee = floatval($d['fixed_monthly_fee'] ?? 0);
+        $concession = floatval($d['concession_amount'] ?? 0);
+        $expected_monthly = floatval($d['monthly_fee'] ?? 0);
+        if ($expected_monthly <= 0) {
+            $expected_monthly = max(0, $fixed_fee - $concession);
+        }
+
+        $arrear_months_found = [];
+        if ($expected_monthly > 0) {
+            $arr_stmt = $conn->prepare("SELECT month FROM fee_records WHERE student_id = ? AND status = 'unpaid' AND amount > 0 AND amount < ? AND month NOT IN ('Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year') AND month NOT LIKE '%Package%'");
+            $arr_stmt->bind_param("id", $s_id, $expected_monthly);
+            $arr_stmt->execute();
+            $arr_res = $arr_stmt->get_result();
+            if ($arr_res) {
+                while ($r_row = $arr_res->fetch_assoc()) {
+                    $arrear_months_found[] = trim($r_row['month']);
+                }
+            }
+            $arr_stmt->close();
+        }
+
+        if (!empty($arrear_months_found)) {
+            $all_defaulter_list[$k]['has_arrears'] = true;
+            // Override pending count & list to show ONLY arrear month(s)
+            $all_defaulter_list[$k]['pending_count'] = count($arrear_months_found);
+            $all_defaulter_list[$k]['pending_months'] = implode(', ', $arrear_months_found);
+        } else {
+            $all_defaulter_list[$k]['has_arrears'] = false;
+        }
+    }
+
+    $all_defaulter_list = array_values(array_filter($all_defaulter_list, function($d) {
+        return !empty($d['has_arrears']);
+    }));
+} elseif ($min_3_months === 1) {
     $all_defaulter_list = array_values(array_filter($all_defaulter_list, function($d) {
         return isset($d['pending_count']) && intval($d['pending_count']) >= 3;
     }));
@@ -113,6 +151,9 @@ if (!$is_filtered) {
         }
         .checkbox-card.card-danger {
             color: #dc3545;
+        }
+        .checkbox-card.card-info {
+            color: #0dcaf0;
         }
     </style>
 </head>
@@ -202,6 +243,12 @@ if (!$is_filtered) {
                                         <input type="checkbox" name="min_3_months" id="min_3_months" value="1" style="width: 18px; height: 18px;" <?php echo ($min_3_months === 1) ? 'checked' : ''; ?>>
                                         <span><i class="fas fa-exclamation-circle me-1"></i> 3+ Months Pending Only</span>
                                     </label>
+
+                                    <!-- Arrears Only Checkbox -->
+                                    <label class="checkbox-card card-info">
+                                        <input type="checkbox" name="arrears_only" id="arrears_only" value="1" style="width: 18px; height: 18px;" <?php echo ($arrears_only === 1) ? 'checked' : ''; ?>>
+                                        <span class="text-dark"><i class="fas fa-coins text-info me-1"></i> Arrears Only (Partial Payments)</span>
+                                    </label>
                                 </div>
                             </div>
 
@@ -225,6 +272,9 @@ if (!$is_filtered) {
                         <?php if ($min_3_months === 1): ?>
                             <input type="hidden" name="min_3_months" value="1">
                         <?php endif; ?>
+                        <?php if ($arrears_only === 1): ?>
+                            <input type="hidden" name="arrears_only" value="1">
+                        <?php endif; ?>
                         <?php foreach ((array)$months_filter as $m_f): ?>
                             <input type="hidden" name="months[]" value="<?php echo htmlspecialchars($m_f); ?>">
                         <?php endforeach; ?>
@@ -242,7 +292,8 @@ if (!$is_filtered) {
                                         'name' => $name_filter, 
                                         'months' => $months_filter,
                                         'min_2_months' => $min_2_months,
-                                        'min_3_months' => $min_3_months
+                                        'min_3_months' => $min_3_months,
+                                        'arrears_only' => $arrears_only
                                     ];
                                     $report_url = "../master/defaulter_report.php?" . http_build_query($query_data);
                                 ?>
@@ -277,7 +328,8 @@ if (!$is_filtered) {
                                             'name' => $name_filter, 
                                             'months' => $months_filter,
                                             'min_2_months' => $min_2_months,
-                                            'min_3_months' => $min_3_months
+                                            'min_3_months' => $min_3_months,
+                                            'arrears_only' => $arrears_only
                                         ]);
                                         ?>
                                         <tr>
@@ -348,16 +400,29 @@ if (!$is_filtered) {
             });
         }
 
-        // Mutual exclusion between 2+ and 3+ checkboxes
+        // Mutual exclusion between 2+, 3+, and Arrears checkboxes
         var min2Cb = document.getElementById('min_2_months');
         var min3Cb = document.getElementById('min_3_months');
+        var arrCb  = document.getElementById('arrears_only');
 
-        if (min2Cb && min3Cb) {
+        if (min2Cb && min3Cb && arrCb) {
             min2Cb.addEventListener('change', function() {
-                if (this.checked) min3Cb.checked = false;
+                if (this.checked) {
+                    min3Cb.checked = false;
+                    arrCb.checked = false;
+                }
             });
             min3Cb.addEventListener('change', function() {
-                if (this.checked) min2Cb.checked = false;
+                if (this.checked) {
+                    min2Cb.checked = false;
+                    arrCb.checked = false;
+                }
+            });
+            arrCb.addEventListener('change', function() {
+                if (this.checked) {
+                    min2Cb.checked = false;
+                    min3Cb.checked = false;
+                }
             });
         }
     });

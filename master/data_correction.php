@@ -60,12 +60,22 @@ if ($student_id > 0) {
             $pkg_concession = floatval($student['concession_amount'] ?? 0);
             $net_pkg = max(0, $pkg_amount - $pkg_concession);
 
+            // Fetch Current Package Record
             $pkg_rec_res = $conn->query("SELECT id, amount, status FROM fee_records WHERE student_id = $student_id AND (month LIKE '%Package%' OR month = 'Yearly Package') ORDER BY id DESC LIMIT 1");
             $pkg_rec = ($pkg_rec_res && $pkg_rec_res->num_rows > 0) ? $pkg_rec_res->fetch_assoc() : null;
             if ($pkg_rec) {
                 $pkg_pending_fee = ($pkg_rec['status'] === 'paid') ? 0 : floatval($pkg_rec['amount']);
             } else {
                 $pkg_pending_fee = $net_pkg;
+            }
+
+            // Fetch Pre-Year (11th Class) Pending Record
+            $pre_rec_res = $conn->query("SELECT id, amount, status FROM fee_records WHERE student_id = $student_id AND month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') ORDER BY id DESC LIMIT 1");
+            $pre_rec = ($pre_rec_res && $pre_rec_res->num_rows > 0) ? $pre_rec_res->fetch_assoc() : null;
+            if ($pre_rec) {
+                $pre_year_pending_fee = ($pre_rec['status'] === 'paid') ? 0 : floatval($pre_rec['amount']);
+            } else {
+                $pre_year_pending_fee = 0;
             }
 
             $pay_res = $conn->query("SELECT SUM(amount) as total_paid FROM payments WHERE student_id = $student_id");
@@ -110,6 +120,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
 
     if ($is_college_student) {
         $new_package_pending = floatval($_POST['package_pending_fee'] ?? 0);
+        $new_pre_year_pending = floatval($_POST['pre_year_pending_fee'] ?? 0);
+
         $conn->begin_transaction();
         try {
             $pkg_amount = floatval($student['package_amount'] > 0 ? $student['package_amount'] : $student['fixed_monthly_fee']);
@@ -118,6 +130,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
             
             $calculated_paid_amount = max(0, $net_pkg - $new_package_pending);
 
+            // 1. Update/Insert Package Fee Record
+            $pkg_month_name = ($student['class'] == '12' || $student['class'] == '12th') ? 'Package-12' : 'Yearly Package';
             $chk = $conn->query("SELECT id FROM fee_records WHERE student_id = $student_id AND (month LIKE '%Package%' OR month = 'Yearly Package')");
             if ($chk && $chk->num_rows > 0) {
                 $rec_id = $chk->fetch_assoc()['id'];
@@ -128,30 +142,49 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                 }
             } else {
                 $status = ($new_package_pending <= 0) ? 'paid' : 'unpaid';
-                $stmt = $conn->prepare("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES (?, 'Yearly Package', ?, ?, ?)");
-                $stmt->bind_param('idss', $student_id, $new_package_pending, $status, $previous_month_date);
+                $stmt = $conn->prepare("INSERT INTO fee_records (student_id, month, amount, status, payment_date) VALUES (?, ?, ?, ?, ?)");
+                $stmt->bind_param('isdss', $student_id, $pkg_month_name, $new_package_pending, $status, $previous_month_date);
                 $stmt->execute();
                 $stmt->close();
             }
 
+            // 2. Update/Insert Pre-Year (11th Class) Fee Record
+            $chk_pre = $conn->query("SELECT id FROM fee_records WHERE student_id = $student_id AND month IN ('Pre_Year', 'Prev-Year', 'Pre-Year')");
+            if ($chk_pre && $chk_pre->num_rows > 0) {
+                $pre_id = $chk_pre->fetch_assoc()['id'];
+                if ($new_pre_year_pending <= 0) {
+                    $conn->query("UPDATE fee_records SET amount = 0, status = 'paid', payment_date = '$previous_month_date' WHERE id = $pre_id");
+                } else {
+                    $conn->query("UPDATE fee_records SET amount = $new_pre_year_pending, status = 'unpaid' WHERE id = $pre_id");
+                }
+            } elseif ($new_pre_year_pending > 0) {
+                $stmt_p = $conn->prepare("INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, 'Pre_Year', ?, 'unpaid')");
+                $stmt_p->bind_param('id', $student_id, $new_pre_year_pending);
+                $stmt_p->execute();
+                $stmt_p->close();
+            }
+
             // Sync with payments table using previous month timestamp
-            $conn->query("DELETE FROM payments WHERE student_id = $student_id AND (paid_for_month = 'Yearly Package' OR paid_for_month LIKE '%Package%')");
+            $conn->query("DELETE FROM payments WHERE student_id = $student_id AND (paid_for_month LIKE '%Package%' OR paid_for_month = 'Yearly Package')");
             if ($calculated_paid_amount > 0) {
-                $stmt_pay = $conn->prepare("INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, 'Yearly Package', ?, ?, 'cash')");
-                $stmt_pay->bind_param('idss', $student_id, $calculated_paid_amount, $previous_month_date, $received_by);
+                $stmt_pay = $conn->prepare("INSERT INTO payments (student_id, amount, paid_for_month, payment_date, received_by, payment_mode) VALUES (?, ?, ?, ?, ?, 'cash')");
+                $stmt_pay->bind_param('idsss', $student_id, $calculated_paid_amount, $pkg_month_name, $previous_month_date, $received_by);
                 $stmt_pay->execute();
                 $stmt_pay->close();
             }
 
-            $conn->commit();
-            $success = "Package student pending fee & historical payment record corrected successfully!";
-            $pkg_pending_fee = $new_package_pending;
+            // Update students table admission_fee total
+            $total_pending_all = $new_package_pending + $new_pre_year_pending;
+            $conn->query("UPDATE students SET admission_fee = $total_pending_all WHERE id = $student_id");
 
-            $pay_res = $conn->query("SELECT SUM(amount) as total_paid FROM payments WHERE student_id = $student_id");
-            $pkg_total_paid = ($pay_res && $pay_row = $pay_res->fetch_assoc()) ? floatval($pay_row['total_paid'] ?? 0) : 0;
+            $conn->commit();
+            $success = "College student pending package and Pre-Year (11th class) fee corrected successfully!";
+            $pkg_pending_fee = $new_package_pending;
+            $pre_year_pending_fee = $new_pre_year_pending;
+
         } catch (Exception $e) {
             $conn->rollback();
-            $error = "Error correcting package fee: " . $e->getMessage();
+            $error = "Error correcting college fee: " . $e->getMessage();
         }
     } else {
         $pending_amount = floatval($_POST['pending_amount'] ?? 0);
@@ -164,7 +197,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
         
         $conn->begin_transaction();
         try {
-            // FIX: Removed 'monthly_fee = ?' because monthly_fee is a MySQL Generated Column
             $stmt_update_student = $conn->prepare("UPDATE students SET admission_fee = ? WHERE id = ?");
             $stmt_update_student->bind_param('di', $pending_amount, $student_id);
             $stmt_update_student->execute();
@@ -584,17 +616,26 @@ if ($student_id == 0) {
                             <?php if ($is_college_student): ?>
                                 <!-- College Package Students Pending Fee UI -->
                                 <div class="row mb-4 mt-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-bold text-success fs-5" for="package_pending_fee">
-                                            <i class="fas fa-money-bill-wave me-1"></i> Pending Fee (Rs.)
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold text-success fs-6" for="package_pending_fee">
+                                            <i class="fas fa-money-bill-wave me-1"></i> Current Package Pending Fee (Rs.)
                                         </label>
                                         <input type="number" id="package_pending_fee" name="package_pending_fee" class="form-control form-control-lg" value="<?php echo htmlspecialchars($pkg_pending_fee); ?>" step="0.01" min="0" required>
-                                        <div class="form-text text-muted">Current remaining pending fee of this student (0 if fully paid).</div>
+                                        <div class="form-text text-muted">Current class package remaining pending fee (0 if fully paid).</div>
                                     </div>
-                                    <div class="col-md-6 d-flex align-items-center">
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold text-danger fs-6" for="pre_year_pending_fee">
+                                            <i class="fas fa-exclamation-triangle me-1"></i> Pre-Year (11th) Pending Fee (Rs.)
+                                        </label>
+                                        <input type="number" id="pre_year_pending_fee" name="pre_year_pending_fee" class="form-control form-control-lg border-danger" value="<?php echo htmlspecialchars($pre_year_pending_fee); ?>" step="0.01" min="0">
+                                        <div class="form-text text-muted">11th Class / Pre-year unpaid balance.</div>
+                                    </div>
+
+                                    <div class="col-md-4 d-flex align-items-center">
                                         <div class="p-3 bg-light rounded w-100 border">
                                             <p class="mb-1"><strong>Total Package Fee:</strong> <?php echo format_currency($pkg_amount); ?></p>
-                                            <p class="mb-1"><strong>Concession Amount:</strong> <?php echo format_currency($pkg_concession); ?> (Net: <?php echo format_currency($net_pkg); ?>)</p>
+                                            <p class="mb-0"><strong>Concession Amount:</strong> <?php echo format_currency($pkg_concession); ?> (Net: <?php echo format_currency($net_pkg); ?>)</p>
                                         </div>
                                     </div>
                                 </div>

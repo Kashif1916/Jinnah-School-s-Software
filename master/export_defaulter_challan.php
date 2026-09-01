@@ -329,6 +329,14 @@ if ($setting_res) {
             <?php
             $student_id = intval($student['id']);
 
+            // Student net monthly fee setup
+            $fixed_fee = floatval($student['fixed_monthly_fee'] ?? 0);
+            $concession = floatval($student['concession_amount'] ?? 0);
+            $expected_monthly = floatval($student['monthly_fee'] ?? 0);
+            if ($expected_monthly <= 0) {
+                $expected_monthly = max(0, $fixed_fee - $concession);
+            }
+
             // Fetch detailed unpaid records
             $unpaid_query = "SELECT id, month, amount FROM fee_records 
                              WHERE student_id = ? 
@@ -387,12 +395,18 @@ if ($setting_res) {
                 $is_prev_year = (in_array($paid_month, ['Pre_Year', 'Prev-Year', 'Pre-Year']) || strpos($paid_month, 'Prev-Year') !== false);
                 $is_package = (strpos($paid_month, 'Package') !== false);
                 
+                // ARREARS / PARTIAL PAYMENT CHECK:
+                // Regular month ki balance amount agar expected net monthly fee se kam ho, to wo arrear mark hoga.
+                $is_arrear = (!$is_admission && !$is_prev_year && !$is_package && $expected_monthly > 0 && $amt < $expected_monthly);
+
                 if ($is_admission) {
                     $group_key = 'admission';
                 } elseif ($is_prev_year) {
                     $group_key = 'prev_year_' . $rec['id'];
                 } elseif ($is_package) {
                     $group_key = 'package_' . $rec['id'];
+                } elseif ($is_arrear) {
+                    $group_key = 'arrear_' . $rec['id']; // Each partial arrear month gets its own separate row
                 } else {
                     $group_key = 'regular_months';
                 }
@@ -412,6 +426,8 @@ if ($setting_res) {
                     $grouped_challan[$group_key]['title'] = 'Previous Year Pending Fee (' . $paid_month . ')';
                 } elseif ($is_package) {
                     $grouped_challan[$group_key]['title'] = $paid_month . ' (Balance Due)';
+                } elseif ($is_arrear) {
+                    $grouped_challan[$group_key]['title'] = 'Arrears (' . $paid_month . ')';
                 } else {
                     $grouped_challan[$group_key]['months'][] = $paid_month;
                 }
@@ -419,7 +435,7 @@ if ($setting_res) {
                 $grouped_challan[$group_key]['total_amount'] += $amt;
             }
 
-            // Build Title for grouped regular months
+            // Build Title for grouped regular full months
             if (isset($grouped_challan['regular_months']) && !empty($grouped_challan['regular_months']['months'])) {
                 $grouped_challan['regular_months']['title'] = 'Fee for Months: ' . implode(', ', $grouped_challan['regular_months']['months']);
             }
@@ -475,21 +491,18 @@ if ($setting_res) {
                                     if ($group['type'] === 'regular_months') {
                                         $month_count = count($group['months']);
                                         if ($month_count > 0) {
-                                            $fixed_fee  = floatval($student['fixed_monthly_fee'] ?? 0);
-                                            $concession = floatval($student['concession_amount'] ?? 0);
-
                                             if ($concession > 0) {
-                                                $payable_per_month = $fixed_fee - $concession;
                                                 echo "<br><small style='font-size: 9px; color: #555;'>" 
-                                                     . number_format($fixed_fee, 0) . " - " . number_format($concession, 0) . " = " . number_format($payable_per_month, 0) 
+                                                     . number_format($fixed_fee, 0) . " - " . number_format($concession, 0) . " = " . number_format($expected_monthly, 0) 
                                                      . " (Per Month)</small>";
                                             } else {
-                                                $monthly_val = ($fixed_fee > 0) ? $fixed_fee : ($group['total_amount'] / $month_count);
                                                 echo "<br><small style='font-size: 9px; color: #555;'>Fee Per Month = " 
-                                                     . number_format($monthly_val, 0) 
+                                                     . number_format($expected_monthly, 0) 
                                                      . "</small>";
                                             }
                                         }
+                                    } elseif (strpos($group['type'], 'arrear_') === 0) {
+                                        echo "<br><small style='font-size: 9px; color: #dc3545;'>Partial Payment Remaining Balance</small>";
                                     }
                                     ?>
                                 </td>

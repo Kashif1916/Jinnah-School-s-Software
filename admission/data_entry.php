@@ -42,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $concession_amount = floatval($_POST['concession_amount'] ?? 0);
     $concession_reason = sanitize_input($_POST['concession_reason'] ?? '');
     $pending_amount = floatval($_POST['pending_amount'] ?? 0);
+    $pre_year_pending = floatval($_POST['pre_year_pending'] ?? 0); // 11th Class / Pre-year pending fee
     
     $paid_months = $_POST['paid_months'] ?? []; // Checked months array
     
@@ -81,17 +82,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $net_package = max(0, $package_amount - $concession_amount);
                     $fixed_fee_val = 0.00;
                     
-                    // Removed monthly_fee column (14 parameters: ssssddidsssdss)
+                    $total_admission_pending = $pending_amount + $pre_year_pending;
+
                     $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, package_amount, is_package, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
                     $stmt = $conn->prepare($query);
-                    $stmt->bind_param('ssssddidsssdss', $name, $father_name, $class, $section, $fixed_fee_val, $package_amount, $is_package, $pending_amount, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
+                    $stmt->bind_param('ssssddidsssdss', $name, $father_name, $class, $section, $fixed_fee_val, $package_amount, $is_package, $total_admission_pending, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
                     
                     if ($stmt->execute()) {
                         $student_id = $conn->insert_id;
                         $stmt->close();
                         
-                        $pkg_month = 'Yearly Package';
+                        // 1. If 11th class / Pre-year fee is pending, schedule it separately (FIXED bind_param count)
+                        if ($pre_year_pending > 0) {
+                            $query_pre = "INSERT INTO fee_records (student_id, month, amount, status) VALUES (?, 'Pre_Year', ?, 'unpaid')";
+                            $stmt_pre = $conn->prepare($query_pre);
+                            $stmt_pre->bind_param('id', $student_id, $pre_year_pending);
+                            $stmt_pre->execute();
+                            $stmt_pre->close();
+                        }
+
+                        // 2. Schedule Package Fee for current Class
+                        $pkg_month = ($class == '12' || $class == '12th') ? 'Package-12' : 'Yearly Package';
+                        
                         if ($pending_amount > 0 && $pending_amount < $net_package) {
                             $paid_amount = $net_package - $pending_amount;
                             
@@ -116,14 +129,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         }
                         
                         $conn->commit();
-                        $success = 'College package student added successfully via Data Entry! Yearly package fee scheduled.';
+                        $success = 'College package student added successfully via Data Entry! Fees scheduled.';
                     } else {
                         throw new Exception($stmt->error);
                     }
                 } else {
                     $monthly_fee_calc = max(0, $fixed_monthly_fee - $concession_amount);
                     
-                    // Removed monthly_fee column (14 parameters: ssssddidsssdss)
                     $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, package_amount, is_package, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
                     $stmt = $conn->prepare($query);
@@ -317,7 +329,7 @@ $months_list = [
 
                             <div class="col-md-6 d-none" id="packageFeeGroup">
                                 <label class="form-label text-primary fw-bold" for="package_amount">
-                                    <i class="fas fa-box-open me-1"></i> Yearly Package Amount *
+                                    <i class="fas fa-box-open me-1"></i> Current Class Package Amount *
                                 </label>
                                 <input type="number" id="package_amount" name="package_amount" class="form-control border-primary bg-light" step="0.01" min="0" placeholder="Enter Total Package Amount" readonly>
                                 <small class="text-muted">Yearly Package Fee scheduled from Fee Schedule</small>
@@ -338,11 +350,11 @@ $months_list = [
                             </div>
                         </div>
                         <div class="row mb-3">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label" for="concession_amount">Concession Amount</label>
                                 <input type="number" id="concession_amount" name="concession_amount" class="form-control" value="0" step="0.01" min="0">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label" for="concession_reason">Concession Reason</label>
                                 <select id="concession_reason" name="concession_reason" class="form-select">
                                     <option value="">None</option>
@@ -354,10 +366,17 @@ $months_list = [
                                     <option value="T.Son">T.Son</option>
                                 </select>
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label" for="pending_amount" id="pending_amount_label">Previous Pending Fee (if any)</label>
+                            <div class="col-md-3">
+                                <label class="form-label" for="pending_amount" id="pending_amount_label">Current Package Pending</label>
                                 <input type="number" id="pending_amount" name="pending_amount" class="form-control" value="0" step="0.01" min="0">
-                                <small class="text-muted" id="pending_help_text">Leave 0 if no pending balance exists</small>
+                                <small class="text-muted" id="pending_help_text">Current class package unpaid balance</small>
+                            </div>
+                            <div class="col-md-3 d-none" id="preYearPendingGroup">
+                                <label class="form-label text-danger fw-bold" for="pre_year_pending">
+                                    <i class="fas fa-exclamation-triangle me-1"></i> Pre-Year (11th) Pending
+                                </label>
+                                <input type="number" id="pre_year_pending" name="pre_year_pending" class="form-control border-danger" value="0" step="0.01" min="0">
+                                <small class="text-muted">11th Class / Pre-year remaining fee</small>
                             </div>
                         </div>
 
@@ -427,6 +446,7 @@ $months_list = [
             const selectedClass = document.getElementById('class').value;
             const monthlyGroup = document.getElementById('monthlyFeeGroup');
             const packageGroup = document.getElementById('packageFeeGroup');
+            const preYearPendingGroup = document.getElementById('preYearPendingGroup');
             const monthlyInput = document.getElementById('fixed_monthly_fee');
             const packageInput = document.getElementById('package_amount');
             const feePaidMonthsCard = document.getElementById('feePaidMonthsCard');
@@ -436,10 +456,11 @@ $months_list = [
             if (checkIsCollegeClass(selectedClass)) {
                 monthlyGroup.classList.add('d-none');
                 packageGroup.classList.remove('d-none');
+                preYearPendingGroup.classList.remove('d-none');
                 if (feePaidMonthsCard) feePaidMonthsCard.classList.add('d-none');
                 
-                if (pendingLabel) pendingLabel.innerText = "Remaining Pending Fee (if any)";
-                if (pendingHelp) pendingHelp.innerText = "Leave 0 or empty to schedule full package fee as unpaid";
+                if (pendingLabel) pendingLabel.innerText = "Current Package Pending";
+                if (pendingHelp) pendingHelp.innerText = "Current class package unpaid balance";
 
                 monthlyInput.removeAttribute('required');
                 packageInput.setAttribute('required', 'required');
@@ -454,6 +475,7 @@ $months_list = [
             } else {
                 monthlyGroup.classList.remove('d-none');
                 packageGroup.classList.add('d-none');
+                preYearPendingGroup.classList.add('d-none');
                 if (feePaidMonthsCard) feePaidMonthsCard.classList.remove('d-none');
 
                 if (pendingLabel) pendingLabel.innerText = "Previous Pending Fee (if any)";

@@ -125,7 +125,7 @@ function create_annual_fees($student_id, $fixed_monthly_fee, $concession_amount 
         // Standard Monthly Fee system: 12 months
         $day = intval(date('d'));
         if ($day >= 20) {
-            $start_date = strtotime(date('Y-m-01', strtotime('+1 month')));
+            $start_date = strtotime('+1 month', strtotime(date('Y-m-01')));
         } else {
             $start_date = strtotime(date('Y-m-01'));
         }
@@ -833,7 +833,7 @@ function schedule_promotion_annual_fees($student_id, $fixed_monthly_fee, $conces
         } else {
             $day = intval(date('d'));
             if ($day >= 20) {
-                $start_date = strtotime(date('Y-m-01', strtotime('+1 month')));
+                $start_date = strtotime('+1 month', strtotime(date('Y-m-01')));
             } else {
                 $start_date = strtotime(date('Y-m-01'));
             }
