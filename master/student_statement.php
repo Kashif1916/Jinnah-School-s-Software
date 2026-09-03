@@ -356,6 +356,8 @@ if ($is_package_student) {
                                         echo '<span class="badge" style="background:#e3f2fd;color:#1565c0;">Admission Fee</span>';
                                     } elseif ($desc === 'Fine') {
                                         echo '<span class="badge badge-danger">Fine / Late Fee</span>';
+                                    } elseif ($desc === 'Other' || $desc === 'Other Payment') {
+                                        echo '<span class="badge" style="background:#fff3cd;color:#856404;font-weight:bold;">Other Payment</span>';
                                     } else {
                                         echo htmlspecialchars($desc);
                                     }

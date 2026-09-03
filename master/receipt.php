@@ -83,7 +83,7 @@ if (!empty($payments_to_display)) {
         $stud_id = $payment['student_id'];
         $p_month = $payment['paid_for_month'] ?? $payment['month'] ?? '';
         
-        if ($stud_id && $p_month) {
+        if ($stud_id && $p_month && !in_array($p_month, ['Fine', 'Other', 'Other Payment'])) {
             // Fetch student details for pending section
             $q = "SELECT f.amount, f.status, s.name, s.father_name 
                   FROM fee_records f 
@@ -116,9 +116,10 @@ if (!empty($payments_to_display)) {
         $is_admission = (trim($paid_month) === 'Admission');
         $is_prev_year = (trim($paid_month) === 'Prev-Year' || strpos($paid_month, 'Prev-Year') !== false);
         $is_fine = (trim($paid_month) === 'Fine' || strpos($paid_month, 'Fine') !== false);
+        $is_other = (trim($paid_month) === 'Other' || trim($paid_month) === 'Other Payment' || strpos($paid_month, 'Other') !== false);
         
         $is_pending = false;
-        if ($paid_month && !$is_admission && !$is_prev_year && !$is_fine) {
+        if ($paid_month && !$is_admission && !$is_prev_year && !$is_fine && !$is_other) {
             $stmt_check = $conn->prepare("SELECT id FROM payments WHERE student_id = ? AND paid_for_month = ? AND id < ? LIMIT 1");
             $stmt_check->bind_param("isi", $student_id, $paid_month, $payment['id']);
             $stmt_check->execute();
@@ -137,6 +138,8 @@ if (!empty($payments_to_display)) {
             $group_key = $student_id . '_pending_' . $payment['id'];
         } elseif ($is_fine) {
             $group_key = $student_id . '_fine_' . $payment['id'];
+        } elseif ($is_other) {
+            $group_key = $student_id . '_other_' . $payment['id'];
         } else {
             $group_key = $student_id . '_months';
         }
@@ -155,6 +158,7 @@ if (!empty($payments_to_display)) {
                 'is_prev_year' => $is_prev_year,
                 'is_pending' => $is_pending,
                 'is_fine' => $is_fine,
+                'is_other' => $is_other,
                 'months' => [],
                 'total_amount' => 0.0,
                 'payment_mode' => $payment['payment_mode'] ?? 'cash',
@@ -165,6 +169,8 @@ if (!empty($payments_to_display)) {
             $grouped_payments[$group_key]['months'][] = $paid_month . ' Arrears';
         } elseif ($is_fine) {
             $grouped_payments[$group_key]['months'][] = 'Fine / Late Fee';
+        } elseif ($is_other) {
+            $grouped_payments[$group_key]['months'][] = 'Other Payment';
         } else {
             $grouped_payments[$group_key]['months'][] = $paid_month;
         }
@@ -334,6 +340,8 @@ ob_start();
                                 <td>
                                     <?php if (!empty($group['is_fine'])): ?>
                                         <strong style="font-size: 14px;">Fine for Late Fee</strong>
+                                    <?php elseif (!empty($group['is_other'])): ?>
+                                        <strong style="font-size: 14px;">Other Payment / Charges</strong>
                                     <?php else: ?>
                                         <strong style="font-size: 14px;"><?php echo htmlspecialchars($group['name']) . ' / ' . htmlspecialchars($group['father_name']); ?></strong><br>
                                         <?php echo htmlspecialchars($group['class']) . '-' . htmlspecialchars($group['section']); ?> | <?php echo implode(', ', $group['months']); ?>

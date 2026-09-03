@@ -20,6 +20,9 @@ if (!isset($_SESSION['fee_cart'])) {
 if (!isset($_SESSION['fine_amount'])) {
     $_SESSION['fine_amount'] = 0;
 }
+if (!isset($_SESSION['other_amount'])) {
+    $_SESSION['other_amount'] = 0;
+}
 
 $self_url = basename($_SERVER['PHP_SELF']);
 
@@ -27,9 +30,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action']) && $_POST['action'] == 'add_to_cart') {
         $selected_records = $_POST['selected_fee_records'] ?? [];
         $amounts = $_POST['paid_amount'] ?? [];
-        if (isset($_POST['fine_amount'])) {
-            $_SESSION['fine_amount'] = floatval($_POST['fine_amount']);
-        }
         
         foreach ($selected_records as $rec_id) {
             $rec_id = intval($rec_id);
@@ -61,6 +61,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             }
         }
+        
+        // Auto-calculate fine based on overdue months in cart (Rs. 20/day after 10th Aug)
+        $_SESSION['fine_amount'] = calculate_batch_late_fine($_SESSION['fee_cart']);
+        if (!isset($_SESSION['other_amount'])) {
+            $_SESSION['other_amount'] = 0;
+        }
+
         $success = "Fees added to batch list! You can search another student now.";
     } elseif (isset($_POST['action']) && $_POST['action'] == 'remove_item') {
         $remove_rec_id = intval($_POST['remove_record_id'] ?? 0);
@@ -75,13 +82,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         if (empty($_SESSION['fee_cart'])) {
             $_SESSION['fine_amount'] = 0;
-        } elseif (isset($_POST['fine_amount'])) {
-            $_SESSION['fine_amount'] = floatval($_POST['fine_amount']);
+            $_SESSION['other_amount'] = 0;
+        } else {
+            $_SESSION['fine_amount'] = calculate_batch_late_fine($_SESSION['fee_cart']);
         }
         $success = "Item removed from batch list.";
     } elseif (isset($_POST['action']) && $_POST['action'] == 'clear_cart') {
         $_SESSION['fee_cart'] = [];
         $_SESSION['fine_amount'] = 0;
+        $_SESSION['other_amount'] = 0;
         $success = "Batch list cleared.";
     } elseif (isset($_POST['action']) && $_POST['action'] == 'search') {
         $search_name = sanitize_input($_POST['search_name'] ?? '');
@@ -123,7 +132,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $generated_payment_ids = [];
         $payment_mode = sanitize_input($_POST['payment_mode'] ?? 'cash');
         $fine_amount = floatval($_POST['fine_amount'] ?? $_SESSION['fine_amount'] ?? 0);
+        $other_amount = floatval($_POST['other_amount'] ?? $_SESSION['other_amount'] ?? 0);
         $_SESSION['fine_amount'] = $fine_amount;
+        $_SESSION['other_amount'] = $other_amount;
         
         if (!empty($_SESSION['fee_cart'])) {
             $batch_receipt_number = null;
@@ -156,9 +167,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             }
 
+            if ($other_amount > 0 && !empty($_SESSION['fee_cart'])) {
+                $other_student_id = $_SESSION['fee_cart'][0]['student_id'];
+                $other_p_id = record_payment($other_student_id, $other_amount, 'Other Payment', get_username(), $payment_mode, $batch_receipt_number);
+                if ($other_p_id) {
+                    $generated_payment_ids[] = $other_p_id;
+                } else {
+                    $error .= "Error recording other payment. ";
+                }
+            }
+
             if (!empty($generated_payment_ids)) {
                 $_SESSION['fee_cart'] = [];
                 $_SESSION['fine_amount'] = 0;
+                $_SESSION['other_amount'] = 0;
                 $_SESSION['print_receipt_url'] = $receipt_base_url . '?payment_ids=' . implode(',', $generated_payment_ids);
                 header('Location: ' . $self_url);
                 exit();
@@ -433,14 +455,34 @@ if (isset($_GET['id'])) {
                                         <input type="hidden" name="remove_record_id" id="remove_record_id" value="">
                                         
                                         <tr class="table-warning">
-                                            <td><strong class="text-danger"><i class="fas fa-exclamation-circle me-1"></i> Fine / Late Fee</strong></td>
+                                            <td>
+                                                <strong class="text-danger"><i class="fas fa-exclamation-circle me-1"></i> Fine </strong>
+                                               
+                                            </td>
                                             <td>-</td>
                                             <td><span class="badge bg-danger">Fine</span></td>
                                             <td>
                                                 <div class="input-group input-group-sm" style="max-width: 170px;">
                                                     <span class="input-group-text fw-bold">Rs.</span>
                                                     <input type="number" name="fine_amount" id="fine_amount_input" class="form-control fw-bold text-danger" 
-                                                           min="0" step="0.01" value="<?php echo (isset($_SESSION['fine_amount']) && $_SESSION['fine_amount'] > 0) ? floatval($_SESSION['fine_amount']) : ''; ?>" placeholder="0.00">
+                                                           min="0" step="0.01" value="<?php echo (isset($_SESSION['fine_amount']) && $_SESSION['fine_amount'] > 0) ? floatval($_SESSION['fine_amount']) : '0'; ?>" placeholder="0.00">
+                                                </div>
+                                            </td>
+                                            <td></td>
+                                        </tr>
+
+                                        <tr class="table-info" style="background-color: #e8f4fd;">
+                                            <td>
+                                                <strong class="text-primary"><i class="fas fa-plus-circle me-1"></i> Other Dues \ Exam Fee</strong>
+                                                
+                                            </td>
+                                            <td>-</td>
+                                            <td><span class="badge bg-primary">Other</span></td>
+                                            <td>
+                                                <div class="input-group input-group-sm" style="max-width: 170px;">
+                                                    <span class="input-group-text fw-bold">Rs.</span>
+                                                    <input type="number" name="other_amount" id="other_amount_input" class="form-control fw-bold text-primary" 
+                                                           min="0" step="0.01" value="<?php echo (isset($_SESSION['other_amount']) && $_SESSION['other_amount'] > 0) ? floatval($_SESSION['other_amount']) : '0'; ?>" placeholder="0.00">
                                                 </div>
                                             </td>
                                             <td></td>
@@ -448,7 +490,7 @@ if (isset($_GET['id'])) {
 
                                         <tr class="fw-bold table-light">
                                             <td colspan="3" class="text-end">Batch Total:</td>
-                                            <td id="batch_total_display"><?php echo format_currency($batch_total + floatval($_SESSION['fine_amount'] ?? 0)); ?></td>
+                                            <td id="batch_total_display"><?php echo format_currency($batch_total + floatval($_SESSION['fine_amount'] ?? 0) + floatval($_SESSION['other_amount'] ?? 0)); ?></td>
                                             <td></td>
                                         </tr>
                                     </tbody>
@@ -604,7 +646,15 @@ if (isset($_GET['id'])) {
                                     foreach ($student_fees as $fee): 
                                     ?>
                                         <tr>
-                                            <td><?php echo $fee['month']; ?></td>
+                                            <td>
+                                                <strong><?php echo $fee['month']; ?></strong>
+                                                <?php 
+                                                $est_fine = ($fee['status'] == 'unpaid') ? calculate_month_late_fine($fee['month']) : 0;
+                                                if ($est_fine > 0): 
+                                                ?>
+                                                    
+                                                <?php endif; ?>
+                                            </td>
                                             <td><?php echo format_currency($fee['amount']); ?></td>
                                             <td>
                                                 <?php if ($fee['status'] == 'paid'): ?>
@@ -791,15 +841,20 @@ if (isset($_GET['id'])) {
             });
 
             const fineInput = document.getElementById('fine_amount_input');
+            const otherInput = document.getElementById('other_amount_input');
             const batchTotalDisplay = document.getElementById('batch_total_display');
-            if (fineInput && batchTotalDisplay) {
+            if (batchTotalDisplay) {
                 const baseTotal = <?php echo floatval($batch_total ?? 0); ?>;
-                fineInput.addEventListener('input', function() {
-                    let fineVal = parseFloat(this.value);
+                function updateLiveBatchTotal() {
+                    let fineVal = fineInput ? parseFloat(fineInput.value) : 0;
                     if (isNaN(fineVal) || fineVal < 0) fineVal = 0;
-                    const grandTotal = baseTotal + fineVal;
+                    let otherVal = otherInput ? parseFloat(otherInput.value) : 0;
+                    if (isNaN(otherVal) || otherVal < 0) otherVal = 0;
+                    const grandTotal = baseTotal + fineVal + otherVal;
                     batchTotalDisplay.textContent = 'Rs. ' + grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                });
+                }
+                if (fineInput) fineInput.addEventListener('input', updateLiveBatchTotal);
+                if (otherInput) otherInput.addEventListener('input', updateLiveBatchTotal);
             }
         });
     </script>

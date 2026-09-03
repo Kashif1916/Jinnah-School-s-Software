@@ -422,8 +422,8 @@ function record_payment($student_id, $amount, $month, $received_by, $payment_mod
     try {
         $payment_date = date('Y-m-d H:i:s');
 
-        // Special handling for Fine / Late Fee
-        if ($month === 'Fine') {
+        // Special handling for Fine / Late Fee and Other Payments
+        if ($month === 'Fine' || $month === 'Other' || $month === 'Other Payment') {
             $query = "INSERT INTO payments (student_id, receipt_number, amount, paid_for_month, payment_date, received_by, payment_mode) 
                       VALUES (?, ?, ?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($query);
@@ -850,6 +850,86 @@ function schedule_promotion_annual_fees($student_id, $fixed_monthly_fee, $conces
             $ins->close();
         }
     }
+}
+
+/**
+ * Calculate late fee fine for a month (Rs. 20 per day starting from 11th date of month, active from August 2026 onwards)
+ * Note: Months before August 2026 (e.g. Jan-Jul 2026, Pre_Year, Admission, Package) have NO fine (0).
+ */
+function calculate_month_late_fine($month, $today_date = null) {
+    if (empty($month)) return 0;
+    
+    // Exclude non-monthly fee records
+    $excluded = ['Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Fine', 'Other', 'Other Payment'];
+    if (in_array($month, $excluded) || strpos($month, 'Package') !== false) {
+        return 0;
+    }
+    
+    $month_time = strtotime("01-" . $month);
+    if ($month_time === false) return 0;
+    
+    // Fine system start cutoff: August 2026 (01-Aug-2026)
+    // No fine should be charged on any month prior to August 2026
+    $fine_system_start_month = strtotime("2026-09-01");
+    if ($month_time < $fine_system_start_month) {
+        return 0;
+    }
+    
+    // Standard due date: 10th of the fee month (e.g. 10-Aug-2026, 10-Sep-2026)
+    $due_time = strtotime("10-" . $month);
+    if ($due_time === false) return 0;
+    
+    $today_time = $today_date ? strtotime(date('Y-m-d', strtotime($today_date))) : strtotime(date('Y-m-d'));
+    
+    // Fine starts from 11th date of the month (i.e. strictly after 10th)
+    if ($today_time > $due_time) {
+        $late_days = intval(floor(($today_time - $due_time) / 86400));
+        return $late_days * 20;
+    }
+    
+    return 0;
+}
+
+/**
+ * Calculate total late fine for a batch of cart items:
+ * For EACH unique student in the cart, find that student's oldest eligible fee month (Aug 2026 onwards),
+ * calculate that student's late fine (Rs. 20/day starting from 11th of their oldest overdue month),
+ * and sum the fines across all students in the batch.
+ */
+function calculate_batch_late_fine($cart_items, $today_date = null) {
+    if (empty($cart_items) || !is_array($cart_items)) return 0;
+    
+    $excluded = ['Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Fine', 'Other', 'Other Payment'];
+    $fine_system_start_month = strtotime("2026-09-01");
+    
+    // Group cart items by student_id to find each student's oldest eligible month (Aug 2026 onwards)
+    $student_oldest_month = [];
+    
+    foreach ($cart_items as $item) {
+        $student_id = $item['student_id'] ?? 0;
+        $month = $item['month'] ?? '';
+        
+        if (empty($month) || in_array($month, $excluded) || strpos($month, 'Package') !== false) {
+            continue;
+        }
+        
+        $m_time = strtotime("01-" . $month);
+        if ($m_time !== false && $m_time >= $fine_system_start_month) {
+            if (!isset($student_oldest_month[$student_id]) || $m_time < $student_oldest_month[$student_id]['time']) {
+                $student_oldest_month[$student_id] = [
+                    'time' => $m_time,
+                    'month' => $month
+                ];
+            }
+        }
+    }
+    
+    $total_fine = 0;
+    foreach ($student_oldest_month as $stud_id => $data) {
+        $total_fine += calculate_month_late_fine($data['month'], $today_date);
+    }
+    
+    return $total_fine;
 }
 
 ?>
