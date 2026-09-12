@@ -36,11 +36,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['close_clerk_account']
             $stmt = $conn->prepare($query);
             $stmt->bind_param('si', $next_midnight, $clerk_user_id);
             if ($stmt->execute()) {
+                $stmt->close();
+
+                // Log this account close event
+                $master_username = get_username();
+                $ip_address = $_SERVER['REMOTE_ADDR'] ?? '';
+                $log_stmt = $conn->prepare("INSERT INTO account_close_logs (user_id, username, role, closed_by, closed_at, frozen_until, ip_address, status) VALUES (?, ?, 'finance', ?, NOW(), ?, ?, 'closed_by_master')");
+                if ($log_stmt) {
+                    $log_stmt->bind_param('issss', $clerk_user_id, $target_clerk, $master_username, $next_midnight, $ip_address);
+                    $log_stmt->execute();
+                    $log_stmt->close();
+                }
+
                 $success = "Account for clerk <strong>" . htmlspecialchars($target_clerk) . "</strong> has been successfully received and closed for today. It will unfreeze at midnight!";
             } else {
                 $error = 'Failed to close clerk account: ' . $conn->error;
+                $stmt->close();
             }
-            $stmt->close();
         } else {
             $error = "Selected clerk user was not found in database.";
         }
@@ -465,6 +477,7 @@ $cash_remaining = $total_cash - $total_expenses;
                             <i class="fas fa-user-minus text-success"></i> Delete Student
                         </a>
                         <a href="users.php" class="module-nav-btn"><i class="fas fa-users-cog"></i> Users</a>
+                        <a href="account_close_log.php" class="module-nav-btn"><i class="fas fa-lock"></i> Close Logs</a>
                         <a href="receipt_note.php" class="module-nav-btn"><i class="fas fa-sticky-note"></i> Custom Note</a>
                         <a href="../help.php" class="module-nav-btn">
                             <i class="fas fa-question-circle text-success"></i> Help & About

@@ -40,53 +40,8 @@ if ($defaulters) {
     $all_defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
 }
 
-// Identify students with partial payment arrears & filter ONLY arrear months
-if ($arrears_only === 1) {
-    foreach ($all_defaulter_list as $k => $d) {
-        $s_id = intval($d['id']);
-        $fixed_fee = floatval($d['fixed_monthly_fee'] ?? 0);
-        $concession = floatval($d['concession_amount'] ?? 0);
-        $expected_monthly = floatval($d['monthly_fee'] ?? 0);
-        if ($expected_monthly <= 0) {
-            $expected_monthly = max(0, $fixed_fee - $concession);
-        }
-
-        $arrear_months_found = [];
-        if ($expected_monthly > 0) {
-            $arr_stmt = $conn->prepare("SELECT month FROM fee_records WHERE student_id = ? AND status = 'unpaid' AND amount > 0 AND amount < ? AND month NOT IN ('Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year') AND month NOT LIKE '%Package%'");
-            $arr_stmt->bind_param("id", $s_id, $expected_monthly);
-            $arr_stmt->execute();
-            $arr_res = $arr_stmt->get_result();
-            if ($arr_res) {
-                while ($r_row = $arr_res->fetch_assoc()) {
-                    $arrear_months_found[] = trim($r_row['month']);
-                }
-            }
-            $arr_stmt->close();
-        }
-
-        if (!empty($arrear_months_found)) {
-            $all_defaulter_list[$k]['has_arrears'] = true;
-            // Override pending count & list to show ONLY arrear month(s)
-            $all_defaulter_list[$k]['pending_count'] = count($arrear_months_found);
-            $all_defaulter_list[$k]['pending_months'] = implode(', ', $arrear_months_found);
-        } else {
-            $all_defaulter_list[$k]['has_arrears'] = false;
-        }
-    }
-
-    $all_defaulter_list = array_values(array_filter($all_defaulter_list, function($d) {
-        return !empty($d['has_arrears']);
-    }));
-} elseif ($min_3_months === 1) {
-    $all_defaulter_list = array_values(array_filter($all_defaulter_list, function($d) {
-        return isset($d['pending_count']) && intval($d['pending_count']) >= 3;
-    }));
-} elseif ($min_2_months === 1) {
-    $all_defaulter_list = array_values(array_filter($all_defaulter_list, function($d) {
-        return isset($d['pending_count']) && intval($d['pending_count']) >= 2;
-    }));
-}
+// Apply 2+ months, 3+ months, or arrears filter
+$all_defaulter_list = filter_defaulters_by_criteria($all_defaulter_list, $min_2_months, $min_3_months, $arrears_only, $months_filter);
 
 $total_defaulters = count($all_defaulter_list);
 $total_pages = ceil($total_defaulters / $limit);
@@ -282,8 +237,8 @@ if (!$is_filtered) {
                         <div class="table-header d-flex justify-content-between align-items-center mb-3">
                             <h4>Pending Fees (<?php echo $total_defaulters; ?>)</h4>
                             <div class="d-flex gap-2">
-                                <button type="submit" class="btn btn-success">
-                                    <i class="fas fa-file-pdf me-1"></i> Export Selected Challans (PDF)
+                                <button type="submit" class="btn btn-success" id="exportChallansBtn">
+                                    <i class="fas fa-file-pdf me-1"></i> Export Challans (Whole List) (PDF)
                                 </button>
                                 <?php 
                                     $query_data = [
@@ -391,14 +346,35 @@ if (!$is_filtered) {
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         var selectAll = document.getElementById('selectAllStudents');
+        var exportBtn = document.getElementById('exportChallansBtn');
+
+        function updateExportButtonText() {
+            if (!exportBtn) return;
+            var checkedBoxes = document.querySelectorAll('.student-cb:checked');
+            if (checkedBoxes.length > 0) {
+                exportBtn.innerHTML = '<i class="fas fa-file-pdf me-1"></i> Export Selected Challans (' + checkedBoxes.length + ') (PDF)';
+            } else {
+                exportBtn.innerHTML = '<i class="fas fa-file-pdf me-1"></i> Export Challans (Whole List) (PDF)';
+            }
+        }
+
         if (selectAll) {
             selectAll.addEventListener('change', function() {
                 var checkboxes = document.querySelectorAll('.student-cb');
                 checkboxes.forEach(function(cb) {
                     cb.checked = selectAll.checked;
                 });
+                updateExportButtonText();
             });
         }
+
+        document.querySelectorAll('.student-cb').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                updateExportButtonText();
+            });
+        });
+
+        updateExportButtonText();
 
         // Mutual exclusion between 2+, 3+, and Arrears checkboxes
         var min2Cb = document.getElementById('min_2_months');

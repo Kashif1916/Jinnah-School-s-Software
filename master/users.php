@@ -144,7 +144,7 @@ if (isset($_GET['toggle_freeze'])) {
         $error = "You cannot freeze your own account!";
     } else {
         // Get current frozen status
-        $stmt = $conn->prepare("SELECT is_frozen, username FROM users WHERE id = ?");
+        $stmt = $conn->prepare("SELECT is_frozen, username, role FROM users WHERE id = ?");
         $stmt->bind_param("i", $toggle_id);
         $stmt->execute();
         $res = $stmt->get_result();
@@ -152,10 +152,24 @@ if (isset($_GET['toggle_freeze'])) {
         if ($res->num_rows > 0) {
             $user_row = $res->fetch_assoc();
             $new_frozen_status = intval($user_row['is_frozen']) === 1 ? 0 : 1;
-            $new_frozen_until = null; //
+            // When master freezes from users.php, it stays frozen indefinitely until master unfreezes
+            $new_frozen_until = null;
             $update_stmt = $conn->prepare("UPDATE users SET is_frozen = ?, frozen_until = ? WHERE id = ?");
             $update_stmt->bind_param("isi", $new_frozen_status, $new_frozen_until, $toggle_id);
             if ($update_stmt->execute()) {
+                if ($new_frozen_status === 1) {
+                    $master_user = get_username();
+                    $u_role = $user_row['role'] ?? 'finance';
+                    $l_stmt = $conn->prepare("INSERT INTO account_close_logs (user_id, username, role, closed_by, closed_at, frozen_until, status) VALUES (?, ?, ?, ?, NOW(), NULL, 'frozen_by_master')");
+                    if ($l_stmt) {
+                        $l_stmt->bind_param("isss", $toggle_id, $user_row['username'], $u_role, $master_user);
+                        $l_stmt->execute();
+                        $l_stmt->close();
+                    }
+                } else {
+                    // Update latest log status to unfrozen_by_master
+                    $conn->query("UPDATE account_close_logs SET status = 'unfrozen_by_master' WHERE user_id = " . intval($toggle_id) . " ORDER BY id DESC LIMIT 1");
+                }
                 $status_txt = $new_frozen_status === 1 ? 'frozen' : 'unfrozen';
                 $success = "User '" . htmlspecialchars($user_row['username']) . "' has been " . $status_txt . " successfully!";
             } else {
@@ -307,6 +321,9 @@ if ($users_result) {
                         </a>
                         <a href="users.php" class="module-nav-btn active">
                             <i class="fas fa-users-cog"></i> Users
+                        </a>
+                        <a href="account_close_log.php" class="module-nav-btn">
+                            <i class="fas fa-lock"></i> Close Logs
                         </a>
                         <a href="receipt_note.php" class="module-nav-btn">
                             <i class="fas fa-sticky-note"></i> Custom Note

@@ -358,6 +358,9 @@ if (isset($_GET['id'])) {
                             <a href="users.php" class="module-nav-btn">
                                 <i class="fas fa-users-cog"></i> Users
                             </a>
+                                                    <a href="account_close_log.php" class="module-nav-btn">
+                            <i class="fas fa-lock"></i> Close Logs
+                        </a>
                             <a href="receipt_note.php" class="module-nav-btn">
                                 <i class="fas fa-sticky-note"></i> Receipt Note
                             </a>
@@ -496,29 +499,26 @@ if (isset($_GET['id'])) {
                                     </tbody>
                                 </table>
                                 
-                                <div class="d-flex flex-wrap gap-4 align-items-end justify-content-between bg-light p-3 rounded border mt-3">
-                                    <div class="form-group mb-0" style="min-width: 250px;">
-                                        <label for="payment_mode" class="form-label fw-bold text-success mb-2">
-                                            <i class="fas fa-wallet"></i> Choose Payment Method:
-                                        </label>
-                                        <select id="payment_mode" name="payment_mode" class="form-select bg-white" required>
-                                            <option value="cash" selected>💵 Cash Payment</option>
-                                            <option value="bank_transfer">🏦 Bank / Account Transfer</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <div class="d-flex gap-3">
-                                        <a href="<?php echo $self_url; ?>" class="btn btn-outline-primary d-flex align-items-center">
-                                            <i class="fas fa-user-plus me-1"></i> Search & Add Another
-                                        </a>
-                                        <button type="submit" name="action" value="process_batch" class="btn btn-success px-4 d-flex align-items-center">
-                                            <i class="fas fa-print me-1"></i> Print Receipt
-                                        </button>
-                                        <button type="submit" name="action" value="clear_cart" class="btn btn-outline-danger d-flex align-items-center" onclick="return confirm('Clear batch list?')">
-                                            <i class="fas fa-trash me-1"></i> Clear Batch
-                                        </button>
-                                    </div>
-                                </div>
+                                <div class="d-flex flex-wrap gap-3 align-items-center justify-content-end bg-light p-3 rounded border mt-3">
+    <a href="<?php echo $self_url; ?>" class="btn btn-outline-primary d-flex align-items-center">
+        <i class="fas fa-user-plus me-1"></i> Search & Add Another
+    </a>
+
+    <button type="submit" name="action" value="process_batch" class="btn btn-success px-4 d-flex align-items-center">
+        <i class="fas fa-print me-1"></i> Print Receipt
+    </button>
+    
+    <div class="form-group mb-0" style="min-width: 220px;">
+        <select id="payment_mode" name="payment_mode" class="form-select bg-white" required>
+            <option value="cash" selected>💵 Cash Payment</option>
+            <option value="bank_transfer">🏦 Bank / Account Transfer</option>
+        </select>
+    </div>
+
+    <button type="submit" name="action" value="clear_cart" class="btn btn-outline-danger d-flex align-items-center" onclick="return confirm('Clear batch list?')">
+        <i class="fas fa-trash me-1"></i> Clear Batch
+    </button>
+</div>
                             </form>
                         </div>
                     <?php endif; ?>

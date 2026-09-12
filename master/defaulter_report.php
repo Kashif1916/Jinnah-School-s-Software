@@ -20,6 +20,9 @@ $class_filter = isset($_GET['class']) ? sanitize_input($_GET['class']) : '';
 $section_filter = isset($_GET['section']) ? sanitize_input($_GET['section']) : '';
 $name_filter = isset($_GET['name']) ? sanitize_input($_GET['name']) : '';
 $months_filter = isset($_GET['months']) ? (is_array($_GET['months']) ? $_GET['months'] : [sanitize_input($_GET['months'])]) : [];
+$min_2_months = (isset($_GET['min_2_months']) && $_GET['min_2_months'] == '1') ? 1 : 0;
+$min_3_months = (isset($_GET['min_3_months']) && $_GET['min_3_months'] == '1') ? 1 : 0;
+$arrears_only = (isset($_GET['arrears_only']) && $_GET['arrears_only'] == '1') ? 1 : 0;
 
 // Get defaulters
 $defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter);
@@ -27,6 +30,9 @@ $defaulter_list = [];
 if ($defaulters) {
     $defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
 }
+
+// Apply 2+ months, 3+ months, or arrears filter
+$defaulter_list = filter_defaulters_by_criteria($defaulter_list, $min_2_months, $min_3_months, $arrears_only, $months_filter);
 
 // Check if any college student (11th / 12th) exists in the report list
 $has_college_students = false;
@@ -171,6 +177,13 @@ if (!empty($class_filter) && is_college_class($class_filter)) {
                 Class: <?php echo !empty($class_filter) ? htmlspecialchars($class_filter) : 'All'; ?> |
                 Section: <?php echo !empty($section_filter) ? htmlspecialchars($section_filter) : 'All'; ?> |
                 Months: <?php echo !empty($months_filter) ? implode(', ', array_map('htmlspecialchars', $months_filter)) : 'All'; ?>
+                <?php if ($min_3_months === 1): ?>
+                    | <strong>Filter:</strong> 3+ Months Pending Only
+                <?php elseif ($min_2_months === 1): ?>
+                    | <strong>Filter:</strong> 2+ Months Pending Only
+                <?php elseif ($arrears_only === 1): ?>
+                    | <strong>Filter:</strong> Arrears Only (Partial Payments)
+                <?php endif; ?>
             </p>
             <p><strong>Total Pending Students:</strong> <?php echo count($defaulter_list); ?></p>
         </div>
@@ -213,7 +226,7 @@ if (!empty($class_filter) && is_college_class($class_filter)) {
                             <td><?php echo htmlspecialchars($defaulter['class'] . '-' . $defaulter['section']); ?></td>
                             <td>
                                 <?php if (!$is_college): ?>
-                                    <strong>(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Month)</strong><br>
+                                    <strong>(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Month<?php echo ($arrears_only === 1) ? ' Arrears' : ''; ?>)</strong><br>
                                 <?php endif; ?>
                                 <?php echo htmlspecialchars(str_replace(',', ', ', $defaulter['pending_months'])); ?>
                             </td>

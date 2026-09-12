@@ -401,16 +401,18 @@ $cash_remaining = $total_cash - $total_expenses;
             }
 
             .denomination-card {
-                padding: 15px !important;
+                display: block !important;
+                padding: 12px !important;
                 margin-top: 10px !important;
+                border: 1px solid #333 !important;
             }
             .denomination-heading {
                 font-size: 12px !important;
-                margin-bottom: 10px !important;
+                margin-bottom: 8px !important;
                 padding-bottom: 4px !important;
             }
             .denom-row {
-                margin-bottom: 6px !important;
+                margin-bottom: 4px !important;
                 font-size: 11px !important;
                 display: flex !important;
                 align-items: center !important;
@@ -421,12 +423,12 @@ $cash_remaining = $total_cash - $total_expenses;
                 display: inline-block !important;
             }
             .denom-multiply {
-                width: 25px !important;
+                width: 20px !important;
                 display: inline-block !important;
                 text-align: center !important;
             }
             .denom-input-col {
-                width: 60px !important;
+                width: 50px !important;
                 display: inline-block !important;
                 text-align: center !important;
             }
@@ -437,9 +439,13 @@ $cash_remaining = $total_cash - $total_expenses;
                 width: 100% !important;
                 text-align: center !important;
                 font-size: 11px !important;
+                font-weight: bold !important;
+                color: #000 !important;
+                -webkit-appearance: none !important;
+                -moz-appearance: textfield !important;
             }
             .denom-equal {
-                width: 25px !important;
+                width: 20px !important;
                 display: inline-block !important;
                 text-align: center !important;
             }
@@ -447,10 +453,11 @@ $cash_remaining = $total_cash - $total_expenses;
                 text-align: right !important;
                 flex-grow: 1 !important;
                 display: inline-block !important;
+                font-weight: bold !important;
             }
             .denom-grand-total-row {
-                margin-top: 10px !important;
-                padding-top: 8px !important;
+                margin-top: 8px !important;
+                padding-top: 6px !important;
                 font-size: 12px !important;
             }
             .denom-cash-collected-row {
@@ -459,7 +466,7 @@ $cash_remaining = $total_cash - $total_expenses;
                 font-size: 11px !important;
             }
             .difference-row {
-                margin-top: 8px !important;
+                margin-top: 6px !important;
                 padding-top: 6px !important;
                 font-size: 12px !important;
             }
@@ -888,6 +895,10 @@ $cash_remaining = $total_cash - $total_expenses;
         function calcDenom(inputElement) {
             const noteValue = parseInt(inputElement.getAttribute('data-value'));
             const count = parseInt(inputElement.value) || 0;
+            
+            // Explicitly set value attribute for HTML print renderer compatibility
+            inputElement.setAttribute('value', count > 0 ? count : '');
+
             const lineTotal = noteValue * count;
             
             // Update individual note total

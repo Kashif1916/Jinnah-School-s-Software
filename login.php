@@ -80,7 +80,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     
                     $is_frozen = 0; // Unfrozen
                 } else {
-                    $error = 'Your account is closed/frozen for today. It will activate automatically at 12:00 AM.';
+                    if (!empty($frozen_until)) {
+                        $error = 'Your account is closed/frozen for today. It will activate automatically at 12:00 AM.';
+                    } else {
+                        $error = 'Your account has been frozen by the Principal / Administrator. Please contact Master to unfreeze.';
+                    }
                 }
             }
             

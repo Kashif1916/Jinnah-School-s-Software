@@ -310,6 +310,81 @@ function get_defaulters($class = '', $section = '', $months = [], $name = '') {
 }
 
 /**
+ * Filter defaulters list by 2+ months, 3+ months, or arrears only
+ * 
+ * @param array $all_defaulter_list Array of defaulter records
+ * @param int $min_2_months Filter for 2+ months pending
+ * @param int $min_3_months Filter for 3+ months pending
+ * @param int $arrears_only Filter for partial payment arrears only
+ * @param array $months_filter Optional specific months filter
+ * @return array Filtered array of defaulters
+ */
+function filter_defaulters_by_criteria($all_defaulter_list, $min_2_months = 0, $min_3_months = 0, $arrears_only = 0, $months_filter = []) {
+    global $conn;
+
+    if (empty($all_defaulter_list) || !is_array($all_defaulter_list)) {
+        return [];
+    }
+
+    $min_2_months = !empty($min_2_months) ? 1 : 0;
+    $min_3_months = !empty($min_3_months) ? 1 : 0;
+    $arrears_only = !empty($arrears_only) ? 1 : 0;
+
+    if ($arrears_only === 1) {
+        foreach ($all_defaulter_list as $k => $d) {
+            $s_id = intval($d['id']);
+            $fixed_fee = floatval($d['fixed_monthly_fee'] ?? 0);
+            $concession = floatval($d['concession_amount'] ?? 0);
+            $expected_monthly = floatval($d['monthly_fee'] ?? 0);
+            if ($expected_monthly <= 0) {
+                $expected_monthly = max(0, $fixed_fee - $concession);
+            }
+
+            $arrear_months_found = [];
+            if ($expected_monthly > 0) {
+                $arr_stmt = $conn->prepare("SELECT month FROM fee_records WHERE student_id = ? AND status = 'unpaid' AND amount > 0 AND amount < ? AND month NOT IN ('Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year') AND month NOT LIKE '%Package%'");
+                $arr_stmt->bind_param("id", $s_id, $expected_monthly);
+                $arr_stmt->execute();
+                $arr_res = $arr_stmt->get_result();
+                if ($arr_res) {
+                    while ($r_row = $arr_res->fetch_assoc()) {
+                        $m_trimmed = trim($r_row['month']);
+                        if (!empty($months_filter) && !in_array($m_trimmed, (array)$months_filter)) {
+                            continue;
+                        }
+                        $arrear_months_found[] = $m_trimmed;
+                    }
+                }
+                $arr_stmt->close();
+            }
+
+            if (!empty($arrear_months_found)) {
+                $all_defaulter_list[$k]['has_arrears'] = true;
+                // Override pending count & list to show ONLY arrear month(s)
+                $all_defaulter_list[$k]['pending_count'] = count($arrear_months_found);
+                $all_defaulter_list[$k]['pending_months'] = implode(', ', $arrear_months_found);
+            } else {
+                $all_defaulter_list[$k]['has_arrears'] = false;
+            }
+        }
+
+        $all_defaulter_list = array_values(array_filter($all_defaulter_list, function($d) {
+            return !empty($d['has_arrears']);
+        }));
+    } elseif ($min_3_months === 1) {
+        $all_defaulter_list = array_values(array_filter($all_defaulter_list, function($d) {
+            return isset($d['pending_count']) && intval($d['pending_count']) >= 3;
+        }));
+    } elseif ($min_2_months === 1) {
+        $all_defaulter_list = array_values(array_filter($all_defaulter_list, function($d) {
+            return isset($d['pending_count']) && intval($d['pending_count']) >= 2;
+        }));
+    }
+
+    return $all_defaulter_list;
+}
+
+/**
  * Get paid students list
  */
 function get_paid_students($class = '', $section = '', $months = [], $name = '') {
@@ -710,6 +785,9 @@ function render_role_topbar_and_nav($page_title, $active_page) {
                     <a href="users.php" class="module-nav-btn <?php echo ($active_page === 'users') ? 'active' : ''; ?>">
                         <i class="fas fa-users-cog"></i> Users
                     </a>
+                    <a href="account_close_log.php" class="module-nav-btn <?php echo ($active_page === 'account_close_log') ? 'active' : ''; ?>">
+                            <i class="fas fa-lock"></i> Close Logs
+                        </a>
                     <a href="receipt_note.php" class="module-nav-btn <?php echo ($active_page === 'receipt_note') ? 'active' : ''; ?>">
                         <i class="fas fa-sticky-note"></i> Custom Note
                     </a>

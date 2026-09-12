@@ -16,20 +16,35 @@ $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['close_account'])) {
     $user_id = get_user_id();
+    $username = get_username();
+    $role = $_SESSION['role'] ?? 'finance';
     $next_midnight = date('Y-m-d 00:00:00', strtotime('tomorrow'));
+    $ip_address = $_SERVER['REMOTE_ADDR'] ?? '';
+    $closed_by = $username;
     
     $query = "UPDATE users SET is_frozen = 1, frozen_until = ? WHERE id = ?";
     $stmt = $conn->prepare($query);
     $stmt->bind_param('si', $next_midnight, $user_id);
     if ($stmt->execute()) {
         $stmt->close();
+        
+        // Log this account close event
+        $log_query = "INSERT INTO account_close_logs (user_id, username, role, closed_by, closed_at, frozen_until, ip_address, status) 
+                      VALUES (?, ?, ?, ?, NOW(), ?, ?, 'closed')";
+        $log_stmt = $conn->prepare($log_query);
+        if ($log_stmt) {
+            $log_stmt->bind_param('isssss', $user_id, $username, $role, $closed_by, $next_midnight, $ip_address);
+            $log_stmt->execute();
+            $log_stmt->close();
+        }
+        
         session_destroy();
         header('Location: ../login.php?error=closed');
         exit();
     } else {
         $error = 'Failed to close account: ' . $conn->error;
+        $stmt->close();
     }
-    $stmt->close();
 }
 ?>
 <!DOCTYPE html>

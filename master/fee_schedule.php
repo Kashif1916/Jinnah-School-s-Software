@@ -127,6 +127,9 @@ if ($res) {
                         <a href="users.php" class="module-nav-btn">
                             <i class="fas fa-users-cog"></i> Users
                         </a>
+                        <a href="account_close_log.php" class="module-nav-btn">
+                            <i class="fas fa-lock"></i> Close Logs
+                        </a>
                         <a href="receipt_note.php" class="module-nav-btn">
                             <i class="fas fa-sticky-note"></i> Custom Note
                         </a>

@@ -459,6 +459,7 @@ if ($student_id == 0) {
                             <i class="fas fa-user-minus text-success"></i> Delete Student
                         </a>
                         <a href="users.php" class="module-nav-btn"><i class="fas fa-users-cog"></i> Users</a>
+                        <a href="account_close_log.php" class="module-nav-btn"><i class="fas fa-lock"></i> Close Logs</a>
                         <a href="receipt_note.php" class="module-nav-btn"><i class="fas fa-sticky-note"></i> Custom Note</a>
                         <a href="../help.php" class="module-nav-btn"><i class="fas fa-question-circle text-success"></i> Help & About</a>
                     </div>

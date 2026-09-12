@@ -20,6 +20,9 @@ $class_filter = isset($_REQUEST['class']) ? sanitize_input($_REQUEST['class']) :
 $section_filter = isset($_REQUEST['section']) ? sanitize_input($_REQUEST['section']) : '';
 $name_filter = isset($_REQUEST['name']) ? sanitize_input($_REQUEST['name']) : '';
 $months_filter = isset($_REQUEST['months']) ? (is_array($_REQUEST['months']) ? $_REQUEST['months'] : [sanitize_input($_REQUEST['months'])]) : [];
+$min_2_months = (isset($_REQUEST['min_2_months']) && $_REQUEST['min_2_months'] == '1') ? 1 : 0;
+$min_3_months = (isset($_REQUEST['min_3_months']) && $_REQUEST['min_3_months'] == '1') ? 1 : 0;
+$arrears_only = (isset($_REQUEST['arrears_only']) && $_REQUEST['arrears_only'] == '1') ? 1 : 0;
 
 $selected_student_ids = [];
 if (isset($_REQUEST['student_ids'])) {
@@ -39,6 +42,9 @@ if ($defaulters_query) {
     $all_defaulter_list = $defaulters_query->fetch_all(MYSQLI_ASSOC);
 }
 
+// Apply 2+ months, 3+ months, or arrears filter
+$all_defaulter_list = filter_defaulters_by_criteria($all_defaulter_list, $min_2_months, $min_3_months, $arrears_only, $months_filter);
+
 // Filter down to selected students if specific IDs were submitted
 $defaulter_list = [];
 if (!empty($selected_student_ids)) {
@@ -52,7 +58,7 @@ if (!empty($selected_student_ids)) {
 }
 
 if (empty($defaulter_list)) {
-    die('<div style="padding: 20px; font-family: sans-serif; text-align: center;"><h3>No pending fee records found for the selected student(s).</h3><a href="javascript:history.back()">Go Back</a></div>');
+    die('<div style="padding: 20px; font-family: sans-serif; text-align: center;"><h3>No pending fee records found for the selected student(s) with the active filter.</h3><a href="javascript:history.back()">Go Back</a></div>');
 }
 
 // DIRECT DB FETCH: Har defaulter student ka exact fee structure fetch kar rahe hain
@@ -317,7 +323,15 @@ if ($setting_res) {
     <div class="no-print-bar">
         <div>
             <h4 style="margin:0; color:#1f5f46;"><i class="fas fa-file-invoice"></i> Pending Fee Challan Slips</h4>
-            <small style="color:#666;">Generated <?php echo count($defaulter_list); ?> Challan(s)</small>
+            <small style="color:#666;">Generated <?php echo count($defaulter_list); ?> Challan(s)
+                <?php if ($min_3_months === 1): ?>
+                    (3+ Months Pending Only)
+                <?php elseif ($min_2_months === 1): ?>
+                    (2+ Months Pending Only)
+                <?php elseif ($arrears_only === 1): ?>
+                    (Arrears Only)
+                <?php endif; ?>
+            </small>
         </div>
         <button onclick="window.print()" class="btn-print">
             <i class="fas fa-print"></i> Print / Save PDF
@@ -389,7 +403,6 @@ if ($setting_res) {
             foreach ($unpaid_records as $rec) {
                 $paid_month = trim($rec['month']);
                 $amt = floatval($rec['amount']);
-                $total_student_pending += $amt;
 
                 $is_admission = ($paid_month === 'Admission');
                 $is_prev_year = (in_array($paid_month, ['Pre_Year', 'Prev-Year', 'Pre-Year']) || strpos($paid_month, 'Prev-Year') !== false);
@@ -398,6 +411,13 @@ if ($setting_res) {
                 // ARREARS / PARTIAL PAYMENT CHECK:
                 // Regular month ki balance amount agar expected net monthly fee se kam ho, to wo arrear mark hoga.
                 $is_arrear = (!$is_admission && !$is_prev_year && !$is_package && $expected_monthly > 0 && $amt < $expected_monthly);
+
+                // When arrears_only filter is active, skip non-arrear fee records
+                if ($arrears_only === 1 && !$is_arrear) {
+                    continue;
+                }
+
+                $total_student_pending += $amt;
 
                 if ($is_admission) {
                     $group_key = 'admission';
@@ -433,6 +453,11 @@ if ($setting_res) {
                 }
 
                 $grouped_challan[$group_key]['total_amount'] += $amt;
+            }
+
+            // If no records to show for this student with active filter, skip card
+            if (empty($grouped_challan)) {
+                continue;
             }
 
             // Build Title for grouped regular full months

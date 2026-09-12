@@ -158,6 +158,25 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
             FOREIGN KEY (`student_id`) REFERENCES `students`(`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
+
+    // Dynamically ensure account_close_logs table exists
+    $tableCheckCloseLogs = $conn->query("SHOW TABLES LIKE 'account_close_logs'");
+    if ($tableCheckCloseLogs && $tableCheckCloseLogs->num_rows == 0) {
+        $conn->query("CREATE TABLE `account_close_logs` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT NOT NULL,
+            `username` VARCHAR(50) NOT NULL,
+            `role` VARCHAR(50) DEFAULT 'finance',
+            `closed_by` VARCHAR(50) NOT NULL,
+            `closed_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `frozen_until` DATETIME NULL DEFAULT NULL,
+            `ip_address` VARCHAR(45) DEFAULT NULL,
+            `status` VARCHAR(30) DEFAULT 'closed',
+            INDEX (`user_id`),
+            INDEX (`username`),
+            INDEX (`closed_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
 }
 
 /**
