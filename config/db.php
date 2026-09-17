@@ -98,6 +98,16 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
         $conn->query("ALTER TABLE `students` ADD COLUMN `is_package` TINYINT(1) DEFAULT 0 AFTER package_amount");
     }
 
+    // Dynamically ensure b_form and address columns exist in students table
+    $colCheckBForm = $conn->query("SHOW COLUMNS FROM `students` LIKE 'b_form'");
+    if ($colCheckBForm && $colCheckBForm->num_rows == 0) {
+        $conn->query("ALTER TABLE `students` ADD COLUMN `b_form` VARCHAR(50) DEFAULT NULL AFTER `father_name`");
+    }
+    $colCheckAddress = $conn->query("SHOW COLUMNS FROM `students` LIKE 'address'");
+    if ($colCheckAddress && $colCheckAddress->num_rows == 0) {
+        $conn->query("ALTER TABLE `students` ADD COLUMN `address` VARCHAR(255) DEFAULT NULL AFTER `whatsapp_number`");
+    }
+
     // Dynamically ensure settings table exists
     $tableCheckSettings = $conn->query("SHOW TABLES LIKE 'settings'");
     if ($tableCheckSettings && $tableCheckSettings->num_rows == 0) {
@@ -137,6 +147,22 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
         $conn->query("ALTER TABLE `users` ADD COLUMN `edit_access` TINYINT DEFAULT 0");
     }
 
+    // Dynamically ensure fee_records.month and payments.paid_for_month are at least VARCHAR(50)
+    $colFeeMonth = $conn->query("SHOW COLUMNS FROM `fee_records` LIKE 'month'");
+    if ($colFeeMonth && $colFeeMonth->num_rows > 0) {
+        $row = $colFeeMonth->fetch_assoc();
+        if (isset($row['Type']) && strpos($row['Type'], 'varchar(20)') !== false) {
+            $conn->query("ALTER TABLE `fee_records` MODIFY COLUMN `month` VARCHAR(50) NOT NULL");
+        }
+    }
+    $colPayMonth = $conn->query("SHOW COLUMNS FROM `payments` LIKE 'paid_for_month'");
+    if ($colPayMonth && $colPayMonth->num_rows > 0) {
+        $row = $colPayMonth->fetch_assoc();
+        if (isset($row['Type']) && strpos($row['Type'], 'varchar(20)') !== false) {
+            $conn->query("ALTER TABLE `payments` MODIFY COLUMN `paid_for_month` VARCHAR(50) NOT NULL");
+        }
+    }
+
     // Dynamically ensure 'teacher' role exists in the role enum
     $colCheckRole = $conn->query("SHOW COLUMNS FROM `users` LIKE 'role'");
     if ($colCheckRole && $colCheckRole->num_rows > 0) {
@@ -144,6 +170,30 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
         if (isset($row['Type']) && strpos($row['Type'], 'teacher') === false) {
             $conn->query("ALTER TABLE `users` MODIFY COLUMN `role` ENUM('master', 'finance', 'admission', 'teacher') NOT NULL");
         }
+    }
+    // Dynamically ensure calculator_audit_logs table exists
+    $tableCheckAuditLogs = $conn->query("SHOW TABLES LIKE 'calculator_audit_logs'");
+    if ($tableCheckAuditLogs && $tableCheckAuditLogs->num_rows == 0) {
+        $conn->query("CREATE TABLE `calculator_audit_logs` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT NULL DEFAULT NULL,
+            `username` VARCHAR(100) NOT NULL,
+            `log_date` DATE NOT NULL,
+            `d_5000` INT DEFAULT 0,
+            `d_1000` INT DEFAULT 0,
+            `d_500` INT DEFAULT 0,
+            `d_100` INT DEFAULT 0,
+            `d_75` INT DEFAULT 0,
+            `d_50` INT DEFAULT 0,
+            `d_20` INT DEFAULT 0,
+            `d_10` INT DEFAULT 0,
+            `grand_total` DECIMAL(12, 2) DEFAULT 0.00,
+            `cash_collected` DECIMAL(12, 2) DEFAULT 0.00,
+            `difference` DECIMAL(12, 2) DEFAULT 0.00,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY `user_date_unique` (`username`, `log_date`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
 
     // Dynamically ensure dropped_students table exists

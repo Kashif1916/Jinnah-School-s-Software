@@ -114,12 +114,20 @@ if (!empty($payments_to_display)) {
         $paid_month = $payment['paid_for_month'] ?? $payment['month'] ?? '';
         
         $is_admission = (trim($paid_month) === 'Admission');
-        $is_prev_year = (trim($paid_month) === 'Prev-Year' || strpos($paid_month, 'Prev-Year') !== false);
+        $is_prev_year = (trim($paid_month) === 'Prev-Year' || strpos($paid_month, 'Prev-Year') !== false || strpos($paid_month, 'Pre_Year') !== false);
         $is_fine = (trim($paid_month) === 'Fine' || strpos($paid_month, 'Fine') !== false);
-        $is_other = (trim($paid_month) === 'Other' || trim($paid_month) === 'Other Payment' || strpos($paid_month, 'Other') !== false);
+        $is_other = (trim($paid_month) === 'Other' || trim($paid_month) === 'Other Payment');
+        
+        // Check if this is a custom scheduled other fee (e.g. Exam Fee, Party Fee, Photo Fee, etc.)
+        $is_custom_other = false;
+        if (!$is_admission && !$is_prev_year && !$is_fine && !$is_other) {
+            if (!preg_match('/^[A-Za-z]{3}-[0-9]{4}$/', trim($paid_month)) && stripos($paid_month, 'package') === false) {
+                $is_custom_other = true;
+            }
+        }
         
         $is_pending = false;
-        if ($paid_month && !$is_admission && !$is_prev_year && !$is_fine && !$is_other) {
+        if ($paid_month && !$is_admission && !$is_prev_year && !$is_fine && !$is_other && !$is_custom_other) {
             $stmt_check = $conn->prepare("SELECT id FROM payments WHERE student_id = ? AND paid_for_month = ? AND id < ? LIMIT 1");
             $stmt_check->bind_param("isi", $student_id, $paid_month, $payment['id']);
             $stmt_check->execute();
@@ -140,6 +148,8 @@ if (!empty($payments_to_display)) {
             $group_key = $student_id . '_fine_' . $payment['id'];
         } elseif ($is_other) {
             $group_key = $student_id . '_other_' . $payment['id'];
+        } elseif ($is_custom_other) {
+            $group_key = $student_id . '_custom_other_' . $payment['id'];
         } else {
             $group_key = $student_id . '_months';
         }
@@ -159,6 +169,8 @@ if (!empty($payments_to_display)) {
                 'is_pending' => $is_pending,
                 'is_fine' => $is_fine,
                 'is_other' => $is_other,
+                'is_custom_other' => $is_custom_other,
+                'custom_title' => $paid_month,
                 'months' => [],
                 'total_amount' => 0.0,
                 'payment_mode' => $payment['payment_mode'] ?? 'cash',
@@ -171,6 +183,8 @@ if (!empty($payments_to_display)) {
             $grouped_payments[$group_key]['months'][] = 'Fine / Late Fee';
         } elseif ($is_other) {
             $grouped_payments[$group_key]['months'][] = 'Other Payment';
+        } elseif ($is_custom_other) {
+            $grouped_payments[$group_key]['months'][] = $paid_month;
         } else {
             $grouped_payments[$group_key]['months'][] = $paid_month;
         }
@@ -342,6 +356,9 @@ ob_start();
                                         <strong style="font-size: 14px;">Fine for Late Fee</strong>
                                     <?php elseif (!empty($group['is_other'])): ?>
                                         <strong style="font-size: 14px;">Other Payment / Charges</strong>
+                                    <?php elseif (!empty($group['is_custom_other'])): ?>
+                                        <strong style="font-size: 14px;"><?php echo htmlspecialchars($group['custom_title']); ?><?php echo !empty($group['is_pending']) ? ' Arrears' : ''; ?></strong>
+                                        <br><small class="text-muted" style="font-size: 11px; color: #0c0c0c;"><?php echo htmlspecialchars($group['name']) . ' / ' . htmlspecialchars($group['father_name']); ?> (<?php echo htmlspecialchars($group['class']) . '-' . htmlspecialchars($group['section']); ?>)</small>
                                     <?php else: ?>
                                         <strong style="font-size: 14px;"><?php echo htmlspecialchars($group['name']) . ' / ' . htmlspecialchars($group['father_name']); ?></strong><br>
                                         <?php echo htmlspecialchars($group['class']) . '-' . htmlspecialchars($group['section']); ?> | <?php echo implode(', ', $group['months']); ?>

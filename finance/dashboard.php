@@ -119,6 +119,28 @@ for ($i = 0; $i < 12; $i++) {
     $m_label = date('F Y', strtotime("-$i month", $first_day_of_month));
     $month_options[$m_key] = $m_label;
 }
+
+// Monthly Fine & Other Fees Collection Queries
+$start_of_month = date('Y-m-01 00:00:00');
+$end_of_month = date('Y-m-t 23:59:59');
+
+$this_month_fine = 0.00;
+$fine_coll_res = $conn->query("SELECT SUM(amount) as total FROM payments 
+                               WHERE paid_for_month = 'Fine' 
+                                 AND payment_date >= '$start_of_month' AND payment_date <= '$end_of_month'");
+if ($fine_coll_res) {
+    $this_month_fine = floatval($fine_coll_res->fetch_assoc()['total'] ?? 0);
+}
+
+$this_month_other_fee = 0.00;
+$other_fee_res = $conn->query("SELECT SUM(p.amount) as total FROM payments p
+                               WHERE p.payment_date >= '$start_of_month' AND p.payment_date <= '$end_of_month'
+                                 AND p.paid_for_month NOT IN ('Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Fine', 'Other')
+                                 AND p.paid_for_month NOT REGEXP '^[A-Za-z]{3}-[0-9]{4}$'
+                                 AND p.paid_for_month NOT LIKE '%Package%'");
+if ($other_fee_res) {
+    $this_month_other_fee = floatval($other_fee_res->fetch_assoc()['total'] ?? 0);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -387,6 +409,28 @@ for ($i = 0; $i < 12; $i++) {
                                     </li>
                                 <?php endforeach; ?>
                             </ul>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Block 9 (This Month Fine) -->
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
+                            <i class="fas fa-exclamation-circle"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 style="white-space: nowrap;"><?php echo format_currency(round($this_month_fine)); ?></h3>
+                            <p>This Month Fine</p>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Block 10 (This Month Other Fee) -->
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
+                            <i class="fas fa-tags"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 style="white-space: nowrap;"><?php echo format_currency(round($this_month_other_fee)); ?></h3>
+                            <p>This Month Other Dues</p>
                         </div>
                     </div>
                 </div>

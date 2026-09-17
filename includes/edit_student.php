@@ -81,6 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $student_id = intval($_POST['student_id'] ?? 0);
         $name = sanitize_input($_POST['name'] ?? '');
         $father_name = sanitize_input($_POST['father_name'] ?? '');
+        $b_form = sanitize_input($_POST['b_form'] ?? '');
+        $address = sanitize_input($_POST['address'] ?? '');
         $class = sanitize_input($_POST['class'] ?? '');
         $section = sanitize_input($_POST['section'] ?? '');
         $contact_number = sanitize_input($_POST['contact_number'] ?? '');
@@ -124,10 +126,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $net_fee = $fixed_monthly_fee - $concession_amount;
                 if ($net_fee < 0) $net_fee = 0;
 
-                $query = "UPDATE students SET name = ?, father_name = ?, class = ?, section = ?, 
+                $query = "UPDATE students SET name = ?, father_name = ?, b_form = ?, address = ?, class = ?, section = ?, 
                           fixed_monthly_fee = ?, package_amount = ?, is_package = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ? WHERE id = ?";
                 $stmt = $conn->prepare($query);
-                $stmt->bind_param('ssssddisssdsi', $name, $father_name, $class, $section, $fixed_monthly_fee, $package_amount, $is_package, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
+                $stmt->bind_param('ssssssddisssdsi', $name, $father_name, $b_form, $address, $class, $section, $fixed_monthly_fee, $package_amount, $is_package, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
 
                 if ($stmt->execute()) {
                     if (!empty($selected_months)) {
@@ -227,8 +229,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 <?php endif; ?>
 
-                <!-- Search Section -->
-                
                 <!-- Search Results -->
                 <?php if (!empty($search_results)): ?>
                     <div class="table-section mb-4">
@@ -266,155 +266,159 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 <?php endif; ?>
 
-                <!-- Edit Form -->
+                <!-- Edit Form (Matching Add Student Structure) -->
                 <?php if ($student): ?>
-                    <div class="form-container">
-                        <h4 class="mb-4"><i class="fas fa-user-edit me-2"></i>Edit Student: <?php echo htmlspecialchars($student['name']); ?> (ID: <?php echo $student['id']; ?>)</h4>
-                        <form method="POST" class="student-form" id="editStudentForm">
-                            <input type="hidden" name="action" value="update">
-                            <input type="hidden" name="student_id" value="<?php echo $student['id']; ?>">
+                    <form method="POST" class="student-form" id="editStudentForm">
+                        <input type="hidden" name="action" value="update">
+                        <input type="hidden" name="student_id" value="<?php echo $student['id']; ?>">
 
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label" for="name">Student Name *</label>
-                                    <input type="text" id="name" name="name" class="form-control" value="<?php echo htmlspecialchars($student['name']); ?>" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="father_name">Father's Name *</label>
-                                    <input type="text" id="father_name" name="father_name" class="form-control" value="<?php echo htmlspecialchars($student['father_name']); ?>" required>
-                                </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="name">Student Name *</label>
+                                <input type="text" id="name" name="name" class="form-control" value="<?php echo htmlspecialchars($student['name']); ?>" required>
                             </div>
-
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label" for="class">Class *</label>
-                                    <select id="class" name="class" class="form-select" required>
-                                        <?php foreach ($CLASSES as $cls): ?>
-                                            <option value="<?php echo $cls; ?>" <?php echo ($student['class'] === $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="section">Section *</label>
-                                    <select id="section" name="section" class="form-select" required>
-                                        <?php foreach ($SECTIONS as $sec): ?>
-                                            <option value="<?php echo $sec; ?>" <?php echo ($student['section'] === $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="father_name">Father's Name *</label>
+                                <input type="text" id="father_name" name="father_name" class="form-control" value="<?php echo htmlspecialchars($student['father_name']); ?>" required>
                             </div>
+                        </div>
 
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="b_form">B-Form / CNIC</label>
+                                <input type="text" id="b_form" name="b_form" class="form-control" value="<?php echo htmlspecialchars($student['b_form'] ?? ''); ?>" placeholder="">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="address">Address</label>
+                                <input type="text" id="address" name="address" class="form-control" value="<?php echo htmlspecialchars($student['address'] ?? ''); ?>" placeholder="">
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <label class="form-label" for="class">Class *</label>
+                                <select id="class" name="class" class="form-select" required>
+                                    <?php foreach ($CLASSES as $cls): ?>
+                                        <option value="<?php echo $cls; ?>" <?php echo ($student['class'] === $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="section">Section *</label>
+                                <select id="section" name="section" class="form-select" required>
+                                    <?php foreach ($SECTIONS as $sec): ?>
+                                        <option value="<?php echo $sec; ?>" <?php echo ($student['section'] === $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
                             <?php $is_std_pkg = is_college_class($student['class']) || !empty($student['is_package']); ?>
-                            <div class="row mb-3">
-                                <div class="col-md-6 <?php echo $is_std_pkg ? 'd-none' : ''; ?>" id="monthly_fee_container">
-                                    <label class="form-label" for="monthly_fee">Fixed Monthly Fee *</label>
-                                    <input type="number" id="monthly_fee" name="monthly_fee" class="form-control" step="0.01" min="0" value="<?php echo $student['fixed_monthly_fee']; ?>" <?php echo !$is_std_pkg ? 'required' : ''; ?>>
-                                </div>
-                                <div class="col-md-6 <?php echo !$is_std_pkg ? 'd-none' : ''; ?>" id="package_fee_container">
-                                    <label class="form-label" for="package_amount">Total Package Amount (Rs.) *</label>
-                                    <input type="number" id="package_amount" name="package_amount" class="form-control" step="0.01" min="0" value="<?php echo $student['package_amount']; ?>" <?php echo $is_std_pkg ? 'required' : ''; ?>>
-                                    <small class="text-muted"><i class="fas fa-info-circle"></i> Yearly Package scheduled as a single fee (supports partial payments)</small>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="contact_number">Contact Number 1</label>
-                                    <input type="tel" id="contact_number" name="contact_number" class="form-control" value="<?php echo htmlspecialchars($student['contact_number'] ?? ''); ?>">
-                                </div>
+                            <div class="col-md-6 <?php echo $is_std_pkg ? 'd-none' : ''; ?>" id="monthly_fee_container">
+                                <label class="form-label" for="monthly_fee">Fixed Monthly Fee *</label>
+                                <input type="number" id="monthly_fee" name="monthly_fee" class="form-control" step="0.01" min="0" value="<?php echo $student['fixed_monthly_fee']; ?>" <?php echo !$is_std_pkg ? 'required' : ''; ?>>
                             </div>
-
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label for="contact_number2" class="form-label">Contact Number 2</label>
-                                    <input type="tel" id="contact_number2" name="contact_number2" class="form-control" value="<?php echo htmlspecialchars($student['contact_number2'] ?? ''); ?>">
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="whatsapp_number" class="form-label">WhatsApp Number</label>
-                                    <input type="tel" id="whatsapp_number" name="whatsapp_number" class="form-control" value="<?php echo htmlspecialchars($student['whatsapp_number'] ?? ''); ?>">
-                                </div>
+                            <div class="col-md-6 <?php echo !$is_std_pkg ? 'd-none' : ''; ?>" id="package_fee_container">
+                                <label class="form-label" for="package_amount">Total Package Amount (Rs.) *</label>
+                                <input type="number" id="package_amount" name="package_amount" class="form-control" step="0.01" min="0" value="<?php echo $student['package_amount']; ?>" <?php echo $is_std_pkg ? 'required' : ''; ?>>
+                                <small class="text-muted"><i class="fas fa-info-circle"></i> Yearly Package scheduled as a single fee (supports partial payments)</small>
                             </div>
+                        </div>
 
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label" for="concession_amount">Concession Amount</label>
-                                    <input type="number" id="concession_amount" name="concession_amount" class="form-control" value="<?php echo $student['concession_amount'] ?? 0; ?>" step="0.01" min="0">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" for="concession_reason">Concession Reason</label>
-                                    <select id="concession_reason" name="concession_reason" class="form-select">
-                                        <option value="" <?php echo ($student['concession_reason'] ?? '') === '' ? 'selected' : ''; ?>>None</option>
-                                        <option value="Sibling" <?php echo ($student['concession_reason'] ?? '') === 'Sibling' ? 'selected' : ''; ?>>Sibling</option>
-                                        <option value="Hafiz" <?php echo ($student['concession_reason'] ?? '') === 'Hafiz' ? 'selected' : ''; ?>>Hafiz</option>
-                                        <option value="Orphan" <?php echo ($student['concession_reason'] ?? '') === 'Orphan' ? 'selected' : ''; ?>>Orphan</option>
-                                        <option value="S.C" <?php echo ($student['concession_reason'] ?? '') === 'S.C' ? 'selected' : ''; ?>>S.C</option>
-                                        <option value="EMP" <?php echo ($student['concession_reason'] ?? '') === 'EMP' ? 'selected' : ''; ?>>EMP</option>
-                                        <option value="T.Son" <?php echo ($student['concession_reason'] ?? '') === 'T.Son' ? 'selected' : ''; ?>>T.Son</option>
-                                    </select>
-                                </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label" for="contact_number">Contact Number 1</label>
+                                <input type="tel" id="contact_number" name="contact_number" class="form-control" value="<?php echo htmlspecialchars($student['contact_number'] ?? ''); ?>">
                             </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="contact_number2">Contact Number 2</label>
+                                <input type="tel" id="contact_number2" name="contact_number2" class="form-control" value="<?php echo htmlspecialchars($student['contact_number2'] ?? ''); ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="whatsapp_number">WhatsApp Number</label>
+                                <input type="tel" id="whatsapp_number" name="whatsapp_number" class="form-control" value="<?php echo htmlspecialchars($student['whatsapp_number'] ?? ''); ?>">
+                            </div>
+                        </div>
 
-                            <div class="row mb-3">
-                                <div class="col-md-12">
-                                    <label class="form-label fw-bold"><i class="fas fa-calendar-check me-1"></i> Select Previous Unpaid Month(s) to Apply Concession</label>
-                                    <div class="months-checkbox-container p-3 border rounded bg-light" style="max-height: 180px; overflow-y: auto;">
-                                        <div class="row">
-                                            <?php 
-                                            $stmt_unpaid = $conn->prepare("SELECT DISTINCT month FROM fee_records WHERE student_id = ? AND LOWER(status) = 'unpaid' ORDER BY id ASC");
-                                            $stmt_unpaid->bind_param('i', $student['id']);
-                                            $stmt_unpaid->execute();
-                                            $res_unpaid = $stmt_unpaid->get_result();
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="concession_amount">Concession Amount</label>
+                                <input type="number" id="concession_amount" name="concession_amount" class="form-control" value="<?php echo $student['concession_amount'] ?? 0; ?>" step="0.01" min="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="concession_reason">Concession Reason</label>
+                                <select id="concession_reason" name="concession_reason" class="form-select">
+                                    <option value="" <?php echo ($student['concession_reason'] ?? '') === '' ? 'selected' : ''; ?>>None</option>
+                                    <option value="Sibling" <?php echo ($student['concession_reason'] ?? '') === 'Sibling' ? 'selected' : ''; ?>>Sibling</option>
+                                    <option value="Hafiz" <?php echo ($student['concession_reason'] ?? '') === 'Hafiz' ? 'selected' : ''; ?>>Hafiz</option>
+                                    <option value="Orphan" <?php echo ($student['concession_reason'] ?? '') === 'Orphan' ? 'selected' : ''; ?>>Orphan</option>
+                                    <option value="S.C" <?php echo ($student['concession_reason'] ?? '') === 'S.C' ? 'selected' : ''; ?>>S.C</option>
+                                    <option value="EMP" <?php echo ($student['concession_reason'] ?? '') === 'EMP' ? 'selected' : ''; ?>>EMP</option>
+                                    <option value="T.Son" <?php echo ($student['concession_reason'] ?? '') === 'T.Son' ? 'selected' : ''; ?>>T.Son</option>
+                                </select>
+                            </div>
+                        </div>
 
-                                            $current_first_day = date('Y-m-01');
-                                            $previous_unpaid_found = false;
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold"><i class="fas fa-calendar-check me-1"></i> Select Previous Unpaid Month(s) to Apply Concession</label>
+                                <div class="months-checkbox-container p-3 border rounded bg-light" style="max-height: 180px; overflow-y: auto;">
+                                    <div class="row">
+                                        <?php 
+                                        $stmt_unpaid = $conn->prepare("SELECT DISTINCT month FROM fee_records WHERE student_id = ? AND LOWER(status) = 'unpaid' ORDER BY id ASC");
+                                        $stmt_unpaid->bind_param('i', $student['id']);
+                                        $stmt_unpaid->execute();
+                                        $res_unpaid = $stmt_unpaid->get_result();
 
-                                            if ($res_unpaid && $res_unpaid->num_rows > 0):
-                                                while ($row_u = $res_unpaid->fetch_assoc()):
-                                                    $m_name = $row_u['month'];
-                                                    $m_time = strtotime($m_name);
-                                                    
-                                                    if ($m_time !== false && date('Y-m-01', $m_time) < $current_first_day):
-                                                        $previous_unpaid_found = true;
-                                            ?>
-                                                <div class="col-md-3 col-6 mb-2">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input concession-month-cb" type="checkbox" name="concession_months[]" value="<?php echo htmlspecialchars($m_name); ?>" id="m_cb_<?php echo htmlspecialchars($m_name); ?>">
-                                                        <label class="form-check-label" for="m_cb_<?php echo htmlspecialchars($m_name); ?>">
-                                                            <?php echo htmlspecialchars($m_name); ?>
-                                                            <span class="badge bg-danger ms-1">Unpaid</span>
-                                                        </label>
-                                                    </div>
+                                        $current_first_day = date('Y-m-01');
+                                        $previous_unpaid_found = false;
+
+                                        if ($res_unpaid && $res_unpaid->num_rows > 0):
+                                            while ($row_u = $res_unpaid->fetch_assoc()):
+                                                $m_name = $row_u['month'];
+                                                $m_time = strtotime($m_name);
+                                                
+                                                if ($m_time !== false && date('Y-m-01', $m_time) < $current_first_day):
+                                                    $previous_unpaid_found = true;
+                                        ?>
+                                            <div class="col-md-3 col-6 mb-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input concession-month-cb" type="checkbox" name="concession_months[]" value="<?php echo htmlspecialchars($m_name); ?>" id="m_cb_<?php echo htmlspecialchars($m_name); ?>">
+                                                    <label class="form-check-label" for="m_cb_<?php echo htmlspecialchars($m_name); ?>">
+                                                        <?php echo htmlspecialchars($m_name); ?>
+                                                        <span class="badge bg-danger ms-1">Unpaid</span>
+                                                    </label>
                                                 </div>
-                                            <?php 
-                                                    endif;
-                                                endwhile;
-                                            endif;
+                                            </div>
+                                        <?php 
+                                                endif;
+                                            endwhile;
+                                        endif;
 
-                                            if (!$previous_unpaid_found):
-                                            ?>
-                                                <div class="col-12">
-                                                    <p class="text-muted mb-0"><i class="fas fa-info-circle me-1"></i> No previous unpaid months available for this student.</p>
-                                                </div>
-                                            <?php 
-                                            endif; 
-                                            $stmt_unpaid->close();
-                                            ?>
-                                        </div>
+                                        if (!$previous_unpaid_found):
+                                        ?>
+                                            <div class="col-12">
+                                                <p class="text-muted mb-0"><i class="fas fa-info-circle me-1"></i> No previous unpaid months available for this student.</p>
+                                            </div>
+                                        <?php 
+                                        endif; 
+                                        $stmt_unpaid->close();
+                                        ?>
                                     </div>
-                                    <small class="text-muted"><i class="fas fa-info-circle"></i> Note: Concession automatically applies to current & future unpaid months. Check boxes above only if you want to apply concession on <strong>previous unpaid months</strong>.</small>
                                 </div>
+                                <small class="text-muted"><i class="fas fa-info-circle"></i> Note: Concession automatically applies to current & future unpaid months. Check boxes above only if you want to apply concession on <strong>previous unpaid months</strong>.</small>
                             </div>
-                            
-                            <div class="form-actions mt-4">
-                                <button type="submit" class="btn-primary me-2">
-                                    <i class="fas fa-save"></i> Update Student
-                                </button>
-                                <a href="edit_student.php" class="btn-secondary">
-                                    <i class="fas fa-arrow-left"></i> Back
-                                </a>
-                            </div>
-                        </form>
-                    </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">
+                                <i class="fas fa-save"></i> Update Student
+                            </button>
+                            <a href="student_record.php" class="btn-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
                 <?php endif; ?>
             </div>
-        </div>
         </main>
     </div>
 

@@ -33,6 +33,18 @@ if (isset($_GET['unfreeze_user'])) {
         if ($up_stmt->execute()) {
             if ($log_id > 0) {
                 $conn->query("UPDATE account_close_logs SET status = 'unfrozen_by_master' WHERE id = " . intval($log_id));
+            } else {
+                $conn->query("UPDATE account_close_logs SET status = 'unfrozen_by_master' WHERE user_id = " . intval($unfreeze_user_id) . " ORDER BY id DESC LIMIT 1");
+            }
+            // Record unfreeze event in audit log
+            $master_u = get_username();
+            $ip_addr = $_SERVER['REMOTE_ADDR'] ?? '';
+            $u_role = $user_info['role'] ?? 'finance';
+            $log_unfreeze = $conn->prepare("INSERT INTO account_close_logs (user_id, username, role, closed_by, closed_at, frozen_until, ip_address, status) VALUES (?, ?, ?, ?, NOW(), NULL, ?, 'unfrozen_by_master')");
+            if ($log_unfreeze) {
+                $log_unfreeze->bind_param("issss", $unfreeze_user_id, $target_username, $u_role, $master_u, $ip_addr);
+                $log_unfreeze->execute();
+                $log_unfreeze->close();
             }
             $success = "User <strong>" . htmlspecialchars($target_username) . "</strong> has been manually unfrozen and can now log in immediately!";
         } else {
@@ -427,7 +439,7 @@ $stmt->close();
                                         <th>Frozen Until</th>
                                         <th>Initiated By</th>
                                         <th>Account Status</th>
-                                        
+                                        <th class="text-end">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -490,7 +502,15 @@ $stmt->close();
                                                         </span>
                                                     <?php endif; ?>
                                                 </td>
-                                               
+                                                <td class="text-end">
+                                                    <?php if ($is_now_frozen): ?>
+                                                        <a href="account_close_log.php?unfreeze_user=<?php echo $log['user_id']; ?>&log_id=<?php echo $log['id']; ?>" class="btn btn-sm btn-outline-success" onclick="return confirm('Are you sure you want to unfreeze user \'<?php echo htmlspecialchars(addslashes($log['username'])); ?>\' now?');">
+                                                            <i class="fas fa-unlock me-1"></i> Unfreeze
+                                                        </a>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-light text-success border border-success-subtle"><i class="fas fa-check-circle me-1"></i> Active</span>
+                                                    <?php endif; ?>
+                                                </td>
                                             </tr>
                                         <?php endforeach; ?>
                                     <?php else: ?>

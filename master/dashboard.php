@@ -44,7 +44,7 @@ $paid_percentage = $total_students > 0 ? round(($paid_students / $total_students
 $remaining_percentage = 100 - $paid_percentage;
 $total_unpaid = $conn->query("SELECT SUM(amount) as total FROM fee_records WHERE status = 'unpaid'")->fetch_assoc()['total'] ?? 0;
 
-// NEW QUERIES: Fetch count for Section B (Boys) and Section G (Girls) for active students
+// Fetch count for Section B (Boys) and Section G (Girls) for active students
 $total_boys = $conn->query("SELECT COUNT(*) as count FROM students WHERE section = 'B' AND status = 'active' AND class NOT IN ('Passed-10', 'Passed-12')")->fetch_assoc()['count'] ?? 0;
 $total_girls = $conn->query("SELECT COUNT(*) as count FROM students WHERE section = 'G' AND status = 'active' AND class NOT IN ('Passed-10', 'Passed-12')")->fetch_assoc()['count'] ?? 0;
 
@@ -53,7 +53,7 @@ $today_collection = get_daily_collection(date('Y-m-d'));
 // Fetch Monthly Stats for Current Month
 $start_of_month = date('Y-m-01 00:00:00');
 $end_of_month = date('Y-m-t 23:59:59');
-$current_month_str = date('M-Y'); // Formats current month as 'Jul-2026'
+$current_month_str = date('M-Y'); 
 
 // 1. Total Received Collection for ALL payments made in this month
 $this_month_collection = 0.00;
@@ -111,6 +111,26 @@ if ($month_exp_res) {
 }
 
 $this_month_net_profit = $this_month_collection - $this_month_expenses;
+
+// Monthly Fine Paid Collection (ACCURATE FIX)
+$this_month_fine = 0.00;
+$fine_coll_res = $conn->query("SELECT SUM(amount) as total FROM payments 
+                               WHERE paid_for_month = 'Fine' 
+                                 AND payment_date >= '$start_of_month' AND payment_date <= '$end_of_month'");
+if ($fine_coll_res) {
+    $this_month_fine = floatval($fine_coll_res->fetch_assoc()['total'] ?? 0);
+}
+
+// Monthly Other / Custom Scheduled Fee Paid Collection (ACCURATE FIX)
+$this_month_other_fee = 0.00;
+$other_fee_res = $conn->query("SELECT SUM(p.amount) as total FROM payments p
+                               WHERE p.payment_date >= '$start_of_month' AND p.payment_date <= '$end_of_month'
+                                 AND p.paid_for_month NOT IN ('Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Fine', 'Other')
+                                 AND p.paid_for_month NOT REGEXP '^[A-Za-z]{3}-[0-9]{4}$'
+                                 AND p.paid_for_month NOT LIKE '%Package%'");
+if ($other_fee_res) {
+    $this_month_other_fee = floatval($other_fee_res->fetch_assoc()['total'] ?? 0);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -154,6 +174,25 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
             font-weight: 600;
             color: #198754;
             margin-left: 6px;
+        }
+        
+        /* Fixed 4 Cards Per Row Grid Layout */
+        .dashboard-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            width: 100%;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard-cards-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 576px) {
+            .dashboard-cards-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -303,11 +342,11 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                     </aside>
                 </div>
 
-                <!-- Statistics Cards Grid -->
+                <!-- Statistics Cards Grid (4 - 4 - 2 Row Layout) -->
                 <div class="stats-grid-container" style="width: 100%;">
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; width: 100%;">
+                    <div class="dashboard-cards-grid">
                         
-                        <!-- CARD 1: Active Students -->
+                        <!-- ROW 1: CARD 1 -> Active Students -->
                         <div class="stat-card" style="width: 100%; min-width: 0;">
                             <div class="stat-icon" style="background: #e3f1ea;">
                                 <i class="fas fa-users"></i>
@@ -318,7 +357,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             </div>
                         </div>
 
-                        <!-- CARD 2: Boys -->
+                        <!-- ROW 1: CARD 2 -> Boys -->
                         <div class="stat-card" style="width: 100%; min-width: 0;">
                             <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
                                 <i class="fas fa-mars"></i>
@@ -329,7 +368,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             </div>
                         </div>
 
-                        <!-- CARD 3: Girls -->
+                        <!-- ROW 1: CARD 3 -> Girls -->
                         <div class="stat-card" style="width: 100%; min-width: 0;">
                             <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
                                 <i class="fas fa-venus"></i>
@@ -340,7 +379,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             </div>
                         </div>
 
-                        <!-- CARD 4: Today's Collection -->
+                        <!-- ROW 1: CARD 4 -> Today's Collection -->
                         <div class="stat-card" style="width: 100%; min-width: 0;">
                             <div class="stat-icon" style="background: #f0f4ef;">
                                 <i class="fas fa-calendar-day"></i>
@@ -351,7 +390,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             </div>
                         </div>
 
-                        <!-- CARD 5 (Row 2): This Month Collection -->
+                        <!-- ROW 2: CARD 5 -> This Month Collection -->
                         <div class="stat-card" style="width: 100%; min-width: 0;">
                             <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
                                 <i class="fas fa-coins"></i>
@@ -362,7 +401,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             </div>
                         </div>
 
-                        <!-- CARD 6 (Row 2): This Month Expenses -->
+                        <!-- ROW 2: CARD 6 -> This Month Expenses -->
                         <div class="stat-card" style="width: 100%; min-width: 0;">
                             <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
                                 <i class="fas fa-file-invoice-dollar"></i>
@@ -373,7 +412,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             </div>
                         </div>
 
-                        <!-- CARD 7 (Row 2): This Month Profit -->
+                        <!-- ROW 2: CARD 7 -> This Month Profit -->
                         <div class="stat-card" style="width: 100%; min-width: 0;">
                             <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
                                 <i class="fas fa-chart-line"></i>
@@ -384,7 +423,7 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                             </div>
                         </div>
 
-                        <!-- CARD 8 (Row 2): Paid Students (With Dropdown & Realtime Percentage) -->
+                        <!-- ROW 2: CARD 8 -> Paid Students -->
                         <div class="stat-card stat-card--dropdown" style="width: 100%; min-width: 0;">
                             <div class="stat-card__content-wrapper">
                                 <div class="stat-icon" style="background: #e3f1ea;">
@@ -412,6 +451,28 @@ $this_month_net_profit = $this_month_collection - $this_month_expenses;
                                         </li>
                                     <?php endforeach; ?>
                                 </ul>
+                            </div>
+                        </div>
+
+                        <!-- ROW 3: CARD 9 -> This Month Fine -->
+                        <div class="stat-card" style="width: 100%; min-width: 0;">
+                            <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
+                                <i class="fas fa-exclamation-circle"></i>
+                            </div>
+                            <div class="stat-content" style="min-width: 0;">
+                                <h3 style="white-space: nowrap;"><?php echo format_currency(round($this_month_fine)); ?></h3>
+                                <p>This Month Fine</p>
+                            </div>
+                        </div>
+
+                        <!-- ROW 3: CARD 10 -> This Month Other Fee -->
+                        <div class="stat-card" style="width: 100%; min-width: 0;">
+                            <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
+                                <i class="fas fa-tags"></i>
+                            </div>
+                            <div class="stat-content" style="min-width: 0;">
+                                <h3 style="white-space: nowrap;"><?php echo format_currency(round($this_month_other_fee)); ?></h3>
+                                <p>This Month Other Dues</p>
                             </div>
                         </div>
 

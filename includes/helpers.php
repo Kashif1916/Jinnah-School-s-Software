@@ -5,14 +5,24 @@
  */
 
 /**
- * Sanitize input
+ * Sanitize input (Updated to handle strings & arrays)
  */
 function sanitize_input($data) {
     global $conn;
-    $data = trim($data);
+    
+    if (is_array($data)) {
+        return array_map('sanitize_input', $data);
+    }
+    
+    $data = trim($data ?? '');
     $data = stripslashes($data);
-    $data = htmlspecialchars($data);
-    return $conn->real_escape_string($data);
+    $data = htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
+    
+    if ($conn && $conn instanceof mysqli) {
+        $data = $conn->real_escape_string($data);
+    }
+    
+    return $data;
 }
 
 /**
@@ -234,12 +244,12 @@ function get_total_paid_fees($student_id) {
 }
 
 /**
- * Get defaulters list
+ * Get defaulters list (Supports Multi-Select Class & Section Arrays AND Other/Custom Fees)
  */
-function get_defaulters($class = '', $section = '', $months = [], $name = '') {
+function get_defaulters($class = '', $section = '', $months = [], $name = '', $father_name = '') {
     global $conn;
     
-    // If no months are specified, default to previous 12 months (inclusive of current month) plus Admission, Pre_Year, and Package
+    // Default 12 months if empty
     if (empty($months)) {
         $months = [];
         $start_date = strtotime(date('Y-m-01'));
@@ -265,21 +275,47 @@ function get_defaulters($class = '', $section = '', $months = [], $name = '') {
               WHERE s.status = 'active' AND f.status = 'unpaid'";
     
     if (!empty($class)) {
-        $query .= " AND s.class = '" . $conn->real_escape_string($class) . "'";
+        if (is_array($class)) {
+            $escaped_classes = array_map(function($c) use ($conn) {
+                return "'" . $conn->real_escape_string($c) . "'";
+            }, array_filter($class));
+            if (!empty($escaped_classes)) {
+                $query .= " AND s.class IN (" . implode(',', $escaped_classes) . ")";
+            }
+        } else {
+            $query .= " AND s.class = '" . $conn->real_escape_string($class) . "'";
+        }
     }
     
     if (!empty($section)) {
-        $query .= " AND s.section = '" . $conn->real_escape_string($section) . "'";
+        if (is_array($section)) {
+            $escaped_sections = array_map(function($sec) use ($conn) {
+                return "'" . $conn->real_escape_string($sec) . "'";
+            }, array_filter($section));
+            if (!empty($escaped_sections)) {
+                $query .= " AND s.section IN (" . implode(',', $escaped_sections) . ")";
+            }
+        } else {
+            $query .= " AND s.section = '" . $conn->real_escape_string($section) . "'";
+        }
     }
 
     if (!empty($name)) {
         $query .= " AND s.name LIKE '%" . $conn->real_escape_string($name) . "%'";
     }
+
+    if (!empty($father_name)) {
+        $query .= " AND s.father_name LIKE '%" . $conn->real_escape_string($father_name) . "%'";
+    }
     
     if (!empty($months)) {
         if (!is_array($months)) $months = [$months];
+        
+        $has_other_filter = in_array('Other', $months) || in_array('Other Fee', $months);
+        $standard_months = array_diff($months, ['Other', 'Other Fee']);
+
         $expanded_months = [];
-        foreach ($months as $m) {
+        foreach ($standard_months as $m) {
             $expanded_months[] = $m;
             if ($m === 'Pre_Year' || $m === 'Prev-Year' || $m === 'Pre-Year') {
                 $expanded_months[] = 'Pre_Year';
@@ -292,15 +328,28 @@ function get_defaulters($class = '', $section = '', $months = [], $name = '') {
             }
         }
         $expanded_months = array_unique($expanded_months);
-        $escaped_months = array_map(function($m) use ($conn) { 
-            return "'" . $conn->real_escape_string($m) . "'"; 
-        }, $expanded_months);
-        
-        $has_package_filter = in_array('Yearly Package', $expanded_months) || in_array('Package', $expanded_months);
-        if ($has_package_filter) {
-            $query .= " AND (f.month IN (" . implode(',', $escaped_months) . ") OR f.month LIKE '%Package%')";
-        } else {
-            $query .= " AND f.month IN (" . implode(',', $escaped_months) . ")";
+
+        $conditions = [];
+        if (!empty($expanded_months)) {
+            $escaped_months = array_map(function($m) use ($conn) { 
+                return "'" . $conn->real_escape_string($m) . "'"; 
+            }, $expanded_months);
+
+            $has_package_filter = in_array('Yearly Package', $expanded_months) || in_array('Package', $expanded_months);
+            if ($has_package_filter) {
+                $conditions[] = "(f.month IN (" . implode(',', $escaped_months) . ") OR f.month LIKE '%Package%')";
+            } else {
+                $conditions[] = "f.month IN (" . implode(',', $escaped_months) . ")";
+            }
+        }
+
+        // Condition for Other / Custom Fees (Exam Fee, Party Fee, etc.)
+        if ($has_other_filter) {
+            $conditions[] = "(f.month NOT IN ('Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Fine') AND f.month NOT REGEXP '^[A-Za-z]{3}-[0-9]{4}$' AND f.month NOT LIKE '%Package%')";
+        }
+
+        if (!empty($conditions)) {
+            $query .= " AND (" . implode(' OR ', $conditions) . ")";
         }
     }
     
@@ -311,13 +360,6 @@ function get_defaulters($class = '', $section = '', $months = [], $name = '') {
 
 /**
  * Filter defaulters list by 2+ months, 3+ months, or arrears only
- * 
- * @param array $all_defaulter_list Array of defaulter records
- * @param int $min_2_months Filter for 2+ months pending
- * @param int $min_3_months Filter for 3+ months pending
- * @param int $arrears_only Filter for partial payment arrears only
- * @param array $months_filter Optional specific months filter
- * @return array Filtered array of defaulters
  */
 function filter_defaulters_by_criteria($all_defaulter_list, $min_2_months = 0, $min_3_months = 0, $arrears_only = 0, $months_filter = []) {
     global $conn;
@@ -360,7 +402,6 @@ function filter_defaulters_by_criteria($all_defaulter_list, $min_2_months = 0, $
 
             if (!empty($arrear_months_found)) {
                 $all_defaulter_list[$k]['has_arrears'] = true;
-                // Override pending count & list to show ONLY arrear month(s)
                 $all_defaulter_list[$k]['pending_count'] = count($arrear_months_found);
                 $all_defaulter_list[$k]['pending_months'] = implode(', ', $arrear_months_found);
             } else {
@@ -387,10 +428,9 @@ function filter_defaulters_by_criteria($all_defaulter_list, $min_2_months = 0, $
 /**
  * Get paid students list
  */
-function get_paid_students($class = '', $section = '', $months = [], $name = '') {
+function get_paid_students($class = '', $section = '', $months = [], $name = '', $father_name = '') {
     global $conn;
     
-    // If no months are specified, default to previous 12 months (inclusive of current month) plus Admission, Pre_Year, and Package
     if (empty($months)) {
         $months = [];
         $start_date = strtotime(date('Y-m-01'));
@@ -415,15 +455,37 @@ function get_paid_students($class = '', $section = '', $months = [], $name = '')
               WHERE s.status = 'active' AND f.status = 'paid'";
     
     if (!empty($class)) {
-        $query .= " AND s.class = '" . $conn->real_escape_string($class) . "'";
+        if (is_array($class)) {
+            $escaped_classes = array_map(function($c) use ($conn) {
+                return "'" . $conn->real_escape_string($c) . "'";
+            }, array_filter($class));
+            if (!empty($escaped_classes)) {
+                $query .= " AND s.class IN (" . implode(',', $escaped_classes) . ")";
+            }
+        } else {
+            $query .= " AND s.class = '" . $conn->real_escape_string($class) . "'";
+        }
     }
     
     if (!empty($section)) {
-        $query .= " AND s.section = '" . $conn->real_escape_string($section) . "'";
+        if (is_array($section)) {
+            $escaped_sections = array_map(function($sec) use ($conn) {
+                return "'" . $conn->real_escape_string($sec) . "'";
+            }, array_filter($section));
+            if (!empty($escaped_sections)) {
+                $query .= " AND s.section IN (" . implode(',', $escaped_sections) . ")";
+            }
+        } else {
+            $query .= " AND s.section = '" . $conn->real_escape_string($section) . "'";
+        }
     }
 
     if (!empty($name)) {
         $query .= " AND s.name LIKE '%" . $conn->real_escape_string($name) . "%'";
+    }
+
+    if (!empty($father_name)) {
+        $query .= " AND s.father_name LIKE '%" . $conn->real_escape_string($father_name) . "%'";
     }
     
     if (!empty($months)) {
@@ -491,13 +553,11 @@ function get_monthly_collection($month_year) {
 function record_payment($student_id, $amount, $month, $received_by, $payment_mode = 'cash', $receipt_number = null) {
     global $conn;
     
-    // Start transaction
     $conn->begin_transaction();
     
     try {
         $payment_date = date('Y-m-d H:i:s');
 
-        // Special handling for Fine / Late Fee and Other Payments
         if ($month === 'Fine' || $month === 'Other' || $month === 'Other Payment') {
             $query = "INSERT INTO payments (student_id, receipt_number, amount, paid_for_month, payment_date, received_by, payment_mode) 
                       VALUES (?, ?, ?, ?, ?, ?, ?)";
@@ -516,8 +576,6 @@ function record_payment($student_id, $amount, $month, $received_by, $payment_mod
             return $payment_id;
         }
 
-        // Get current balance for the specific fee record
-        // Assuming $month is in 'Mon-YYYY' format and $student_id is integer
         $query = "SELECT id, amount, month FROM fee_records WHERE student_id = ? AND month = ?";
         $stmt = $conn->prepare($query);
         $stmt->bind_param('is', $student_id, $month);
@@ -533,7 +591,6 @@ function record_payment($student_id, $amount, $month, $received_by, $payment_mod
         $current_balance = floatval($current_record['amount']);
         $new_balance = $current_balance - $amount;
 
-        // Record payment
         $query = "INSERT INTO payments (student_id, receipt_number, amount, paid_for_month, payment_date, received_by, payment_mode) 
                  VALUES (?, ?, ?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($query);
@@ -547,7 +604,6 @@ function record_payment($student_id, $amount, $month, $received_by, $payment_mod
             $conn->query("UPDATE payments SET receipt_number = '$auto_receipt' WHERE id = $payment_id");
         }
         
-        // Update fee record: if balance is 0 or less, mark as paid. Otherwise update remaining amount.
         if ($new_balance <= 0) {
             $query = "UPDATE fee_records SET status = 'paid', payment_date = ?, amount = 0 WHERE id = ?";
             $stmt = $conn->prepare($query);
@@ -560,7 +616,6 @@ function record_payment($student_id, $amount, $month, $received_by, $payment_mod
         $stmt->execute();
         $stmt->close();
         
-        // Auto check for buffer after payment
         $student = get_student($student_id);
         $net_fee = floatval($student['fixed_monthly_fee']) - floatval($student['concession_amount']);
         auto_generate_fee_buffer($student_id, $net_fee);
@@ -574,14 +629,13 @@ function record_payment($student_id, $amount, $month, $received_by, $payment_mod
 }
 
 /**
- * Get 12 months (current + past 11 months) status for a student
+ * Get 12 months status for a student
  */
 function get_student_concession_months_status($student_id) {
     global $conn;
     $result = [];
     $start_date = strtotime(date('Y-m-01'));
     
-    // Fetch fee records for this student
     $fee_records = [];
     $stmt = $conn->prepare("SELECT month, status, amount FROM fee_records WHERE student_id = ?");
     $stmt->bind_param('i', $student_id);
@@ -628,7 +682,6 @@ function render_system_logo($class = '') {
     return '<img src="' . BASE_URL . 'images/logo.jfif" alt="' . htmlspecialchars(SITE_NAME, ENT_QUOTES, 'UTF-8') . '"' . $class_attr . '>';
 }
 
-
 /**
  * Render Smart Truncated Pagination Links
  */
@@ -637,7 +690,6 @@ function render_pagination($page, $total_pages, $extra_params = '', $is_filtered
         return;
     }
     
-    // Process query string
     $query_params = [];
     if (is_array($extra_params)) {
         $query_params = $extra_params;
@@ -648,20 +700,18 @@ function render_pagination($page, $total_pages, $extra_params = '', $is_filtered
     echo '<nav class="mt-4 no-print">';
     echo '<ul class="pagination justify-content-center flex-wrap">';
     
-    // Build link helper
     $get_url = function($p) use ($query_params) {
         $params = array_merge($query_params, ['page' => $p]);
         return '?' . http_build_query($params);
     };
 
-    // Previous Link
     if ($page <= 1) {
         echo '<li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-left me-1"></i> Prev</span></li>';
     } else {
         echo '<li class="page-item"><a class="page-link" href="' . $get_url($page - 1) . '"><i class="fas fa-chevron-left me-1"></i> Prev</a></li>';
     }
     
-    $range = 2; // Window range around current page
+    $range = 2;
     $start_page = max(1, $page - $range);
     $end_page = min($total_pages, $page + $range);
 
@@ -686,7 +736,6 @@ function render_pagination($page, $total_pages, $extra_params = '', $is_filtered
         echo '<li class="page-item ' . ($page == $total_pages ? 'active' : '') . '"><a class="page-link" href="' . $get_url($total_pages) . '">' . $total_pages . '</a></li>';
     }
     
-    // Next Link
     if ($page >= $total_pages) {
         echo '<li class="page-item disabled"><span class="page-link">Next <i class="fas fa-chevron-right ms-1"></i></span></li>';
     } else {
@@ -873,7 +922,7 @@ function render_role_topbar_and_nav($page_title, $active_page) {
 }
 
 /**
- * Create fee schedule for promoted student (Single Yearly Package or 12 Monthly Fees)
+ * Schedule promotion annual fees
  */
 function schedule_promotion_annual_fees($student_id, $fixed_monthly_fee, $concession_amount = 0, $package_amount = 0, $is_package = 0, $to_class = '') {
     global $conn;
@@ -883,7 +932,6 @@ function schedule_promotion_annual_fees($student_id, $fixed_monthly_fee, $conces
         if ($net_package < 0) $net_package = 0;
 
         $month_label = 'Yearly Package';
-        // If student already has 'Yearly Package' from previous class, differentiate by class name (e.g. Package-12)
         $chk = $conn->prepare("SELECT id FROM fee_records WHERE student_id = ? AND month = ?");
         $chk->bind_param('is', $student_id, $month_label);
         $chk->execute();
@@ -897,7 +945,6 @@ function schedule_promotion_annual_fees($student_id, $fixed_monthly_fee, $conces
         $ins->execute();
         $ins->close();
     } else {
-        // Find the latest existing fee month for this student (exclude 'Admission' and Package records)
         $query = "SELECT month FROM fee_records WHERE student_id = ? AND month NOT LIKE '%Package%' AND month != 'Admission' AND month NOT IN ('Pre_Year', 'Prev-Year', 'Pre-Year') ORDER BY STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y') DESC LIMIT 1";
         $stmt = $conn->prepare($query);
         $stmt->bind_param('i', $student_id);
@@ -931,35 +978,62 @@ function schedule_promotion_annual_fees($student_id, $fixed_monthly_fee, $conces
 }
 
 /**
- * Calculate late fee fine for a month (Rs. 20 per day starting from 11th date of month, active from August 2026 onwards)
- * Note: Months before August 2026 (e.g. Jan-Jul 2026, Pre_Year, Admission, Package) have NO fine (0).
+ * Calculate month late fine (Updated to check Zero Monthly Fee & Existing Payments)
  */
-function calculate_month_late_fine($month, $today_date = null) {
+function calculate_month_late_fine($month, $today_date = null, $student_id = null) {
+    global $conn;
     if (empty($month)) return 0;
     
-    // Exclude non-monthly fee records
     $excluded = ['Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Fine', 'Other', 'Other Payment'];
     if (in_array($month, $excluded) || strpos($month, 'Package') !== false) {
         return 0;
     }
     
+    // Check Zero monthly fee OR Previous Partial Payment condition if student_id is available
+    if (!empty($student_id) && $conn) {
+        $student = get_student($student_id);
+        if ($student) {
+            $fixed_fee = floatval($student['fixed_monthly_fee'] ?? 0);
+            $concession = floatval($student['concession_amount'] ?? 0);
+            $expected_monthly = floatval($student['monthly_fee'] ?? 0);
+            if ($expected_monthly <= 0) {
+                $expected_monthly = max(0, $fixed_fee - $concession);
+            }
+            
+            // Rule 1: Zero monthly fee => Fine = 0
+            if ($expected_monthly <= 0) {
+                return 0;
+            }
+            
+            // Rule 2: Check if ANY payment has ALREADY been recorded in history for this month
+            $stmt_pay_check = $conn->prepare("SELECT id FROM payments WHERE student_id = ? AND paid_for_month = ?");
+            if ($stmt_pay_check) {
+                $stmt_pay_check->bind_param('is', $student_id, $month);
+                $stmt_pay_check->execute();
+                $has_prior_payment = $stmt_pay_check->get_result()->num_rows > 0;
+                $stmt_pay_check->close();
+                
+                // Fine has already been taken during the FIRST transaction, so remaining arrear pay karte waqt 0 fine!
+                if ($has_prior_payment) {
+                    return 0;
+                }
+            }
+        }
+    }
+    
     $month_time = strtotime("01-" . $month);
     if ($month_time === false) return 0;
     
-    // Fine system start cutoff: August 2026 (01-Aug-2026)
-    // No fine should be charged on any month prior to August 2026
     $fine_system_start_month = strtotime("2026-09-01");
     if ($month_time < $fine_system_start_month) {
         return 0;
     }
     
-    // Standard due date: 10th of the fee month (e.g. 10-Aug-2026, 10-Sep-2026)
     $due_time = strtotime("10-" . $month);
     if ($due_time === false) return 0;
     
     $today_time = $today_date ? strtotime(date('Y-m-d', strtotime($today_date))) : strtotime(date('Y-m-d'));
     
-    // Fine starts from 11th date of the month (i.e. strictly after 10th)
     if ($today_time > $due_time) {
         $late_days = intval(floor(($today_time - $due_time) / 86400));
         return $late_days * 20;
@@ -969,45 +1043,132 @@ function calculate_month_late_fine($month, $today_date = null) {
 }
 
 /**
- * Calculate total late fine for a batch of cart items:
- * For EACH unique student in the cart, find that student's oldest eligible fee month (Aug 2026 onwards),
- * calculate that student's late fine (Rs. 20/day starting from 11th of their oldest overdue month),
- * and sum the fines across all students in the batch.
+ * Calculate late fee fine for a student
+ */
+function calculate_student_fine($student_id, $unpaid_records = null, $today_date = null) {
+    global $conn;
+    $student_id = intval($student_id);
+    if ($student_id <= 0) return 0;
+
+    // Fetch student fee structure
+    $stmt = $conn->prepare("SELECT class, fixed_monthly_fee, concession_amount, monthly_fee, is_package, package_amount FROM students WHERE id = ?");
+    if (!$stmt) return 0;
+    $stmt->bind_param("i", $student_id);
+    $stmt->execute();
+    $st = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$st) return 0;
+
+    // College / package classes don't have monthly late fine
+    if (is_college_class($st['class']) || (!empty($st['is_package']) && $st['is_package'] == 1)) {
+        return 0;
+    }
+
+    $fixed = floatval($st['fixed_monthly_fee'] ?? 0);
+    $concession = floatval($st['concession_amount'] ?? 0);
+    $net_monthly = floatval($st['monthly_fee'] ?? 0);
+    if ($net_monthly <= 0) {
+        $net_monthly = max(0, $fixed - $concession);
+    }
+
+    // Rule 1: If net monthly fee is 0, NO fine!
+    if ($net_monthly <= 0) {
+        return 0;
+    }
+
+    // Fetch unpaid records if not provided
+    if ($unpaid_records === null) {
+        $stmt_rec = $conn->prepare("SELECT id, month, amount FROM fee_records WHERE student_id = ? AND status = 'unpaid'");
+        if ($stmt_rec) {
+            $stmt_rec->bind_param("i", $student_id);
+            $stmt_rec->execute();
+            $unpaid_records = $stmt_rec->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt_rec->close();
+        } else {
+            $unpaid_records = [];
+        }
+    }
+
+    if (empty($unpaid_records)) {
+        return 0;
+    }
+
+    // Fetch months for which this student ALREADY made a payment in database (already charged fine)
+    $stmt_pay = $conn->prepare("SELECT DISTINCT paid_for_month FROM payments WHERE student_id = ?");
+    $paid_months_set = [];
+    if ($stmt_pay) {
+        $stmt_pay->bind_param("i", $student_id);
+        $stmt_pay->execute();
+        $pay_res = $stmt_pay->get_result();
+        if ($pay_res) {
+            while ($p_row = $pay_res->fetch_assoc()) {
+                $paid_months_set[trim($p_row['paid_for_month'])] = true;
+            }
+        }
+        $stmt_pay->close();
+    }
+
+    $excluded = ['Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Fine', 'Other', 'Other Payment'];
+    $fine_system_start_month = strtotime("2026-09-01");
+
+    $oldest_eligible_time = null;
+    $oldest_eligible_month = null;
+
+    foreach ($unpaid_records as $rec) {
+        $m = trim($rec['month'] ?? '');
+        $amt = floatval($rec['amount'] ?? 0);
+
+        if (empty($m) || in_array($m, $excluded) || strpos($m, 'Package') !== false) {
+            continue;
+        }
+
+        // Must be regular monthly format like 'Sep-2026'
+        if (!preg_match('/^[A-Za-z]{3}-[0-9]{4}$/', $m)) {
+            continue;
+        }
+
+        $m_time = strtotime("01-" . $m);
+        if ($m_time === false || $m_time < $fine_system_start_month) {
+            continue;
+        }
+
+        // Rule 2: If payment was ALREADY recorded for this month in payments table, Fine is already paid, so NO fine!
+        if (isset($paid_months_set[$m])) {
+            continue;
+        }
+
+        if ($oldest_eligible_time === null || $m_time < $oldest_eligible_time) {
+            $oldest_eligible_time = $m_time;
+            $oldest_eligible_month = $m;
+        }
+    }
+
+    if ($oldest_eligible_month !== null) {
+        return calculate_month_late_fine($oldest_eligible_month, $today_date, $student_id);
+    }
+
+    return 0;
+}
+
+/**
+ * Calculate batch late fine
  */
 function calculate_batch_late_fine($cart_items, $today_date = null) {
     if (empty($cart_items) || !is_array($cart_items)) return 0;
     
-    $excluded = ['Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Fine', 'Other', 'Other Payment'];
-    $fine_system_start_month = strtotime("2026-09-01");
-    
-    // Group cart items by student_id to find each student's oldest eligible month (Aug 2026 onwards)
-    $student_oldest_month = [];
-    
+    $students_items = [];
     foreach ($cart_items as $item) {
-        $student_id = $item['student_id'] ?? 0;
-        $month = $item['month'] ?? '';
-        
-        if (empty($month) || in_array($month, $excluded) || strpos($month, 'Package') !== false) {
-            continue;
-        }
-        
-        $m_time = strtotime("01-" . $month);
-        if ($m_time !== false && $m_time >= $fine_system_start_month) {
-            if (!isset($student_oldest_month[$student_id]) || $m_time < $student_oldest_month[$student_id]['time']) {
-                $student_oldest_month[$student_id] = [
-                    'time' => $m_time,
-                    'month' => $month
-                ];
-            }
+        $sid = intval($item['student_id'] ?? 0);
+        if ($sid > 0) {
+            $students_items[$sid][] = $item;
         }
     }
     
     $total_fine = 0;
-    foreach ($student_oldest_month as $stud_id => $data) {
-        $total_fine += calculate_month_late_fine($data['month'], $today_date);
+    foreach ($students_items as $sid => $items) {
+        $total_fine += calculate_student_fine($sid, $items, $today_date);
     }
     
     return $total_fine;
 }
-
 ?>

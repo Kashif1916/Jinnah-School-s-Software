@@ -132,10 +132,11 @@ $offset = ($page - 1) * $limit;
 
 // --- LOGIC FOR DROP MODE (ACTIVE STUDENTS) ---
 $search_name = sanitize_input($_GET['search_name'] ?? '');
+$search_father_name = sanitize_input($_GET['search_father_name'] ?? '');
 $search_class = sanitize_input($_GET['search_class'] ?? '');
 $search_section = sanitize_input($_GET['search_section'] ?? '');
 
-$is_filtered_drop = (!empty($search_name) || !empty($search_class) || !empty($search_section));
+$is_filtered_drop = (!empty($search_name) || !empty($search_father_name) || !empty($search_class) || !empty($search_section));
 $total_students = 0;
 $total_pages_drop = 0;
 
@@ -147,6 +148,11 @@ if ($view_mode === 'drop_mode' && $can_drop) {
     if (!empty($search_name)) {
         $count_query .= " AND name LIKE ?";
         $count_params[] = '%' . $search_name . '%';
+        $count_types .= 's';
+    }
+    if (!empty($search_father_name)) {
+        $count_query .= " AND father_name LIKE ?";
+        $count_params[] = '%' . $search_father_name . '%';
         $count_types .= 's';
     }
     if (!empty($search_class)) {
@@ -179,6 +185,11 @@ if ($view_mode === 'drop_mode' && $can_drop) {
         $params[] = '%' . $search_name . '%';
         $param_types .= 's';
     }
+    if (!empty($search_father_name)) {
+        $query .= " AND father_name LIKE ?";
+        $params[] = '%' . $search_father_name . '%';
+        $param_types .= 's';
+    }
     if (!empty($search_class)) {
         $query .= " AND class = ?";
         $params[] = $search_class;
@@ -209,10 +220,12 @@ if ($view_mode === 'drop_mode' && $can_drop) {
 }
 
 // --- LOGIC FOR SEE MODE (DROPPED STUDENTS HISTORY) ---
+$filter_name = sanitize_input($_GET['filter_name'] ?? '');
+$filter_father_name = sanitize_input($_GET['filter_father_name'] ?? '');
 $filter_year = sanitize_input($_GET['filter_year'] ?? '');
 $filter_class = sanitize_input($_GET['filter_class'] ?? '');
 
-$is_filtered_see = (!empty($filter_year) || !empty($filter_class));
+$is_filtered_see = (!empty($filter_name) || !empty($filter_father_name) || !empty($filter_year) || !empty($filter_class));
 $total_dropped = 0;
 $total_pages_see = 0;
 
@@ -223,6 +236,16 @@ if ($view_mode === 'see_mode') {
     $count_params = [];
     $count_types = '';
 
+    if (!empty($filter_name)) {
+        $count_query .= " AND s.name LIKE ?";
+        $count_params[] = '%' . $filter_name . '%';
+        $count_types .= 's';
+    }
+    if (!empty($filter_father_name)) {
+        $count_query .= " AND s.father_name LIKE ?";
+        $count_params[] = '%' . $filter_father_name . '%';
+        $count_types .= 's';
+    }
     if (!empty($filter_year)) {
         $count_query .= " AND YEAR(ds.dropped_at) = ?";
         $count_params[] = intval($filter_year);
@@ -244,12 +267,22 @@ if ($view_mode === 'see_mode') {
 
     $total_pages_see = ceil($total_dropped / $limit);
 
-    $query = "SELECT ds.*, s.name, s.class, s.section 
+    $query = "SELECT ds.*, s.name, s.father_name, s.class, s.section 
               FROM dropped_students ds 
               JOIN students s ON ds.student_id = s.id WHERE 1=1";
     $params = [];
     $param_types = '';
 
+    if (!empty($filter_name)) {
+        $query .= " AND s.name LIKE ?";
+        $params[] = '%' . $filter_name . '%';
+        $param_types .= 's';
+    }
+    if (!empty($filter_father_name)) {
+        $query .= " AND s.father_name LIKE ?";
+        $params[] = '%' . $filter_father_name . '%';
+        $param_types .= 's';
+    }
     if (!empty($filter_year)) {
         $query .= " AND YEAR(ds.dropped_at) = ?";
         $params[] = intval($filter_year);
@@ -281,9 +314,10 @@ if ($view_mode === 'see_mode') {
 
 // --- LOGIC FOR RESTORE MODE (RESTORE DROPPED STUDENTS) ---
 $restore_name = sanitize_input($_GET['restore_name'] ?? '');
+$restore_father_name = sanitize_input($_GET['restore_father_name'] ?? '');
 $restore_class = sanitize_input($_GET['restore_class'] ?? '');
 
-$is_filtered_restore = (!empty($restore_name) || !empty($restore_class));
+$is_filtered_restore = (!empty($restore_name) || !empty($restore_father_name) || !empty($restore_class));
 $total_restore = 0;
 $total_pages_restore = 0;
 
@@ -295,6 +329,11 @@ if ($view_mode === 'restore_mode' && is_master()) {
     if (!empty($restore_name)) {
         $count_query .= " AND name LIKE ?";
         $count_params[] = '%' . $restore_name . '%';
+        $count_types .= 's';
+    }
+    if (!empty($restore_father_name)) {
+        $count_query .= " AND father_name LIKE ?";
+        $count_params[] = '%' . $restore_father_name . '%';
         $count_types .= 's';
     }
     if (!empty($restore_class)) {
@@ -320,6 +359,11 @@ if ($view_mode === 'restore_mode' && is_master()) {
     if (!empty($restore_name)) {
         $query .= " AND name LIKE ?";
         $params[] = '%' . $restore_name . '%';
+        $param_types .= 's';
+    }
+    if (!empty($restore_father_name)) {
+        $query .= " AND father_name LIKE ?";
+        $params[] = '%' . $restore_father_name . '%';
         $param_types .= 's';
     }
     if (!empty($restore_class)) {
@@ -356,7 +400,6 @@ if ($view_mode === 'restore_mode' && is_master()) {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
     <style>
-        /* Custom Modern Tabs UI with Exact Matching Active Color */
         .mode-container {
             background: #f8f9fa;
             padding: 8px;
@@ -437,11 +480,15 @@ if ($view_mode === 'restore_mode' && is_master()) {
                         <h4>Search Active Students to Drop</h4>
                         <form method="GET" class="row g-3">
                             <input type="hidden" name="view" value="drop_mode">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label">Student Name</label>
                                 <input type="text" name="search_name" class="form-control" value="<?php echo htmlspecialchars($search_name); ?>" placeholder="Search by name...">
                             </div>
                             <div class="col-md-3">
+                                <label class="form-label">Father Name</label>
+                                <input type="text" name="search_father_name" class="form-control" value="<?php echo htmlspecialchars($search_father_name); ?>" placeholder="Search by father name...">
+                            </div>
+                            <div class="col-md-2">
                                 <label class="form-label">Class</label>
                                 <select name="search_class" class="form-select">
                                     <option value="">All Classes</option>
@@ -450,7 +497,7 @@ if ($view_mode === 'restore_mode' && is_master()) {
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label class="form-label">Section</label>
                                 <select name="search_section" class="form-select">
                                     <option value="">All Sections</option>
@@ -528,11 +575,19 @@ if ($view_mode === 'restore_mode' && is_master()) {
                         <h4>Search Dropped Students History</h4>
                         <form method="GET" class="row g-3">
                             <input type="hidden" name="view" value="see_mode">
-                            <div class="col-md-5">
+                            <div class="col-md-3">
+                                <label class="form-label">Student Name</label>
+                                <input type="text" name="filter_name" class="form-control" value="<?php echo htmlspecialchars($filter_name); ?>" placeholder="Search by student name...">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Father Name</label>
+                                <input type="text" name="filter_father_name" class="form-control" value="<?php echo htmlspecialchars($filter_father_name); ?>" placeholder="Search by father name...">
+                            </div>
+                            <div class="col-md-2">
                                 <label class="form-label">Year</label>
                                 <input type="number" name="filter_year" class="form-control" value="<?php echo htmlspecialchars($filter_year); ?>" placeholder="e.g. 2026" min="2000" max="2099">
                             </div>
-                            <div class="col-md-5">
+                            <div class="col-md-2">
                                 <label class="form-label">Class</label>
                                 <select name="filter_class" class="form-select">
                                     <option value="">All Classes</option>
@@ -556,6 +611,7 @@ if ($view_mode === 'restore_mode' && is_master()) {
                                 <thead>
                                     <tr>
                                         <th>Name</th>
+                                        <th>Father Name</th>
                                         <th>Class</th>
                                         <th>Section</th>
                                         <th>Dropped Date</th>
@@ -567,6 +623,7 @@ if ($view_mode === 'restore_mode' && is_master()) {
                                     <?php foreach ($dropped_students as $dropped): ?>
                                         <tr>
                                             <td><strong><?php echo htmlspecialchars($dropped['name']); ?></strong></td>
+                                            <td><?php echo htmlspecialchars($dropped['father_name'] ?? ''); ?></td>
                                             <td><?php echo htmlspecialchars($dropped['class']); ?></td>
                                             <td><?php echo htmlspecialchars($dropped['section']); ?></td>
                                             <td><?php echo format_datetime($dropped['dropped_at']); ?></td>
@@ -591,11 +648,15 @@ if ($view_mode === 'restore_mode' && is_master()) {
                         <h4>Search Dropped Students to Restore</h4>
                         <form method="GET" class="row g-3">
                             <input type="hidden" name="view" value="restore_mode">
-                            <div class="col-md-5">
+                            <div class="col-md-4">
                                 <label class="form-label">Student Name</label>
                                 <input type="text" name="restore_name" class="form-control" value="<?php echo htmlspecialchars($restore_name); ?>" placeholder="Search by name...">
                             </div>
-                            <div class="col-md-5">
+                            <div class="col-md-4">
+                                <label class="form-label">Father Name</label>
+                                <input type="text" name="restore_father_name" class="form-control" value="<?php echo htmlspecialchars($restore_father_name); ?>" placeholder="Search by father name...">
+                            </div>
+                            <div class="col-md-2">
                                 <label class="form-label">Class</label>
                                 <select name="restore_class" class="form-select">
                                     <option value="">All Classes</option>
@@ -678,7 +739,6 @@ if ($view_mode === 'restore_mode' && is_master()) {
     <script src="../assets/js/script.js"></script>
     
     <script>
-        // Checkbox Select All functionality (For Drop Mode)
         const selectAllCheckbox = document.getElementById('selectAll');
         if (selectAllCheckbox) {
             selectAllCheckbox.addEventListener('change', function() {
@@ -687,7 +747,6 @@ if ($view_mode === 'restore_mode' && is_master()) {
             });
         }
 
-        // Checkbox Select All functionality (For Restore Mode)
         const selectAllRestore = document.getElementById('selectAllRestore');
         if (selectAllRestore) {
             selectAllRestore.addEventListener('change', function() {
@@ -696,7 +755,6 @@ if ($view_mode === 'restore_mode' && is_master()) {
             });
         }
 
-        // Bulk Drop Validation and Prompter
         function handleBulkDropSubmit(form) {
             const checkedBoxes = document.querySelectorAll('.student-checkbox:checked');
             if (checkedBoxes.length === 0) {
@@ -706,7 +764,7 @@ if ($view_mode === 'restore_mode' && is_master()) {
             
             const reason = prompt("Are you sure you want to drop " + checkedBoxes.length + " selected student(s)?\nPlease enter the reason for dropping:");
             if (reason === null) {
-                return false; // User cancelled prompt
+                return false;
             }
             if (reason.trim() === '') {
                 alert("Drop reason is required to process bulk drop.");
@@ -717,7 +775,6 @@ if ($view_mode === 'restore_mode' && is_master()) {
             return true;
         }
 
-        // Bulk Restore Validation and Confirmation
         function handleBulkRestoreSubmit() {
             const checkedBoxes = document.querySelectorAll('.restore-checkbox:checked');
             if (checkedBoxes.length === 0) {

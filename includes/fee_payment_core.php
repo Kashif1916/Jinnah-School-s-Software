@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
         
-        // Auto-calculate fine based on overdue months in cart (Rs. 20/day after 10th Aug)
+        // Auto-calculate fine based on overdue months in cart
         $_SESSION['fine_amount'] = calculate_batch_late_fine($_SESSION['fee_cart']);
         if (!isset($_SESSION['other_amount'])) {
             $_SESSION['other_amount'] = 0;
@@ -72,13 +72,45 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } elseif (isset($_POST['action']) && $_POST['action'] == 'remove_item') {
         $remove_rec_id = intval($_POST['remove_record_id'] ?? 0);
         if (!empty($_SESSION['fee_cart'])) {
+            $remove_index = -1;
+            $remove_student_id = 0;
+            
             foreach ($_SESSION['fee_cart'] as $key => $item) {
                 if ($item['record_id'] == $remove_rec_id) {
-                    unset($_SESSION['fee_cart'][$key]);
+                    $remove_index = $key;
+                    $remove_student_id = $item['student_id'];
                     break;
                 }
             }
-            $_SESSION['fee_cart'] = array_values($_SESSION['fee_cart']);
+
+            if ($remove_index !== -1) {
+                // Check if removing a regular monthly fee breaks sequential order
+                $removed_item = $_SESSION['fee_cart'][$remove_index];
+                $is_other = !in_array($removed_item['month'], ['Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Package-12']) && !preg_match('/^[A-Za-z]{3}-[0-9]{4}$/', $removed_item['month']) && strpos($removed_item['month'], 'Package') === false;
+
+                if (!$is_other) {
+                    // Remove this item and all subsequent regular fee items for the same student to avoid gap payment
+                    $new_cart = [];
+                    $stop_adding = false;
+
+                    foreach ($_SESSION['fee_cart'] as $key => $item) {
+                        if ($item['student_id'] == $remove_student_id) {
+                            $is_item_other = !in_array($item['month'], ['Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Package-12']) && !preg_match('/^[A-Za-z]{3}-[0-9]{4}$/', $item['month']) && strpos($item['month'], 'Package') === false;
+                            
+                            if ($key >= $remove_index && !$is_item_other) {
+                                continue; // Skip removed item & all subsequent regular items
+                            }
+                        }
+                        $new_cart[] = $item;
+                    }
+                    $_SESSION['fee_cart'] = $new_cart;
+                    $success = "Removed selected fee along with subsequent months to maintain valid sequential payment order.";
+                } else {
+                    unset($_SESSION['fee_cart'][$remove_index]);
+                    $_SESSION['fee_cart'] = array_values($_SESSION['fee_cart']);
+                    $success = "Item removed from batch list.";
+                }
+            }
         }
         if (empty($_SESSION['fee_cart'])) {
             $_SESSION['fine_amount'] = 0;
@@ -86,7 +118,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         } else {
             $_SESSION['fine_amount'] = calculate_batch_late_fine($_SESSION['fee_cart']);
         }
-        $success = "Item removed from batch list.";
     } elseif (isset($_POST['action']) && $_POST['action'] == 'clear_cart') {
         $_SESSION['fee_cart'] = [];
         $_SESSION['fine_amount'] = 0;
@@ -94,10 +125,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $success = "Batch list cleared.";
     } elseif (isset($_POST['action']) && $_POST['action'] == 'search') {
         $search_name = sanitize_input($_POST['search_name'] ?? '');
+        $search_father_name = sanitize_input($_POST['search_father_name'] ?? '');
         $search_class = sanitize_input($_POST['search_class'] ?? '');
         $search_section = sanitize_input($_POST['search_section'] ?? '');
         
-        if (!empty($search_name) || !empty($search_class) || !empty($search_section)) {
+        if (!empty($search_name) || !empty($search_father_name) || !empty($search_class) || !empty($search_section)) {
             $query = "SELECT * FROM students WHERE status = 'active'";
             $params = [];
             $param_types = '';
@@ -105,6 +137,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if (!empty($search_name)) {
                 $query .= " AND name LIKE ?";
                 $params[] = '%' . $search_name . '%';
+                $param_types .= 's';
+            }
+
+            if (!empty($search_father_name)) {
+                $query .= " AND father_name LIKE ?";
+                $params[] = '%' . $search_father_name . '%';
                 $param_types .= 's';
             }
             
@@ -198,24 +236,7 @@ if (isset($_GET['id'])) {
     if ($student) {
         $is_college = (is_college_class($student['class']) || !empty($student['is_package']));
 
-        if ($is_college) {
-            $query = "SELECT * FROM fee_records WHERE student_id = ? 
-                      ORDER BY CASE 
-                          WHEN month = 'Admission' THEN 1 
-                          WHEN month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 
-                          WHEN month LIKE '%Yearly Package%' OR month LIKE '%yearly_package%' OR month LIKE '%yearly-package%' THEN 3 
-                          WHEN month LIKE '%Package%' OR month LIKE '%yearly%' THEN 4 
-                          ELSE 5 
-                      END, id ASC";
-        } else {
-            $query = "SELECT * FROM fee_records WHERE student_id = ? 
-                      ORDER BY CASE 
-                          WHEN month = 'Admission' THEN 1 
-                          WHEN month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 
-                          ELSE 3 
-                      END, STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y'), id ASC";
-        }
-
+        $query = "SELECT * FROM fee_records WHERE student_id = ? ORDER BY id ASC";
         $stmt = $conn->prepare($query);
         $stmt->bind_param('i', $student_id);
         $stmt->execute();
@@ -238,10 +259,23 @@ if (isset($_GET['id'])) {
         
         $student_fees = array_merge($paid_fees, $unpaid_fees);
         
+        // CUSTOM SORTING: OTHER FEES FIRST, THEN ADMISSION/REGULAR MONTHS
         usort($student_fees, function($a, $b) use ($is_college) {
+            $is_a_other = !in_array($a['month'], ['Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Package-12']) && !preg_match('/^[A-Za-z]{3}-[0-9]{4}$/', $a['month']) && strpos($a['month'], 'Package') === false;
+            $is_b_other = !in_array($b['month'], ['Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Package-12']) && !preg_match('/^[A-Za-z]{3}-[0-9]{4}$/', $b['month']) && strpos($b['month'], 'Package') === false;
+
+            // Priority 1: Other Custom Fees (Exam Fee, Party Fee, Photo Fee, etc.) come FIRST
+            if ($is_a_other && !$is_b_other) return -1;
+            if (!$is_a_other && $is_b_other) return 1;
+            if ($is_a_other && $is_b_other) {
+                return $a['id'] - $b['id'];
+            }
+
+            // Priority 2: Admission Fees
             if ($a['month'] === 'Admission') return -1;
             if ($b['month'] === 'Admission') return 1;
 
+            // Priority 3: Pre-Year Fees
             $pre_years = ['Pre_Year', 'Prev-Year', 'Pre-Year'];
             if (in_array($a['month'], $pre_years) && !in_array($b['month'], $pre_years)) return -1;
             if (!in_array($a['month'], $pre_years) && in_array($b['month'], $pre_years)) return 1;
@@ -250,14 +284,12 @@ if (isset($_GET['id'])) {
                 $a_month = strtolower(trim($a['month']));
                 $b_month = strtolower(trim($b['month']));
 
-                // Priority for Class 11 Yearly Package
                 $is_a_p1 = (strpos($a_month, 'yearly package') !== false || strpos($a_month, 'yearly_package') !== false || strpos($a_month, 'yearly-package') !== false);
                 $is_b_p1 = (strpos($b_month, 'yearly package') !== false || strpos($b_month, 'yearly_package') !== false || strpos($b_month, 'yearly-package') !== false);
 
                 if ($is_a_p1 && !$is_b_p1) return -1;
                 if ($is_b_p1 && !$is_a_p1) return 1;
 
-                // Priority for Class 12 Package (Package-12)
                 $a_pkg = (strpos($a_month, 'package') !== false || strpos($a_month, 'yearly') !== false);
                 $b_pkg = (strpos($b_month, 'package') !== false || strpos($b_month, 'yearly') !== false);
 
@@ -358,9 +390,9 @@ if (isset($_GET['id'])) {
                             <a href="users.php" class="module-nav-btn">
                                 <i class="fas fa-users-cog"></i> Users
                             </a>
-                                                    <a href="account_close_log.php" class="module-nav-btn">
-                            <i class="fas fa-lock"></i> Close Logs
-                        </a>
+                            <a href="account_close_log.php" class="module-nav-btn">
+                                <i class="fas fa-lock"></i> Close Logs
+                            </a>
                             <a href="receipt_note.php" class="module-nav-btn">
                                 <i class="fas fa-sticky-note"></i> Receipt Note
                             </a>
@@ -423,7 +455,7 @@ if (isset($_GET['id'])) {
                     <?php if (!empty($_SESSION['fee_cart'])): ?>
                         <div class="batch-summary mb-5 p-4 border rounded shadow-sm bg-white">
                             <h4 class="text-success mb-3"><i class="fas fa-receipt"></i> Batch List for Receipt</h4>
-                            <form method="POST" class="w-100" action="<?php echo $self_url; ?>">
+                            <form method="POST" class="w-100" action="<?php echo $self_url; ?>" id="batchCartForm">
                                 <table class="table table-bordered align-middle">
                                     <thead class="table-light">
                                         <tr>
@@ -447,7 +479,7 @@ if (isset($_GET['id'])) {
                                                 <td><?php echo format_currency($item['amount']); ?></td>
                                                 <td class="text-center">
                                                     <button type="submit" name="action" value="remove_item" 
-                                                            onclick="document.getElementById('remove_record_id').value='<?php echo $item['record_id']; ?>'; return confirm('Remove <?php echo htmlspecialchars($item['name']); ?> (<?php echo $item['month']; ?>) from batch list?');" 
+                                                            onclick="document.getElementById('remove_record_id').value='<?php echo $item['record_id']; ?>'; return confirm('Remove <?php echo htmlspecialchars($item['name']); ?> (<?php echo $item['month']; ?>)? Note: Removing an earlier month will also remove subsequent months.');" 
                                                             class="btn btn-sm btn-outline-danger py-1 px-2" title="Remove Item">
                                                         <i class="fas fa-times"></i>
                                                     </button>
@@ -460,7 +492,6 @@ if (isset($_GET['id'])) {
                                         <tr class="table-warning">
                                             <td>
                                                 <strong class="text-danger"><i class="fas fa-exclamation-circle me-1"></i> Fine </strong>
-                                               
                                             </td>
                                             <td>-</td>
                                             <td><span class="badge bg-danger">Fine</span></td>
@@ -474,22 +505,7 @@ if (isset($_GET['id'])) {
                                             <td></td>
                                         </tr>
 
-                                        <tr class="table-info" style="background-color: #e8f4fd;">
-                                            <td>
-                                                <strong class="text-primary"><i class="fas fa-plus-circle me-1"></i> Other Dues \ Exam Fee</strong>
-                                                
-                                            </td>
-                                            <td>-</td>
-                                            <td><span class="badge bg-primary">Other</span></td>
-                                            <td>
-                                                <div class="input-group input-group-sm" style="max-width: 170px;">
-                                                    <span class="input-group-text fw-bold">Rs.</span>
-                                                    <input type="number" name="other_amount" id="other_amount_input" class="form-control fw-bold text-primary" 
-                                                           min="0" step="0.01" value="<?php echo (isset($_SESSION['other_amount']) && $_SESSION['other_amount'] > 0) ? floatval($_SESSION['other_amount']) : '0'; ?>" placeholder="0.00">
-                                                </div>
-                                            </td>
-                                            <td></td>
-                                        </tr>
+                                        
 
                                         <tr class="fw-bold table-light">
                                             <td colspan="3" class="text-end">Batch Total:</td>
@@ -500,25 +516,25 @@ if (isset($_GET['id'])) {
                                 </table>
                                 
                                 <div class="d-flex flex-wrap gap-3 align-items-center justify-content-end bg-light p-3 rounded border mt-3">
-    <a href="<?php echo $self_url; ?>" class="btn btn-outline-primary d-flex align-items-center">
-        <i class="fas fa-user-plus me-1"></i> Search & Add Another
-    </a>
+                                    <a href="<?php echo $self_url; ?>" class="btn btn-outline-primary d-flex align-items-center">
+                                        <i class="fas fa-user-plus me-1"></i> Search & Add Another
+                                    </a>
 
-    <button type="submit" name="action" value="process_batch" class="btn btn-success px-4 d-flex align-items-center">
-        <i class="fas fa-print me-1"></i> Print Receipt
-    </button>
-    
-    <div class="form-group mb-0" style="min-width: 220px;">
-        <select id="payment_mode" name="payment_mode" class="form-select bg-white" required>
-            <option value="cash" selected>💵 Cash Payment</option>
-            <option value="bank_transfer">🏦 Bank / Account Transfer</option>
-        </select>
-    </div>
+                                    <button type="submit" name="action" value="process_batch" class="btn btn-success px-4 d-flex align-items-center">
+                                        <i class="fas fa-print me-1"></i> Print Receipt
+                                    </button>
+                                    
+                                    <div class="form-group mb-0" style="min-width: 220px;">
+                                        <select id="payment_mode" name="payment_mode" class="form-select bg-white" required>
+                                            <option value="cash" selected>💵 Cash Payment</option>
+                                            <option value="bank_transfer">🏦 Bank / Account Transfer</option>
+                                        </select>
+                                    </div>
 
-    <button type="submit" name="action" value="clear_cart" class="btn btn-outline-danger d-flex align-items-center" onclick="return confirm('Clear batch list?')">
-        <i class="fas fa-trash me-1"></i> Clear Batch
-    </button>
-</div>
+                                    <button type="submit" name="action" value="clear_cart" class="btn btn-outline-danger d-flex align-items-center" onclick="return confirm('Clear batch list?')">
+                                        <i class="fas fa-trash me-1"></i> Clear Batch
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     <?php endif; ?>
@@ -531,35 +547,41 @@ if (isset($_GET['id'])) {
                             </div>
                             <form method="POST" class="search-form" action="<?php echo $self_url; ?>">
                                 <input type="hidden" name="action" value="search">
-                                <div class="search-grid">
-                                    <div class="form-group">
-                                        <label for="search_name">Student Name</label>
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-3">
+                                        <label for="search_name" class="form-label">Student Name</label>
                                         <input type="text" id="search_name" name="search_name" class="form-control" 
-                                               placeholder="Enter Student Name ">
+                                               value="<?php echo htmlspecialchars($_POST['search_name'] ?? ''); ?>" placeholder="Enter Student Name">
                                     </div>
                                     
-                                    <div class="form-group">
-                                        <label for="search_class">Class</label>
-                                        <select id="search_class" name="search_class" class="form-control">
+                                    <div class="col-md-3">
+                                        <label for="search_father_name" class="form-label">Father Name</label>
+                                        <input type="text" id="search_father_name" name="search_father_name" class="form-control" 
+                                               value="<?php echo htmlspecialchars($_POST['search_father_name'] ?? ''); ?>" placeholder="Enter Father Name">
+                                    </div>
+                                    
+                                    <div class="col-md-2">
+                                        <label for="search_class" class="form-label">Class</label>
+                                        <select id="search_class" name="search_class" class="form-select">
                                             <option value="">All Classes</option>
                                             <?php foreach ($CLASSES as $cls): ?>
-                                                <option value="<?php echo $cls; ?>"><?php echo $cls; ?></option>
+                                                <option value="<?php echo $cls; ?>" <?php echo (($_POST['search_class'] ?? '') === $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
                                     
-                                    <div class="form-group">
-                                        <label for="search_section">Section</label>
-                                        <select id="search_section" name="search_section" class="form-control">
+                                    <div class="col-md-2">
+                                        <label for="search_section" class="form-label">Section</label>
+                                        <select id="search_section" name="search_section" class="form-select">
                                             <option value="">All Sections</option>
                                             <?php foreach ($SECTIONS as $sec): ?>
-                                                <option value="<?php echo $sec; ?>"><?php echo $sec; ?></option>
+                                                <option value="<?php echo $sec; ?>" <?php echo (($_POST['search_section'] ?? '') === $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
                                     
-                                    <div class="form-group">
-                                        <button type="submit" class="btn-primary" style="margin-top: 30px;">
+                                    <div class="col-md-2">
+                                        <button type="submit" class="btn btn-primary w-100 py-2">
                                             <i class="fas fa-search"></i> Search
                                         </button>
                                     </div>
@@ -567,7 +589,7 @@ if (isset($_GET['id'])) {
                             </form>
                             
                             <?php if (count($search_results) > 0): ?>
-                                <div class="search-results">
+                                <div class="search-results mt-4">
                                     <h5>Search Results</h5>
                                     <table class="table table-hover">
                                         <thead>
@@ -586,10 +608,10 @@ if (isset($_GET['id'])) {
                                             ?>
                                                 <tr>
                                                     <td><strong><?php echo $res['id']; ?></strong></td>
-                                                    <td><?php echo $res['name']; ?></td>
-                                                    <td><?php echo $res['father_name']; ?></td>
-                                                    <td><?php echo $res['class']; ?></td>
-                                                    <td><?php echo $res['section']; ?></td>
+                                                    <td><?php echo htmlspecialchars($res['name']); ?></td>
+                                                    <td><?php echo htmlspecialchars($res['father_name']); ?></td>
+                                                    <td><?php echo htmlspecialchars($res['class']); ?></td>
+                                                    <td><?php echo htmlspecialchars($res['section']); ?></td>
                                                     
                                                     <td>
                                                         <a href="?id=<?php echo $res['id']; ?>" class="btn-action">
@@ -602,15 +624,15 @@ if (isset($_GET['id'])) {
                                     </table>
                                 </div>
                             <?php elseif (isset($_POST['action']) && $_POST['action'] == 'search'): ?>
-                                <div class="alert alert-info">No students found!</div>
+                                <div class="alert alert-info mt-4">No students found!</div>
                             <?php endif; ?>
                         </div>
                     <?php else: ?>
                         <div class="fee-details">
                             <div class="fee-header">
                                 <div>
-                                    <h4><?php echo $student['name']; ?> (<?php echo $student['class']; ?>-<?php echo $student['section']; ?>)</h4>
-                                    <p>Father: <?php echo $student['father_name']; ?> | Contact: <?php echo $student['contact_number']; ?></p>
+                                    <h4><?php echo htmlspecialchars($student['name']); ?> (<?php echo htmlspecialchars($student['class']); ?>-<?php echo htmlspecialchars($student['section']); ?>)</h4>
+                                    <p>Father: <?php echo htmlspecialchars($student['father_name']); ?> | Contact: <?php echo htmlspecialchars($student['contact_number']); ?></p>
                                 </div>
                                 <div class="fee-summary">
                                     <?php 
@@ -633,7 +655,7 @@ if (isset($_GET['id'])) {
                             <table class="table table-striped">
                                 <thead>
                                     <tr>
-                                        <th>Month</th>
+                                        <th>Month / Title</th>
                                         <th>Balance Due</th>
                                         <th>Status</th>
                                         <th>Payment Date</th>
@@ -644,15 +666,13 @@ if (isset($_GET['id'])) {
                                     <?php 
                                     $unpaid_idx = 0;
                                     foreach ($student_fees as $fee): 
+                                        $is_other_fee = !in_array($fee['month'], ['Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Package-12']) && !preg_match('/^[A-Za-z]{3}-[0-9]{4}$/', $fee['month']) && strpos($fee['month'], 'Package') === false;
                                     ?>
                                         <tr>
                                             <td>
-                                                <strong><?php echo $fee['month']; ?></strong>
-                                                <?php 
-                                                $est_fine = ($fee['status'] == 'unpaid') ? calculate_month_late_fine($fee['month']) : 0;
-                                                if ($est_fine > 0): 
-                                                ?>
-                                                    
+                                                <strong><?php echo htmlspecialchars($fee['month']); ?></strong>
+                                                <?php if ($is_other_fee): ?>
+                                                    <span class="badge bg-warning text-dark ms-1" style="font-size: 0.75rem;"><i class="fas fa-tag"></i> Custom Fee</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td><?php echo format_currency($fee['amount']); ?></td>
@@ -666,25 +686,44 @@ if (isset($_GET['id'])) {
                                             <td><?php echo format_datetime($fee['payment_date']); ?></td>
                                             <td>
                                                 <?php if ($fee['status'] == 'unpaid'): ?>
-                                                    <div class="d-flex gap-2 align-items-center flex-wrap">
-                                                        <input type="checkbox" name="selected_fee_records[]" value="<?php echo $fee['id']; ?>" 
-                                                               class="form-check-input fee-checkbox"
-                                                               data-index="<?php echo $unpaid_idx; ?>"
-                                                               <?php echo ($unpaid_idx > 0) ? 'disabled' : ''; ?>>
-                                                        
-                                                        <div class="input-group input-group-sm" style="width: 140px;">
-                                                            <span class="input-group-text">Rs.</span>
-                                                            <input type="number" name="paid_amount[<?php echo $fee['id']; ?>]" 
-                                                                   class="form-control paid-amount-input" 
-                                                                   data-fee-id="<?php echo $fee['id']; ?>"
-                                                                   data-original-val="<?php echo $fee['amount']; ?>"
-                                                                   value="<?php echo $fee['amount']; ?>" 
-                                                                   step="0.01" min="0" max="<?php echo $fee['amount']; ?>" 
-                                                                   disabled>
+                                                    <?php if ($is_other_fee): ?>
+                                                        <div class="d-flex gap-2 align-items-center flex-wrap">
+                                                            <input type="checkbox" name="selected_fee_records[]" value="<?php echo $fee['id']; ?>" 
+                                                                   class="form-check-input fee-checkbox other-fee-checkbox">
+                                                            
+                                                            <div class="input-group input-group-sm" style="width: 140px;">
+                                                                <span class="input-group-text">Rs.</span>
+                                                                <input type="number" name="paid_amount[<?php echo $fee['id']; ?>]" 
+                                                                       class="form-control paid-amount-input" 
+                                                                       data-fee-id="<?php echo $fee['id']; ?>"
+                                                                       data-original-val="<?php echo $fee['amount']; ?>"
+                                                                       value="<?php echo $fee['amount']; ?>" 
+                                                                       step="0.01" min="0" max="<?php echo $fee['amount']; ?>" 
+                                                                       disabled>
+                                                            </div>
+                                                            <span id="remaining_<?php echo $fee['id']; ?>" class="font-monospace text-warning small fw-bold"></span>
                                                         </div>
-                                                        <span id="remaining_<?php echo $fee['id']; ?>" class="font-monospace text-warning small fw-bold"></span>
-                                                    </div>
-                                                    <?php $unpaid_idx++; ?>
+                                                    <?php else: ?>
+                                                        <div class="d-flex gap-2 align-items-center flex-wrap">
+                                                            <input type="checkbox" name="selected_fee_records[]" value="<?php echo $fee['id']; ?>" 
+                                                                   class="form-check-input fee-checkbox regular-fee-checkbox"
+                                                                   data-index="<?php echo $unpaid_idx; ?>"
+                                                                   <?php echo ($unpaid_idx > 0) ? 'disabled' : ''; ?>>
+                                                            
+                                                            <div class="input-group input-group-sm" style="width: 140px;">
+                                                                <span class="input-group-text">Rs.</span>
+                                                                <input type="number" name="paid_amount[<?php echo $fee['id']; ?>]" 
+                                                                       class="form-control paid-amount-input" 
+                                                                       data-fee-id="<?php echo $fee['id']; ?>"
+                                                                       data-original-val="<?php echo $fee['amount']; ?>"
+                                                                       value="<?php echo $fee['amount']; ?>" 
+                                                                       step="0.01" min="0" max="<?php echo $fee['amount']; ?>" 
+                                                                       disabled>
+                                                            </div>
+                                                            <span id="remaining_<?php echo $fee['id']; ?>" class="font-monospace text-warning small fw-bold"></span>
+                                                        </div>
+                                                        <?php $unpaid_idx++; ?>
+                                                    <?php endif; ?>
                                                 <?php endif; ?>
                                             </td>
                                         </tr>
@@ -765,11 +804,21 @@ if (isset($_GET['id'])) {
                 <?php unset($_SESSION['print_receipt_url']); ?>
             <?php endif; ?>
 
-            const checkboxes = document.querySelectorAll('.fee-checkbox');
+            const allCheckboxes = document.querySelectorAll('.fee-checkbox');
+            const regularCheckboxes = document.querySelectorAll('.regular-fee-checkbox');
+            const otherCheckboxes = document.querySelectorAll('.other-fee-checkbox');
             const inputs = document.querySelectorAll('.paid-amount-input');
             const addBatchBtn = document.getElementById('addBatchBtn');
 
-            checkboxes.forEach((cb, index) => {
+            function updateBatchButtonState() {
+                const anyChecked = Array.from(allCheckboxes).some(c => c.checked);
+                if (addBatchBtn) {
+                    addBatchBtn.disabled = !anyChecked;
+                }
+            }
+
+            // Sequential checking for Regular Monthly / Package Fees
+            regularCheckboxes.forEach((cb, index) => {
                 cb.addEventListener('change', function() {
                     const feeId = this.value;
                     const input = document.querySelector(`.paid-amount-input[data-fee-id="${feeId}"]`);
@@ -779,17 +828,17 @@ if (isset($_GET['id'])) {
                             input.disabled = false;
                             input.dispatchEvent(new Event('input'));
                         }
-                        if (checkboxes[index + 1]) {
-                            checkboxes[index + 1].disabled = false;
+                        if (regularCheckboxes[index + 1]) {
+                            regularCheckboxes[index + 1].disabled = false;
                         }
                     } else {
-                        for (let i = index; i < checkboxes.length; i++) {
-                            checkboxes[i].checked = false;
+                        for (let i = index; i < regularCheckboxes.length; i++) {
+                            regularCheckboxes[i].checked = false;
                             if (i > index) {
-                                checkboxes[i].disabled = true;
+                                regularCheckboxes[i].disabled = true;
                             }
                             
-                            const subFeeId = checkboxes[i].value;
+                            const subFeeId = regularCheckboxes[i].value;
                             const subInput = document.querySelector(`.paid-amount-input[data-fee-id="${subFeeId}"]`);
                             if (subInput) {
                                 subInput.value = subInput.getAttribute('data-original-val');
@@ -802,11 +851,31 @@ if (isset($_GET['id'])) {
                             }
                         }
                     }
-                    
-                    const anyChecked = Array.from(checkboxes).some(c => c.checked);
-                    if (addBatchBtn) {
-                        addBatchBtn.disabled = !anyChecked;
+                    updateBatchButtonState();
+                });
+            });
+
+            // Independent checking for Other / Custom Fees
+            otherCheckboxes.forEach((cb) => {
+                cb.addEventListener('change', function() {
+                    const feeId = this.value;
+                    const input = document.querySelector(`.paid-amount-input[data-fee-id="${feeId}"]`);
+                    if (this.checked) {
+                        if (input) {
+                            input.disabled = false;
+                            input.dispatchEvent(new Event('input'));
+                        }
+                    } else {
+                        if (input) {
+                            input.value = input.getAttribute('data-original-val');
+                            input.disabled = true;
+                        }
+                        const remainingSpan = document.getElementById('remaining_' + feeId);
+                        if (remainingSpan) {
+                            remainingSpan.textContent = '';
+                        }
                     }
+                    updateBatchButtonState();
                 });
             });
 

@@ -19,13 +19,14 @@ if (!is_master() && !is_finance() && !is_admission() && !is_teacher()) {
 $class_filter = isset($_GET['class']) ? sanitize_input($_GET['class']) : '';
 $section_filter = isset($_GET['section']) ? sanitize_input($_GET['section']) : '';
 $name_filter = isset($_GET['name']) ? sanitize_input($_GET['name']) : '';
+$father_name_filter = isset($_GET['father_name']) ? sanitize_input($_GET['father_name']) : '';
 $months_filter = isset($_GET['months']) ? (is_array($_GET['months']) ? $_GET['months'] : [sanitize_input($_GET['months'])]) : [];
 $min_2_months = (isset($_GET['min_2_months']) && $_GET['min_2_months'] == '1') ? 1 : 0;
 $min_3_months = (isset($_GET['min_3_months']) && $_GET['min_3_months'] == '1') ? 1 : 0;
 $arrears_only = (isset($_GET['arrears_only']) && $_GET['arrears_only'] == '1') ? 1 : 0;
 
 // Get defaulters
-$defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter);
+$defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter, $father_name_filter);
 $defaulter_list = [];
 if ($defaulters) {
     $defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
@@ -210,7 +211,8 @@ if (!empty($class_filter) && is_college_class($class_filter)) {
                     $counter = 1;
                     foreach ($defaulter_list as $defaulter):
                         $unpaid = get_total_unpaid_fees($defaulter['id']);
-                        $total_unpaid += $unpaid;
+                        $s_fine = calculate_student_fine($defaulter['id']);
+                        $total_unpaid += ($unpaid + $s_fine);
                         
                         // Check if student belongs to 11th or 12th class / college package
                         $is_college = is_college_class($defaulter['class']) || (!empty($defaulter['is_package']) && $defaulter['is_package'] == 1);
@@ -229,6 +231,9 @@ if (!empty($class_filter) && is_college_class($class_filter)) {
                                     <strong>(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Month<?php echo ($arrears_only === 1) ? ' Arrears' : ''; ?>)</strong><br>
                                 <?php endif; ?>
                                 <?php echo htmlspecialchars(str_replace(',', ', ', $defaulter['pending_months'])); ?>
+                                <?php if ($s_fine > 0): ?>
+                                    <br><span style="color: #dc3545; font-size: 10px; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Fine: <?php echo format_currency($s_fine); ?></span>
+                                <?php endif; ?>
                             </td>
                             <td class="amount">
                                 <?php if ($is_college): ?>

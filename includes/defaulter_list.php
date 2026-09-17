@@ -16,16 +16,26 @@ if (!is_master() && !is_finance() && !is_admission() && !is_teacher()) {
     exit();
 }
 
-$class_filter = sanitize_input($_REQUEST['class'] ?? '');
-$section_filter = sanitize_input($_REQUEST['section'] ?? '');
+// Multi-select Class & Section Filter inputs (arrays)
+$class_filter = $_REQUEST['class'] ?? [];
+if (!is_array($class_filter)) {
+    $class_filter = !empty($class_filter) ? [$class_filter] : [];
+}
+
+$section_filter = $_REQUEST['section'] ?? [];
+if (!is_array($section_filter)) {
+    $section_filter = !empty($section_filter) ? [$section_filter] : [];
+}
+
 $name_filter = sanitize_input($_REQUEST['name'] ?? '');
+$father_name_filter = sanitize_input($_REQUEST['father_name'] ?? '');
 $months_filter = $_REQUEST['months'] ?? [];
 $min_2_months = isset($_REQUEST['min_2_months']) ? 1 : 0; // 2+ Months Checkbox value
 $min_3_months = isset($_REQUEST['min_3_months']) ? 1 : 0; // 3+ Months Checkbox value
 $arrears_only = isset($_REQUEST['arrears_only']) ? 1 : 0; // Arrears (Partial Payment) Checkbox value
 
 // Check if user has applied any filter
-$is_filtered = (!empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($months_filter) || $min_2_months === 1 || $min_3_months === 1 || $arrears_only === 1);
+$is_filtered = (!empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($father_name_filter) || !empty($months_filter) || $min_2_months === 1 || $min_3_months === 1 || $arrears_only === 1);
 
 // Pagination Configuration (Only applies when NO filter is used)
 $limit = 20; // Default items per page
@@ -33,8 +43,8 @@ $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] :
 if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
 
-// Get defaulters
-$defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter);
+// Get defaulters (updated to accept multi-select class & section arrays)
+$defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter, $father_name_filter);
 $all_defaulter_list = [];
 if ($defaulters) {
     $all_defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
@@ -128,28 +138,44 @@ if (!$is_filtered) {
                             </div>
 
                             <div class="form-group">
-                                <label for="class">Class</label>
-                                <select id="class" name="class" class="form-control">
-                                    <option value="">All Classes</option>
-                                    <?php foreach ($CLASSES as $cls): ?>
-                                        <option value="<?php echo $cls; ?>" <?php echo ($class_filter === $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
-                                    <?php endforeach; ?>
-                                </select>
+                                <label for="father_name">Father Name</label>
+                                <input type="text" id="father_name" name="father_name" class="form-control" placeholder="Search by father name..." value="<?php echo htmlspecialchars($father_name_filter); ?>">
                             </div>
 
+                            <!-- Multi-select Class Filter -->
                             <div class="form-group">
-                                <label for="section">Section</label>
-                                <select id="section" name="section" class="form-control">
-                                    <option value="">All Sections</option>
-                                    <?php foreach ($SECTIONS as $sec): ?>
-                                        <option value="<?php echo $sec; ?>" <?php echo ($section_filter === $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label>Select Month(s)</label>
+                                <label>Select Class(es)</label>
                                 <div class="months-checkbox-container">
+                                    <?php foreach ($CLASSES as $cls): 
+                                        $checked_cls = in_array($cls, (array)$class_filter) ? 'checked' : '';
+                                    ?>
+                                        <label class="month-tick-item">
+                                            <input type="checkbox" name="class[]" value="<?php echo htmlspecialchars($cls); ?>" <?php echo $checked_cls; ?>>
+                                            <?php echo htmlspecialchars($cls); ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
+                            <!-- Multi-select Section Filter -->
+                            <div class="form-group">
+                                <label>Select Section(s)</label>
+                                <div class="months-checkbox-container">
+                                    <?php foreach ($SECTIONS as $sec): 
+                                        $checked_sec = in_array($sec, (array)$section_filter) ? 'checked' : '';
+                                    ?>
+                                        <label class="month-tick-item">
+                                            <input type="checkbox" name="section[]" value="<?php echo htmlspecialchars($sec); ?>" <?php echo $checked_sec; ?>>
+                                            Section <?php echo htmlspecialchars($sec); ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Select Month(s) / Fee Types</label>
+                                <div class="months-checkbox-container">
+                                   
                                     <?php
                                      $start_date = new DateTime('first day of this month');
                                      for ($i = 0; $i < 12; $i++) {
@@ -169,6 +195,10 @@ if (!$is_filtered) {
                                         <?php 
                                     } 
                                     ?>
+                                     <label class="month-tick-item ">
+                                        <input type="checkbox" name="months[]" value="Other" <?php echo (in_array('Other', (array)$months_filter) || in_array('Other Fee', (array)$months_filter)) ? 'checked' : ''; ?>>
+                                        Other / Custom Fees 
+                                    </label>
                                     <label class="month-tick-item">
                                         <input type="checkbox" name="months[]" value="Admission" <?php echo (in_array('Admission', (array)$months_filter)) ? 'checked' : ''; ?>>
                                         Admission
@@ -218,9 +248,14 @@ if (!$is_filtered) {
 
                 <div class="table-section">
                     <form method="POST" action="../master/export_defaulter_challan.php" target="_blank" id="defaulterChallanForm">
-                        <input type="hidden" name="class" value="<?php echo htmlspecialchars($class_filter); ?>">
-                        <input type="hidden" name="section" value="<?php echo htmlspecialchars($section_filter); ?>">
+                        <?php foreach ((array)$class_filter as $c_f): ?>
+                            <input type="hidden" name="class[]" value="<?php echo htmlspecialchars($c_f); ?>">
+                        <?php endforeach; ?>
+                        <?php foreach ((array)$section_filter as $s_f): ?>
+                            <input type="hidden" name="section[]" value="<?php echo htmlspecialchars($s_f); ?>">
+                        <?php endforeach; ?>
                         <input type="hidden" name="name" value="<?php echo htmlspecialchars($name_filter); ?>">
+                        <input type="hidden" name="father_name" value="<?php echo htmlspecialchars($father_name_filter); ?>">
                         <?php if ($min_2_months === 1): ?>
                             <input type="hidden" name="min_2_months" value="1">
                         <?php endif; ?>
@@ -245,6 +280,7 @@ if (!$is_filtered) {
                                         'class' => $class_filter, 
                                         'section' => $section_filter, 
                                         'name' => $name_filter, 
+                                        'father_name' => $father_name_filter,
                                         'months' => $months_filter,
                                         'min_2_months' => $min_2_months,
                                         'min_3_months' => $min_3_months,
@@ -281,6 +317,7 @@ if (!$is_filtered) {
                                             'class' => $class_filter, 
                                             'section' => $section_filter, 
                                             'name' => $name_filter, 
+                                            'father_name' => $father_name_filter,
                                             'months' => $months_filter,
                                             'min_2_months' => $min_2_months,
                                             'min_3_months' => $min_3_months,
@@ -299,8 +336,14 @@ if (!$is_filtered) {
                                             </td>
                                             <td><?php echo htmlspecialchars($defaulter['class']) . '-' . htmlspecialchars($defaulter['section']); ?></td>
                                             <td style="max-width: 200px; font-size: 11px;">
-                                                <strong class="text-danger">(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Month)</strong><br>
+                                                <strong class="text-danger">(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Fee)</strong><br>
                                                 <?php echo htmlspecialchars(str_replace(',', ', ', $defaulter['pending_months'])); ?>
+                                                <?php 
+                                                $s_fine = calculate_student_fine($defaulter['id']);
+                                                if ($s_fine > 0) {
+                                                    echo '<br><span class="badge bg-danger mt-1" style="font-size: 10px;"><i class="fas fa-exclamation-circle me-1"></i>Fine: ' . format_currency($s_fine) . '</span>';
+                                                }
+                                                ?>
                                             </td>
                                             <td>
                                                 <?php 

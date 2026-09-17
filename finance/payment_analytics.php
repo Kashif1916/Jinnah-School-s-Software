@@ -11,6 +11,53 @@ require_once '../includes/helpers.php';
 
 require_finance();
 
+// Handle AJAX Save Audit Log
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_audit_log') {
+    header('Content-Type: application/json');
+    $log_date = sanitize_input($_POST['log_date'] ?? date('Y-m-d'));
+    $d_5000 = max(0, intval($_POST['d_5000'] ?? 0));
+    $d_1000 = max(0, intval($_POST['d_1000'] ?? 0));
+    $d_500  = max(0, intval($_POST['d_500'] ?? 0));
+    $d_100  = max(0, intval($_POST['d_100'] ?? 0));
+    $d_75   = max(0, intval($_POST['d_75'] ?? 0));
+    $d_50   = max(0, intval($_POST['d_50'] ?? 0));
+    $d_20   = max(0, intval($_POST['d_20'] ?? 0));
+    $d_10   = max(0, intval($_POST['d_10'] ?? 0));
+    $grand_total = floatval($_POST['grand_total'] ?? 0);
+    $cash_collected = floatval($_POST['cash_collected'] ?? 0);
+    $difference = floatval($_POST['difference'] ?? 0);
+    $u_id = get_user_id();
+    $u_name = get_username();
+
+    $stmt_save = $conn->prepare("
+        INSERT INTO calculator_audit_logs 
+        (user_id, username, log_date, d_5000, d_1000, d_500, d_100, d_75, d_50, d_20, d_10, grand_total, cash_collected, difference) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE 
+            d_5000 = VALUES(d_5000),
+            d_1000 = VALUES(d_1000),
+            d_500 = VALUES(d_500),
+            d_100 = VALUES(d_100),
+            d_75 = VALUES(d_75),
+            d_50 = VALUES(d_50),
+            d_20 = VALUES(d_20),
+            d_10 = VALUES(d_10),
+            grand_total = VALUES(grand_total),
+            cash_collected = VALUES(cash_collected),
+            difference = VALUES(difference),
+            updated_at = NOW()
+    ");
+    if ($stmt_save) {
+        $stmt_save->bind_param('issiiiiiiiiddd', $u_id, $u_name, $log_date, $d_5000, $d_1000, $d_500, $d_100, $d_75, $d_50, $d_20, $d_10, $grand_total, $cash_collected, $difference);
+        $res = $stmt_save->execute();
+        $stmt_save->close();
+        echo json_encode(['success' => $res, 'message' => $res ? 'Audit log saved.' : 'Database error.']);
+    } else {
+        echo json_encode(['success' => false, 'message' => $conn->error]);
+    }
+    exit();
+}
+
 // Get date and time filters. Default to today's start and end if not set.
 $start_date = isset($_GET['start_date']) && !empty($_GET['start_date']) ? sanitize_input($_GET['start_date']) : date('Y-m-d\T00:00');
 $end_date = isset($_GET['end_date']) && !empty($_GET['end_date']) ? sanitize_input($_GET['end_date']) : date('Y-m-d\T23:59');
@@ -24,6 +71,17 @@ if (strtotime($start_date) > strtotime($end_date)) {
 
 $username = get_username();
 $user_id = get_user_id();
+$selected_log_date = date('Y-m-d', strtotime($start_date));
+
+// Fetch saved calculator audit log for this user and selected date
+$saved_audit = null;
+$stmt_audit = $conn->prepare("SELECT * FROM calculator_audit_logs WHERE username = ? AND log_date = ?");
+if ($stmt_audit) {
+    $stmt_audit->bind_param('ss', $username, $selected_log_date);
+    $stmt_audit->execute();
+    $saved_audit = $stmt_audit->get_result()->fetch_assoc();
+    $stmt_audit->close();
+}
 
 // Fetch payments received by this user in the date range (Using full datetime comparison)
 $query_payments = "SELECT p.*, s.name, s.father_name, s.class, s.section FROM payments p 
@@ -778,15 +836,23 @@ $cash_remaining = $total_cash - $total_expenses;
                         </div>
 
                         <div class="denomination-card">
-                            <div class="denomination-heading">
-                                <i class="fas fa-calculator me-1"></i> Clerk Calculator Audit Log
+                            <div class="denomination-heading d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-calculator me-1"></i> Clerk Calculator Audit Log
+                                    <small class="text-muted d-block" style="font-size: 11px; font-weight: normal;">
+                                        Date: <strong><?php echo date('d-M-Y', strtotime($selected_log_date)); ?></strong>
+                                    </small>
+                                </div>
+                                <span id="audit-save-status" class="badge bg-success-subtle text-success border border-success px-2 py-1" style="font-size: 0.75rem; font-weight: 600; display: none;">
+                                    <i class="fas fa-check-circle me-1"></i> Saved
+                                </span>
                             </div>
                             
                             <div class="denom-row">
                                 <span class="denom-label">5,000</span>
                                 <span class="denom-multiply">×</span>
                                 <div class="denom-input-col">
-                                    <input type="number" min="0" class="denom-input" data-value="5000" oninput="calcDenom(this)" placeholder="0">
+                                    <input type="number" min="0" class="denom-input" id="input-5000" data-value="5000" oninput="calcDenom(this)" placeholder="0" value="<?php echo (!empty($saved_audit['d_5000'])) ? intval($saved_audit['d_5000']) : ''; ?>">
                                 </div>
                                 <span class="denom-equal">=</span>
                                 <span class="denom-total-output" id="total-5000">0.00</span>
@@ -796,7 +862,7 @@ $cash_remaining = $total_cash - $total_expenses;
                                 <span class="denom-label">1,000</span>
                                 <span class="denom-multiply">×</span>
                                 <div class="denom-input-col">
-                                    <input type="number" min="0" class="denom-input" data-value="1000" oninput="calcDenom(this)" placeholder="0">
+                                    <input type="number" min="0" class="denom-input" id="input-1000" data-value="1000" oninput="calcDenom(this)" placeholder="0" value="<?php echo (!empty($saved_audit['d_1000'])) ? intval($saved_audit['d_1000']) : ''; ?>">
                                 </div>
                                 <span class="denom-equal">=</span>
                                 <span class="denom-total-output" id="total-1000">0.00</span>
@@ -806,7 +872,7 @@ $cash_remaining = $total_cash - $total_expenses;
                                 <span class="denom-label">500</span>
                                 <span class="denom-multiply">×</span>
                                 <div class="denom-input-col">
-                                    <input type="number" min="0" class="denom-input" data-value="500" oninput="calcDenom(this)" placeholder="0">
+                                    <input type="number" min="0" class="denom-input" id="input-500" data-value="500" oninput="calcDenom(this)" placeholder="0" value="<?php echo (!empty($saved_audit['d_500'])) ? intval($saved_audit['d_500']) : ''; ?>">
                                 </div>
                                 <span class="denom-equal">=</span>
                                 <span class="denom-total-output" id="total-500">0.00</span>
@@ -816,7 +882,7 @@ $cash_remaining = $total_cash - $total_expenses;
                                 <span class="denom-label">100</span>
                                 <span class="denom-multiply">×</span>
                                 <div class="denom-input-col">
-                                    <input type="number" min="0" class="denom-input" data-value="100" oninput="calcDenom(this)" placeholder="0">
+                                    <input type="number" min="0" class="denom-input" id="input-100" data-value="100" oninput="calcDenom(this)" placeholder="0" value="<?php echo (!empty($saved_audit['d_100'])) ? intval($saved_audit['d_100']) : ''; ?>">
                                 </div>
                                 <span class="denom-equal">=</span>
                                 <span class="denom-total-output" id="total-100">0.00</span>
@@ -826,7 +892,7 @@ $cash_remaining = $total_cash - $total_expenses;
                                 <span class="denom-label">75</span>
                                 <span class="denom-multiply">×</span>
                                 <div class="denom-input-col">
-                                    <input type="number" min="0" class="denom-input" data-value="75" oninput="calcDenom(this)" placeholder="0">
+                                    <input type="number" min="0" class="denom-input" id="input-75" data-value="75" oninput="calcDenom(this)" placeholder="0" value="<?php echo (!empty($saved_audit['d_75'])) ? intval($saved_audit['d_75']) : ''; ?>">
                                 </div>
                                 <span class="denom-equal">=</span>
                                 <span class="denom-total-output" id="total-75">0.00</span>
@@ -836,7 +902,7 @@ $cash_remaining = $total_cash - $total_expenses;
                                 <span class="denom-label">50</span>
                                 <span class="denom-multiply">×</span>
                                 <div class="denom-input-col">
-                                    <input type="number" min="0" class="denom-input" data-value="50" oninput="calcDenom(this)" placeholder="0">
+                                    <input type="number" min="0" class="denom-input" id="input-50" data-value="50" oninput="calcDenom(this)" placeholder="0" value="<?php echo (!empty($saved_audit['d_50'])) ? intval($saved_audit['d_50']) : ''; ?>">
                                 </div>
                                 <span class="denom-equal">=</span>
                                 <span class="denom-total-output" id="total-50">0.00</span>
@@ -846,7 +912,7 @@ $cash_remaining = $total_cash - $total_expenses;
                                 <span class="denom-label">20</span>
                                 <span class="denom-multiply">×</span>
                                 <div class="denom-input-col">
-                                    <input type="number" min="0" class="denom-input" data-value="20" oninput="calcDenom(this)" placeholder="0">
+                                    <input type="number" min="0" class="denom-input" id="input-20" data-value="20" oninput="calcDenom(this)" placeholder="0" value="<?php echo (!empty($saved_audit['d_20'])) ? intval($saved_audit['d_20']) : ''; ?>">
                                 </div>
                                 <span class="denom-equal">=</span>
                                 <span class="denom-total-output" id="total-20">0.00</span>
@@ -856,7 +922,7 @@ $cash_remaining = $total_cash - $total_expenses;
                                 <span class="denom-label">10</span>
                                 <span class="denom-multiply">×</span>
                                 <div class="denom-input-col">
-                                    <input type="number" min="0" class="denom-input" data-value="10" oninput="calcDenom(this)" placeholder="0">
+                                    <input type="number" min="0" class="denom-input" id="input-10" data-value="10" oninput="calcDenom(this)" placeholder="0" value="<?php echo (!empty($saved_audit['d_10'])) ? intval($saved_audit['d_10']) : ''; ?>">
                                 </div>
                                 <span class="denom-equal">=</span>
                                 <span class="denom-total-output" id="total-10">0.00</span>
@@ -890,9 +956,10 @@ $cash_remaining = $total_cash - $total_expenses;
     <script>
         // PHP Cash Remaining Value passed to JavaScript safely
         const reconciledCashRemaining = <?php echo floatval($cash_remaining); ?>;
+        let autoSaveTimer = null;
 
         // Real-time currency denomination calculation logic
-        function calcDenom(inputElement) {
+        function calcDenom(inputElement, isUserTyping = true) {
             const noteValue = parseInt(inputElement.getAttribute('data-value'));
             const count = parseInt(inputElement.value) || 0;
             
@@ -902,7 +969,10 @@ $cash_remaining = $total_cash - $total_expenses;
             const lineTotal = noteValue * count;
             
             // Update individual note total
-            document.getElementById('total-' + noteValue).innerText = lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const totalEl = document.getElementById('total-' + noteValue);
+            if (totalEl) {
+                totalEl.innerText = lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
             
             // Calculate Grand Total
             let grandTotal = 0;
@@ -914,33 +984,95 @@ $cash_remaining = $total_cash - $total_expenses;
             });
             
             // Update Grand Total UI
-            document.getElementById('denom-grand-total').innerText = grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const grandTotalEl = document.getElementById('denom-grand-total');
+            if (grandTotalEl) {
+                grandTotalEl.innerText = grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
 
             // Calculate Difference: Audit Grand Total - Reconciled Cash
             const diffAmount = grandTotal - reconciledCashRemaining;
             const diffElement = document.getElementById('audit-difference');
             
-            if (diffAmount > 0) {
-                // Grand total ziada hai (Extra)
-                const formattedVal = Math.abs(diffAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                diffElement.innerText = formattedVal + ' Extra';
-                diffElement.style.color = '#dc3545'; // Red color highlight
-            } else if (diffAmount < 0) {
-                // Grand total kam hai (Less)
-                const formattedVal = Math.abs(diffAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                diffElement.innerText = formattedVal + ' Less';
-                diffElement.style.color = '#dc3545'; // Red color highlight
-            } else {
-                // Perfectly Balanced
-                diffElement.innerText = '0.00 (Balanced)';
-                diffElement.style.color = '#1f5f46'; // Green color
+            if (diffElement) {
+                if (diffAmount > 0) {
+                    const formattedVal = Math.abs(diffAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    diffElement.innerText = formattedVal + ' Extra';
+                    diffElement.style.color = '#dc3545';
+                } else if (diffAmount < 0) {
+                    const formattedVal = Math.abs(diffAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    diffElement.innerText = formattedVal + ' Less';
+                    diffElement.style.color = '#dc3545';
+                } else {
+                    diffElement.innerText = '0.00 (Balanced)';
+                    diffElement.style.color = '#1f5f46';
+                }
+            }
+
+            if (isUserTyping) {
+                triggerAutoSave(grandTotal, diffAmount);
             }
         }
 
-        // Run calculation once on page load to set the initial difference state
+        function triggerAutoSave(grandTotal, diffAmount) {
+            const statusEl = document.getElementById('audit-save-status');
+            if (statusEl) {
+                statusEl.className = 'badge bg-warning-subtle text-warning border border-warning px-2 py-1';
+                statusEl.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Saving...';
+                statusEl.style.display = 'inline-block';
+            }
+
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = setTimeout(() => {
+                const formData = new FormData();
+                formData.append('action', 'save_audit_log');
+                formData.append('log_date', '<?php echo $selected_log_date; ?>');
+                formData.append('d_5000', document.getElementById('input-5000')?.value || 0);
+                formData.append('d_1000', document.getElementById('input-1000')?.value || 0);
+                formData.append('d_500', document.getElementById('input-500')?.value || 0);
+                formData.append('d_100', document.getElementById('input-100')?.value || 0);
+                formData.append('d_75', document.getElementById('input-75')?.value || 0);
+                formData.append('d_50', document.getElementById('input-50')?.value || 0);
+                formData.append('d_20', document.getElementById('input-20')?.value || 0);
+                formData.append('d_10', document.getElementById('input-10')?.value || 0);
+                formData.append('grand_total', grandTotal);
+                formData.append('cash_collected', reconciledCashRemaining);
+                formData.append('difference', diffAmount);
+
+                fetch('payment_analytics.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (statusEl) {
+                        if (res.success) {
+                            statusEl.className = 'badge bg-success-subtle text-success border border-success px-2 py-1';
+                            statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i> Saved';
+                            setTimeout(() => {
+                                statusEl.style.display = 'none';
+                            }, 2000);
+                        } else {
+                            statusEl.className = 'badge bg-danger-subtle text-danger border border-danger px-2 py-1';
+                            statusEl.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i> ' + (res.message || 'Error');
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Audit save error:', err);
+                    if (statusEl) {
+                        statusEl.className = 'badge bg-danger-subtle text-danger border border-danger px-2 py-1';
+                        statusEl.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i> Save Failed';
+                    }
+                });
+            }, 600);
+        }
+
+        // Run calculation once on page load to set initial state from loaded database values
         window.addEventListener('DOMContentLoaded', () => {
-            const dummyInput = document.querySelector('.denom-input');
-            if (dummyInput) calcDenom(dummyInput);
+            const allInputs = document.querySelectorAll('.denom-input');
+            allInputs.forEach(inp => {
+                calcDenom(inp, false);
+            });
         });
     </script>
 </body>

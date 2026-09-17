@@ -169,6 +169,16 @@ if (isset($_GET['toggle_freeze'])) {
                 } else {
                     // Update latest log status to unfrozen_by_master
                     $conn->query("UPDATE account_close_logs SET status = 'unfrozen_by_master' WHERE user_id = " . intval($toggle_id) . " ORDER BY id DESC LIMIT 1");
+                    // Insert unfreeze audit entry
+                    $master_user = get_username();
+                    $u_role = $user_row['role'] ?? 'finance';
+                    $ip_addr = $_SERVER['REMOTE_ADDR'] ?? '';
+                    $l_stmt = $conn->prepare("INSERT INTO account_close_logs (user_id, username, role, closed_by, closed_at, frozen_until, ip_address, status) VALUES (?, ?, ?, ?, NOW(), NULL, ?, 'unfrozen_by_master')");
+                    if ($l_stmt) {
+                        $l_stmt->bind_param("issss", $toggle_id, $user_row['username'], $u_role, $master_user, $ip_addr);
+                        $l_stmt->execute();
+                        $l_stmt->close();
+                    }
                 }
                 $status_txt = $new_frozen_status === 1 ? 'frozen' : 'unfrozen';
                 $success = "User '" . htmlspecialchars($user_row['username']) . "' has been " . $status_txt . " successfully!";

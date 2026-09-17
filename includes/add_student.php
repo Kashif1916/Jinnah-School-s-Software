@@ -31,6 +31,8 @@ if ($fee_res) {
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $name = sanitize_input($_POST['name'] ?? '');
     $father_name = sanitize_input($_POST['father_name'] ?? '');
+    $b_form = sanitize_input($_POST['b_form'] ?? '');
+    $address = sanitize_input($_POST['address'] ?? '');
     $class = sanitize_input($_POST['class'] ?? '');
     $section = sanitize_input($_POST['section'] ?? '');
     $admission_fee = floatval($_POST['admission_fee'] ?? 0);
@@ -55,24 +57,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($name) || empty($father_name) || empty($class) || empty($section) || $fee_to_validate <= 0) {
         $error = 'All required fields must be filled correctly!';
     } else {
-        // Check if student already exists in the same class and section
-        $check_query = "SELECT id FROM students WHERE name = ? AND father_name = ? AND class = ? AND section = ? AND status = 'active'";
+        // Check if student already exists in the same class (active or dropped)
+        $check_query = "SELECT id, class, section, status, drop_reason FROM students WHERE name = ? AND father_name = ? AND class = ? ORDER BY FIELD(status, 'active', 'dropped') ASC, id DESC LIMIT 1";
         $check_stmt = $conn->prepare($check_query);
-        $check_stmt->bind_param('ssss', $name, $father_name, $class, $section);
+        $check_stmt->bind_param('sss', $name, $father_name, $class);
         $check_stmt->execute();
-        $check_stmt->store_result();
+        $check_result = $check_stmt->get_result();
         
-        if ($check_stmt->num_rows > 0) {
-            $error = 'Student is not entered because this student is already exist in the same class with the same name and same class section!';
+        if ($check_result && $check_result->num_rows > 0) {
+            $existing = $check_result->fetch_assoc();
             $check_stmt->close();
+
+            if ($existing['status'] === 'dropped') {
+                $drop_info = !empty($existing['drop_reason']) ? ' (Reason: ' . htmlspecialchars($existing['drop_reason']) . ')' : '';
+                $error = "Student is not entered! A student with the same Name and Father Name already exists in Class {$class} (Section: {$existing['section']}, Student ID: #{$existing['id']}) but is currently DROPPED{$drop_info}.";
+            } else {
+                $error = "Student is not entered because this student already exists in Class {$class} (Section: {$existing['section']}, Student ID: #{$existing['id']}) with ACTIVE status!";
+            }
         } else {
             $check_stmt->close();
             // Insert student
             $created_by = get_username();
-            $query = "INSERT INTO students (name, father_name, class, section, fixed_monthly_fee, package_amount, is_package, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
+            $query = "INSERT INTO students (name, father_name, b_form, address, class, section, fixed_monthly_fee, package_amount, is_package, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
             $stmt = $conn->prepare($query);
-            $stmt->bind_param('ssssddidsssdss', $name, $father_name, $class, $section, $fixed_monthly_fee, $package_amount, $is_package, $admission_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
+            $stmt->bind_param('ssssssddidsssdss', $name, $father_name, $b_form, $address, $class, $section, $fixed_monthly_fee, $package_amount, $is_package, $admission_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
             
             if ($stmt->execute()) {
                 $student_id = $conn->insert_id;
@@ -129,6 +138,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <div class="col-md-6">
                             <label class="form-label" for="father_name">Father's Name *</label>
                             <input type="text" id="father_name" name="father_name" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="b_form">B-Form / CNIC</label>
+                            <input type="text" id="b_form" name="b_form" class="form-control" placeholder="">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="address">Address</label>
+                            <input type="text" id="address" name="address" class="form-control" placeholder="">
                         </div>
                     </div>
                     <div class="row mb-3">

@@ -16,9 +16,19 @@ if (!is_master() && !is_finance() && !is_admission() && !is_teacher()) {
     exit();
 }
 
-$class_filter = isset($_REQUEST['class']) ? sanitize_input($_REQUEST['class']) : '';
-$section_filter = isset($_REQUEST['section']) ? sanitize_input($_REQUEST['section']) : '';
+// Multi-select Class & Section Arrays Handling
+$class_filter = isset($_REQUEST['class']) ? $_REQUEST['class'] : '';
+if (!is_array($class_filter)) {
+    $class_filter = !empty($class_filter) ? [sanitize_input($class_filter)] : [];
+}
+
+$section_filter = isset($_REQUEST['section']) ? $_REQUEST['section'] : '';
+if (!is_array($section_filter)) {
+    $section_filter = !empty($section_filter) ? [sanitize_input($section_filter)] : [];
+}
+
 $name_filter = isset($_REQUEST['name']) ? sanitize_input($_REQUEST['name']) : '';
+$father_name_filter = isset($_REQUEST['father_name']) ? sanitize_input($_REQUEST['father_name']) : '';
 $months_filter = isset($_REQUEST['months']) ? (is_array($_REQUEST['months']) ? $_REQUEST['months'] : [sanitize_input($_REQUEST['months'])]) : [];
 $min_2_months = (isset($_REQUEST['min_2_months']) && $_REQUEST['min_2_months'] == '1') ? 1 : 0;
 $min_3_months = (isset($_REQUEST['min_3_months']) && $_REQUEST['min_3_months'] == '1') ? 1 : 0;
@@ -36,7 +46,7 @@ if (isset($_REQUEST['student_ids'])) {
 }
 
 // Fetch defaulter students
-$defaulters_query = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter);
+$defaulters_query = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter, $father_name_filter);
 $all_defaulter_list = [];
 if ($defaulters_query) {
     $all_defaulter_list = $defaulters_query->fetch_all(MYSQLI_ASSOC);
@@ -354,16 +364,14 @@ if ($setting_res) {
             // Fetch detailed unpaid records
             $unpaid_query = "SELECT id, month, amount FROM fee_records 
                              WHERE student_id = ? 
-                             AND status = 'unpaid' 
-                              AND (
-                                  month IN ('Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year') 
-                                  OR month LIKE '%Package%'
-                                  OR STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y') <= LAST_DAY(CURRENT_DATE())
-                              )";
+                             AND status = 'unpaid'";
             
             if (!empty($months_filter)) {
+                $has_other_filter = in_array('Other', (array)$months_filter) || in_array('Other Fee', (array)$months_filter);
+                $standard_months = array_diff((array)$months_filter, ['Other', 'Other Fee']);
+
                 $expanded_months = [];
-                foreach ((array)$months_filter as $m) {
+                foreach ($standard_months as $m) {
                     $expanded_months[] = $m;
                     if ($m === 'Pre_Year' || $m === 'Prev-Year' || $m === 'Pre-Year') {
                         $expanded_months[] = 'Pre_Year';
@@ -376,25 +384,47 @@ if ($setting_res) {
                     }
                 }
                 $expanded_months = array_unique($expanded_months);
-                $escaped_months = array_map(function($m) use ($conn) { 
-                    return "'" . $conn->real_escape_string($m) . "'"; 
-                }, $expanded_months);
-                
-                $has_pkg = in_array('Yearly Package', $expanded_months) || in_array('Package', $expanded_months);
-                if ($has_pkg) {
-                    $unpaid_query .= " AND (month IN (" . implode(',', $escaped_months) . ") OR month LIKE '%Package%')";
-                } else {
-                    $unpaid_query .= " AND month IN (" . implode(',', $escaped_months) . ")";
+
+                $conditions = [];
+                if (!empty($expanded_months)) {
+                    $escaped_months = array_map(function($m) use ($conn) { 
+                        return "'" . $conn->real_escape_string($m) . "'"; 
+                    }, $expanded_months);
+
+                    $has_pkg = in_array('Yearly Package', $expanded_months) || in_array('Package', $expanded_months);
+                    if ($has_pkg) {
+                        $conditions[] = "(month IN (" . implode(',', $escaped_months) . ") OR month LIKE '%Package%')";
+                    } else {
+                        $conditions[] = "month IN (" . implode(',', $escaped_months) . ")";
+                    }
                 }
+
+                if ($has_other_filter) {
+                    $conditions[] = "(month NOT IN ('Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Fine') AND month NOT REGEXP '^[A-Za-z]{3}-[0-9]{4}$' AND month NOT LIKE '%Package%')";
+                }
+
+                if (!empty($conditions)) {
+                    $unpaid_query .= " AND (" . implode(' OR ', $conditions) . ")";
+                }
+            } else {
+                $unpaid_query .= " AND (
+                    month IN ('Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year') 
+                    OR month LIKE '%Package%'
+                    OR STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y') <= LAST_DAY(CURRENT_DATE())
+                    OR (month NOT IN ('Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Fine') AND month NOT REGEXP '^[A-Za-z]{3}-[0-9]{4}$' AND month NOT LIKE '%Package%')
+                )";
             }
             
-            $unpaid_query .= " ORDER BY CASE WHEN month = 'Admission' THEN 1 WHEN month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 WHEN month LIKE '%Package%' THEN 3 ELSE 4 END, STR_TO_DATE(CONCAT('01-', month), '%d-%b-%Y')";
+            $unpaid_query .= " ORDER BY CASE WHEN month = 'Admission' THEN 1 WHEN month IN ('Pre_Year', 'Prev-Year', 'Pre-Year') THEN 2 WHEN month LIKE '%Package%' THEN 3 ELSE 4 END, id ASC";
             
             $stmt_unpaid = $conn->prepare($unpaid_query);
             $stmt_unpaid->bind_param('i', $student_id);
             $stmt_unpaid->execute();
             $unpaid_records = $stmt_unpaid->get_result()->fetch_all(MYSQLI_ASSOC);
             $stmt_unpaid->close();
+
+            // Calculate late fee fine for this student (Zero fee and arrears exempted)
+            $student_fine = calculate_student_fine($student_id, $unpaid_records);
 
             // Direct Grouping Algorithm
             $grouped_challan = [];
@@ -407,10 +437,10 @@ if ($setting_res) {
                 $is_admission = ($paid_month === 'Admission');
                 $is_prev_year = (in_array($paid_month, ['Pre_Year', 'Prev-Year', 'Pre-Year']) || strpos($paid_month, 'Prev-Year') !== false);
                 $is_package = (strpos($paid_month, 'Package') !== false);
+                $is_other_fee = (!$is_admission && !$is_prev_year && !$is_package && !preg_match('/^[A-Za-z]{3}-[0-9]{4}$/', $paid_month));
                 
                 // ARREARS / PARTIAL PAYMENT CHECK:
-                // Regular month ki balance amount agar expected net monthly fee se kam ho, to wo arrear mark hoga.
-                $is_arrear = (!$is_admission && !$is_prev_year && !$is_package && $expected_monthly > 0 && $amt < $expected_monthly);
+                $is_arrear = (!$is_admission && !$is_prev_year && !$is_package && !$is_other_fee && $expected_monthly > 0 && $amt < $expected_monthly);
 
                 // When arrears_only filter is active, skip non-arrear fee records
                 if ($arrears_only === 1 && !$is_arrear) {
@@ -425,8 +455,10 @@ if ($setting_res) {
                     $group_key = 'prev_year_' . $rec['id'];
                 } elseif ($is_package) {
                     $group_key = 'package_' . $rec['id'];
+                } elseif ($is_other_fee) {
+                    $group_key = 'other_fee_' . $rec['id']; // Custom fees (Exam Fee, Party Fee, etc.)
                 } elseif ($is_arrear) {
-                    $group_key = 'arrear_' . $rec['id']; // Each partial arrear month gets its own separate row
+                    $group_key = 'arrear_' . $rec['id'];
                 } else {
                     $group_key = 'regular_months';
                 }
@@ -446,6 +478,8 @@ if ($setting_res) {
                     $grouped_challan[$group_key]['title'] = 'Previous Year Pending Fee (' . $paid_month . ')';
                 } elseif ($is_package) {
                     $grouped_challan[$group_key]['title'] = $paid_month . ' (Balance Due)';
+                } elseif ($is_other_fee) {
+                    $grouped_challan[$group_key]['title'] = $paid_month . ' (Custom Fee)';
                 } elseif ($is_arrear) {
                     $grouped_challan[$group_key]['title'] = 'Arrears (' . $paid_month . ')';
                 } else {
@@ -526,6 +560,8 @@ if ($setting_res) {
                                                      . "</small>";
                                             }
                                         }
+                                    } elseif (strpos($group['type'], 'other_fee_') === 0) {
+                                        echo "<br><small style='font-size: 9px; color: #0d6efd;'>Scheduled Custom Fee Dues</small>";
                                     } elseif (strpos($group['type'], 'arrear_') === 0) {
                                         echo "<br><small style='font-size: 9px; color: #dc3545;'>Partial Payment Remaining Balance</small>";
                                     }
@@ -534,11 +570,23 @@ if ($setting_res) {
                                 <td style="text-align: right; font-weight: 600;"><?php echo number_format($group['total_amount'], 2); ?></td>
                             </tr>
                         <?php endforeach; ?>
+                        <?php if ($student_fine > 0): ?>
+                            <tr>
+                                <td><?php echo $sr++; ?></td>
+                                <td>
+                                    <strong style="font-size: 10px; color: #dc3545;">
+                                        <i class="fas fa-exclamation-circle me-1"></i> Late Fee Fine
+                                    </strong>
+                                    <br><small style="font-size: 9px; color: #dc3545;">Late Payment Fine (Rs. 20/day after 10th of overdue month)</small>
+                                </td>
+                                <td style="text-align: right; font-weight: 600; color: #dc3545;"><?php echo number_format($student_fine, 2); ?></td>
+                            </tr>
+                        <?php endif; ?>
                     </tbody>
                     <tfoot>
                         <tr class="total-row">
-                            <td colspan="2" style="text-align: right;">TOTAL REMAINING FEE DUE:</td>
-                            <td style="text-align: right; font-size: 11px;">Rs. <?php echo number_format($total_student_pending, 2); ?></td>
+                            <td colspan="2" style="text-align: right;">TOTAL REMAINING FEE DUE<?php echo ($student_fine > 0) ? ' (INCL. FINE)' : ''; ?>:</td>
+                            <td style="text-align: right; font-size: 11px;">Rs. <?php echo number_format($total_student_pending + $student_fine, 2); ?></td>
                         </tr>
                     </tfoot>
                 </table>

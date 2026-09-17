@@ -18,10 +18,11 @@ if (!is_master() && !is_finance() && !is_admission() && !is_teacher()) {
 $class_filter = sanitize_input($_REQUEST['class'] ?? '');
 $section_filter = sanitize_input($_REQUEST['section'] ?? '');
 $name_filter = sanitize_input($_REQUEST['name'] ?? '');
+$father_name_filter = sanitize_input($_REQUEST['father_name'] ?? '');
 $months_filter = $_REQUEST['months'] ?? [];
 
 // Check if user has applied any filter
-$is_filtered = (!empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($months_filter));
+$is_filtered = (!empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($father_name_filter) || !empty($months_filter));
 
 // Pagination Configuration (Only applies when NO filter is used)
 $limit = 20; // Default items per page
@@ -29,8 +30,8 @@ $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] :
 if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
 
-// Get paid students
-$paid_res = get_paid_students($class_filter, $section_filter, $months_filter, $name_filter);
+// Get paid students (Updated to pass father_name filter)
+$paid_res = get_paid_students($class_filter, $section_filter, $months_filter, $name_filter, $father_name_filter);
 $all_paid_list = [];
 if ($paid_res) {
     $all_paid_list = $paid_res->fetch_all(MYSQLI_ASSOC);
@@ -109,6 +110,11 @@ if (!$is_filtered) {
                             <div class="form-group">
                                 <label for="name">Student Name</label>
                                 <input type="text" id="name" name="name" class="form-control" placeholder="Search by name..." value="<?php echo htmlspecialchars($name_filter); ?>">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="father_name">Father Name</label>
+                                <input type="text" id="father_name" name="father_name" class="form-control" placeholder="Search by father name..." value="<?php echo htmlspecialchars($father_name_filter); ?>">
                             </div>
 
                             <div class="form-group">

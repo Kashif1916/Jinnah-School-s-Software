@@ -73,10 +73,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
 
 // --- SEARCH FILTERS & PAGINATION ---
 $search_name = sanitize_input($_GET['search_name'] ?? '');
+$search_father_name = sanitize_input($_GET['search_father_name'] ?? '');
 $search_class = sanitize_input($_GET['search_class'] ?? '');
 $search_section = sanitize_input($_GET['search_section'] ?? '');
 
-$is_filtered = (!empty($search_name) || !empty($search_class) || !empty($search_section));
+$is_filtered = (!empty($search_name) || !empty($search_father_name) || !empty($search_class) || !empty($search_section));
 
 $limit = 20; // Default 20 per page
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -93,6 +94,11 @@ $count_types = 's';
 if (!empty($search_name)) {
     $count_query .= " AND name LIKE ?";
     $count_params[] = '%' . $search_name . '%';
+    $count_types .= 's';
+}
+if (!empty($search_father_name)) {
+    $count_query .= " AND father_name LIKE ?";
+    $count_params[] = '%' . $search_father_name . '%';
     $count_types .= 's';
 }
 if (!empty($search_class)) {
@@ -124,6 +130,11 @@ $param_types = 's';
 if (!empty($search_name)) {
     $query .= " AND name LIKE ?";
     $params[] = '%' . $search_name . '%';
+    $param_types .= 's';
+}
+if (!empty($search_father_name)) {
+    $query .= " AND father_name LIKE ?";
+    $params[] = '%' . $search_father_name . '%';
     $param_types .= 's';
 }
 if (!empty($search_class)) {
@@ -264,10 +275,10 @@ $stmt->close();
                     <!-- --- MODE SELECTION BUTTONS (2 BUTTONS) --- -->
                     <div class="text-center mb-4">
                         <div class="mode-container">
-                            <a href="delete_student.php?view=active_mode<?php echo !empty($search_name) ? '&search_name='.urlencode($search_name) : ''; ?><?php echo !empty($search_class) ? '&search_class='.urlencode($search_class) : ''; ?><?php echo !empty($search_section) ? '&search_section='.urlencode($search_section) : ''; ?>" class="btn mode-btn <?php echo $view_mode === 'active_mode' ? 'active-mode' : ''; ?>">
+                            <a href="delete_student.php?view=active_mode<?php echo !empty($search_name) ? '&search_name='.urlencode($search_name) : ''; ?><?php echo !empty($search_father_name) ? '&search_father_name='.urlencode($search_father_name) : ''; ?><?php echo !empty($search_class) ? '&search_class='.urlencode($search_class) : ''; ?><?php echo !empty($search_section) ? '&search_section='.urlencode($search_section) : ''; ?>" class="btn mode-btn <?php echo $view_mode === 'active_mode' ? 'active-mode' : ''; ?>">
                                 <i class="fas fa-user-times me-2"></i> Delete Active Students
                             </a>
-                            <a href="delete_student.php?view=dropped_mode<?php echo !empty($search_name) ? '&search_name='.urlencode($search_name) : ''; ?><?php echo !empty($search_class) ? '&search_class='.urlencode($search_class) : ''; ?><?php echo !empty($search_section) ? '&search_section='.urlencode($search_section) : ''; ?>" class="btn mode-btn <?php echo $view_mode === 'dropped_mode' ? 'active-mode' : ''; ?>">
+                            <a href="delete_student.php?view=dropped_mode<?php echo !empty($search_name) ? '&search_name='.urlencode($search_name) : ''; ?><?php echo !empty($search_father_name) ? '&search_father_name='.urlencode($search_father_name) : ''; ?><?php echo !empty($search_class) ? '&search_class='.urlencode($search_class) : ''; ?><?php echo !empty($search_section) ? '&search_section='.urlencode($search_section) : ''; ?>" class="btn mode-btn <?php echo $view_mode === 'dropped_mode' ? 'active-mode' : ''; ?>">
                                 <i class="fas fa-trash-alt me-2"></i> Delete Drop Students
                             </a>
                         </div>
@@ -280,11 +291,15 @@ $stmt->close();
                         <h4><?php echo $view_mode === 'active_mode' ? 'Search Active Students to Delete' : 'Search Dropped Students to Delete'; ?></h4>
                         <form method="GET" class="row g-3">
                             <input type="hidden" name="view" value="<?php echo htmlspecialchars($view_mode); ?>">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label">Student Name</label>
                                 <input type="text" name="search_name" class="form-control" value="<?php echo htmlspecialchars($search_name); ?>" placeholder="Search by name...">
                             </div>
                             <div class="col-md-3">
+                                <label class="form-label">Father Name</label>
+                                <input type="text" name="search_father_name" class="form-control" value="<?php echo htmlspecialchars($search_father_name); ?>" placeholder="Search by father name...">
+                            </div>
+                            <div class="col-md-2">
                                 <label class="form-label">Class</label>
                                 <select name="search_class" class="form-select">
                                     <option value="">All Classes</option>
@@ -293,7 +308,7 @@ $stmt->close();
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label class="form-label">Section</label>
                                 <select name="search_section" class="form-select">
                                     <option value="">All Sections</option>
