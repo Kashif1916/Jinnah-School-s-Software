@@ -1,6 +1,6 @@
 <?php
 /**
- * Day-wise Monthly Collection, User Breakdown, and Expense Report
+ * Day-wise Monthly Collection, User Breakdown, Expense Report & Audit Difference
  * School Finance Management System - Master Panel
  */
 
@@ -24,8 +24,10 @@ $display_month_name = date('F Y', $timestamp);
 
 $start_date = "$selected_month-01 00:00:00";
 $end_date = "$selected_month-$days_in_month 23:59:59";
+$start_date_only = "$selected_month-01";
+$end_date_only = "$selected_month-$days_in_month";
 
-// 1. Fetch ALL Finance & Master Users from Database (To guarantee 4 distinct columns)
+// 1. Fetch ALL Finance & Master Users from Database
 $collecting_users = [];
 $user_q = $conn->query("SELECT username FROM users WHERE role IN ('master', 'finance') ORDER BY CASE WHEN role = 'master' THEN 1 ELSE 2 END, username ASC");
 if ($user_q) {
@@ -34,7 +36,7 @@ if ($user_q) {
     }
 }
 
-// Fallback: If less than 4 users exist in DB, fetch active payment receivers or set default placeholders
+// Fallback: Fetch active payment receivers if users < 4
 if (count($collecting_users) < 4) {
     $p_users = $conn->query("SELECT DISTINCT received_by FROM payments WHERE received_by IS NOT NULL AND received_by != ''");
     while ($pu = $p_users->fetch_assoc()) {
@@ -68,11 +70,24 @@ while ($row = $e_res->fetch_assoc()) {
 }
 $stmt->close();
 
+// 4. Fetch Calculator Audit Log Differences grouped by date (Sum of all users per day)
+$diff_by_day = [];
+$diff_query = "SELECT log_date, SUM(difference) as total_diff FROM calculator_audit_logs WHERE log_date BETWEEN ? AND ? GROUP BY log_date";
+$stmt = $conn->prepare($diff_query);
+$stmt->bind_param('ss', $start_date_only, $end_date_only);
+$stmt->execute();
+$diff_res = $stmt->get_result();
+while ($row = $diff_res->fetch_assoc()) {
+    $diff_by_day[$row['log_date']] = floatval($row['total_diff']);
+}
+$stmt->close();
+
 // Grand Totals Init
 $user_grand_totals = array_fill_keys($collecting_users, 0.00);
 $grand_total_collection = 0.00;
 $grand_total_expenses = 0.00;
 $grand_total_profit = 0.00;
+$grand_total_diff = 0.00;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -150,6 +165,17 @@ $grand_total_profit = 0.00;
             color: #c0392b;
             font-weight: bold;
         }
+        .diff-positive {
+            color: #1f5f46;
+            font-weight: bold;
+        }
+        .diff-negative {
+            color: #c0392b;
+            font-weight: bold;
+        }
+        .diff-zero {
+            color: #555;
+        }
         .user-header {
             background: #154331 !important;
             border-color: #154331 !important;
@@ -193,7 +219,7 @@ $grand_total_profit = 0.00;
                     
                     <!-- 4 User Columns -->
                     <?php foreach ($collecting_users as $username): ?>
-                        <th >
+                        <th>
                             <?php echo htmlspecialchars($username); ?>
                         </th>
                     <?php endforeach; ?>
@@ -201,6 +227,7 @@ $grand_total_profit = 0.00;
                     <th>Total Coll.</th>
                     <th>Expenses</th>
                     <th>Net Profit</th>
+                    <th>Difference</th>
                 </tr>
             </thead>
             <tbody>
@@ -226,17 +253,32 @@ $grand_total_profit = 0.00;
                         <?php 
                         $expense = $expenses_by_day[$day_date] ?? 0.00;
                         $net_profit = $day_total_collection - $expense;
+                        $day_diff = $diff_by_day[$day_date] ?? 0.00;
                         
                         $grand_total_collection += $day_total_collection;
                         $grand_total_expenses += $expense;
                         $grand_total_profit += $net_profit;
+                        $grand_total_diff += $day_diff;
                         
                         $profit_class = $net_profit >= 0 ? 'profit-positive' : 'profit-negative';
+                        
+                        // Difference formatting logic
+                        if ($day_diff > 0) {
+                            $diff_str = '+' . number_format($day_diff, 0);
+                            $diff_class = 'diff-positive';
+                        } elseif ($day_diff < 0) {
+                            $diff_str = '-' . number_format(abs($day_diff), 0);
+                            $diff_class = 'diff-negative';
+                        } else {
+                            $diff_str = '0';
+                            $diff_class = 'diff-zero';
+                        }
                         ?>
 
                         <td><strong><?php echo ($day_total_collection > 0) ? number_format($day_total_collection, 0) : '-'; ?></strong></td>
                         <td><?php echo ($expense > 0) ? number_format($expense, 0) : '-'; ?></td>
                         <td class="<?php echo $profit_class; ?>"><?php echo number_format($net_profit, 0); ?></td>
+                        <td class="<?php echo $diff_class; ?>"><?php echo $diff_str; ?></td>
                     </tr>
                 <?php } ?>
                 
@@ -253,6 +295,17 @@ $grand_total_profit = 0.00;
                     <td><?php echo number_format($grand_total_expenses, 0); ?></td>
                     <td class="<?php echo $grand_total_profit >= 0 ? 'profit-positive' : 'profit-negative'; ?>">
                         <?php echo number_format($grand_total_profit, 0); ?>
+                    </td>
+                    <td class="<?php echo $grand_total_diff > 0 ? 'diff-positive' : ($grand_total_diff < 0 ? 'diff-negative' : 'diff-zero'); ?>">
+                        <?php 
+                        if ($grand_total_diff > 0) {
+                            echo '+' . number_format($grand_total_diff, 0);
+                        } elseif ($grand_total_diff < 0) {
+                            echo '-' . number_format(abs($grand_total_diff), 0);
+                        } else {
+                            echo '0';
+                        }
+                        ?>
                     </td>
                 </tr>
             </tbody>

@@ -213,7 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive_past_cash']))
 
 // Get date and time filters. Default to today's start and end if not set.
 $start_date = isset($_GET['start_date']) && !empty($_GET['start_date']) ? sanitize_input($_GET['start_date']) : date('Y-m-d\T00:00');
-$end_date = isset($_GET['end_date']) && !empty($_GET['end_date']) ? sanitize_input($_GET['end_date']) : date('Y-m-d\T15:00');
+$end_date = isset($_GET['end_date']) && !empty($_GET['end_date']) ? sanitize_input($_GET['end_date']) : date('Y-m-d\T23:59');
 
 // Ensure start_date is not after end_date
 if (strtotime($start_date) > strtotime($end_date)) {
@@ -1623,7 +1623,7 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                                                     <input type="hidden" name="target_clerk" value="<?php echo htmlspecialchars($clerk_filter); ?>">
                                                     <input type="hidden" name="receive_date" value="<?php echo $start_day; ?>">
                                                     <button type="submit" name="receive_past_cash" class="btn btn-success btn-lg w-100 py-3 fw-bold" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);">
-                                                        <i class="fas fa-hand-holding-usd me-2"></i> Received Cash
+                                                        <i class="fas fa-hand-holding-usd me-2"></i> Cash Received 
                                                     </button>
                                                 </form>
                                                 <small class="text-success d-block mt-2 fw-semibold">
