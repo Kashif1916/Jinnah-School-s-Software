@@ -15,6 +15,7 @@ if (!is_master() && !is_finance() && !is_admission() && !is_teacher()) {
     exit();
 }
 
+$search_id = sanitize_input($_GET['search_id'] ?? '');
 $search_name = sanitize_input($_GET['search_name'] ?? '');
 $search_father_name = sanitize_input($_GET['search_father_name'] ?? '');
 $search_b_form = sanitize_input($_GET['search_b_form'] ?? '');
@@ -25,7 +26,7 @@ $search_reasons = isset($_GET['search_reasons']) && is_array($_GET['search_reaso
 $CONCESSION_REASONS = ['Sibling', 'Hafiz', 'Orphan', 'S.C', 'EMP', 'T.Son'];
 
 // Check if user has applied any filter
-$is_filtered = (!empty($search_name) || !empty($search_father_name) || !empty($search_b_form) || !empty($search_classes) || !empty($search_sections) || !empty($search_reasons));
+$is_filtered = (!empty($search_id) || !empty($search_name) || !empty($search_father_name) || !empty($search_b_form) || !empty($search_classes) || !empty($search_sections) || !empty($search_reasons));
 
 // Pagination Configuration
 $limit = 20;
@@ -38,6 +39,11 @@ $where_clauses = ["1=1"];
 $params = [];
 $param_types = '';
 
+if (!empty($search_id)) {
+    $where_clauses[] = "id = ?";
+    $params[] = intval($search_id);
+    $param_types .= 'i';
+}
 if (!empty($search_name)) {
     $where_clauses[] = "name LIKE ?";
     $params[] = '%' . $search_name . '%';
@@ -132,6 +138,30 @@ $stmt->close();
             margin-bottom: 4px;
             font-size: 13px;
         }
+        
+        /* 7 Columns Grid Fit */
+        .filter-row-7 {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 12px;
+            width: 100%;
+        }
+
+        @media (max-width: 1400px) {
+            .filter-row-7 {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+        @media (max-width: 768px) {
+            .filter-row-7 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (max-width: 576px) {
+            .filter-row-7 {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -141,60 +171,68 @@ $stmt->close();
             
             <div class="form-section">
                 <div class="search-section mb-4">
-                    <form method="GET" class="row g-3">
-                        <div class="col-md-2">
-                            <label class="form-label fw-bold">Student Name</label>
-                            <input type="text" name="search_name" class="form-control" value="<?php echo htmlspecialchars($search_name); ?>" placeholder="Search name...">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label fw-bold">Father Name</label>
-                            <input type="text" name="search_father_name" class="form-control" value="<?php echo htmlspecialchars($search_father_name); ?>" placeholder="Search father...">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label fw-bold">B-Form / CNIC</label>
-                            <input type="text" name="search_b_form" class="form-control" value="<?php echo htmlspecialchars($search_b_form); ?>" placeholder="Search B-Form...">
-                        </div>
-                        
-                        <!-- Select Class(es) Multi-Checkbox Box -->
-                        <div class="col-md-2">
-                            <label class="form-label fw-bold">Select Class(es)</label>
-                            <div class="filter-checkbox-box">
-                                <?php foreach ($CLASSES as $cls): ?>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="search_classes[]" value="<?php echo $cls; ?>" id="cls_<?php echo md5($cls); ?>" <?php echo in_array($cls, $search_classes) ? 'checked' : ''; ?>>
-                                        <label class="form-check-label" for="cls_<?php echo md5($cls); ?>"><?php echo $cls; ?></label>
-                                    </div>
-                                <?php endforeach; ?>
+                    <form method="GET">
+                        <!-- Top Row: All 7 Inputs Side by Side -->
+                        <div class="filter-row-7">
+                            <div>
+                                <label class="form-label fw-bold">Student ID</label>
+                                <input type="number" name="search_id" class="form-control" value="<?php echo htmlspecialchars($search_id); ?>" placeholder="Search ID...">
+                            </div>
+                            <div>
+                                <label class="form-label fw-bold">Student Name</label>
+                                <input type="text" name="search_name" class="form-control" value="<?php echo htmlspecialchars($search_name); ?>" placeholder="Search name...">
+                            </div>
+                            <div>
+                                <label class="form-label fw-bold">Father Name</label>
+                                <input type="text" name="search_father_name" class="form-control" value="<?php echo htmlspecialchars($search_father_name); ?>" placeholder="Search father...">
+                            </div>
+                            <div>
+                                <label class="form-label fw-bold">B-Form / CNIC</label>
+                                <input type="text" name="search_b_form" class="form-control" value="<?php echo htmlspecialchars($search_b_form); ?>" placeholder="Search B-Form...">
+                            </div>
+                            
+                            <!-- Select Class(es) Multi-Checkbox Box -->
+                            <div>
+                                <label class="form-label fw-bold">Select Class(es)</label>
+                                <div class="filter-checkbox-box">
+                                    <?php foreach ($CLASSES as $cls): ?>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="search_classes[]" value="<?php echo $cls; ?>" id="cls_<?php echo md5($cls); ?>" <?php echo in_array($cls, $search_classes) ? 'checked' : ''; ?>>
+                                            <label class="form-check-label" for="cls_<?php echo md5($cls); ?>"><?php echo $cls; ?></label>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
+                            <!-- Select Section(s) Multi-Checkbox Box -->
+                            <div>
+                                <label class="form-label fw-bold">Select Section(s)</label>
+                                <div class="filter-checkbox-box">
+                                    <?php foreach ($SECTIONS as $sec): ?>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="search_sections[]" value="<?php echo $sec; ?>" id="sec_<?php echo md5($sec); ?>" <?php echo in_array($sec, $search_sections) ? 'checked' : ''; ?>>
+                                            <label class="form-check-label" for="sec_<?php echo md5($sec); ?>">Section <?php echo $sec; ?></label>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
+                            <!-- Select Concession Reason(s) Multi-Checkbox Box (Shifted Up Here) -->
+                            <div>
+                                <label class="form-label fw-bold">Concession Reason(s)</label>
+                                <div class="filter-checkbox-box">
+                                    <?php foreach ($CONCESSION_REASONS as $reason): ?>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="search_reasons[]" value="<?php echo $reason; ?>" id="rsn_<?php echo md5($reason); ?>" <?php echo in_array($reason, $search_reasons) ? 'checked' : ''; ?>>
+                                            <label class="form-check-label" for="rsn_<?php echo md5($reason); ?>"><?php echo $reason; ?></label>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Select Section(s) Multi-Checkbox Box -->
-                        <div class="col-md-2">
-                            <label class="form-label fw-bold">Select Section(s)</label>
-                            <div class="filter-checkbox-box">
-                                <?php foreach ($SECTIONS as $sec): ?>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="search_sections[]" value="<?php echo $sec; ?>" id="sec_<?php echo md5($sec); ?>" <?php echo in_array($sec, $search_sections) ? 'checked' : ''; ?>>
-                                        <label class="form-check-label" for="sec_<?php echo md5($sec); ?>">Section <?php echo $sec; ?></label>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-
-                        <!-- Select Concession Reason(s) Multi-Checkbox Box -->
-                        <div class="col-md-2">
-                            <label class="form-label fw-bold">Concession Reason(s)</label>
-                            <div class="filter-checkbox-box">
-                                <?php foreach ($CONCESSION_REASONS as $reason): ?>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="search_reasons[]" value="<?php echo $reason; ?>" id="rsn_<?php echo md5($reason); ?>" <?php echo in_array($reason, $search_reasons) ? 'checked' : ''; ?>>
-                                        <label class="form-check-label" for="rsn_<?php echo md5($reason); ?>"><?php echo $reason; ?></label>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-
-                        <div class="col-md-12 text-end mt-2">
+                        <!-- Filter Button -->
+                        <div class="w-100 text-end mt-3">
                             <button type="submit" class="btn-primary px-4">
                                 <i class="fas fa-search me-1"></i> Filter / Search Students
                             </button>
@@ -232,7 +270,7 @@ $stmt->close();
                                 <?php if (count($students) > 0): ?>
                                     <?php foreach ($students as $s): ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($s['id']); ?></td>
+                                            <td><strong><?php echo htmlspecialchars($s['id']); ?></strong></td>
                                             <td><strong><?php echo htmlspecialchars($s['name']); ?></strong></td>
                                             <td><?php echo htmlspecialchars($s['father_name']); ?></td>
                                             <td><?php echo !empty($s['b_form']) ? htmlspecialchars($s['b_form']) : '<span class="text-muted">-</span>'; ?></td>
@@ -306,6 +344,7 @@ $stmt->close();
                     </div>
                     <div class="modal-body">
                         <!-- Hidden Filter States -->
+                        <input type="hidden" name="search_id" value="<?php echo htmlspecialchars($search_id); ?>">
                         <input type="hidden" name="search_name" value="<?php echo htmlspecialchars($search_name); ?>">
                         <input type="hidden" name="search_father_name" value="<?php echo htmlspecialchars($search_father_name); ?>">
                         <input type="hidden" name="search_b_form" value="<?php echo htmlspecialchars($search_b_form); ?>">
@@ -325,7 +364,7 @@ $stmt->close();
                             <div class="col-6">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="cols[id]" value="1" checked id="col_id">
-                                    <label class="form-check-label" for="col_id">Student ID</label>
+                                    <label class="form-check-label" for="col_id">Student ID (Roll No.)</label>
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="cols[name]" value="1" checked id="col_name">

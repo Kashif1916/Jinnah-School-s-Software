@@ -218,14 +218,22 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
             `username` VARCHAR(50) NOT NULL,
             `role` VARCHAR(50) DEFAULT 'finance',
             `closed_by` VARCHAR(50) NOT NULL,
+            `close_date` DATE NULL DEFAULT NULL,
             `closed_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `frozen_until` DATETIME NULL DEFAULT NULL,
             `ip_address` VARCHAR(45) DEFAULT NULL,
             `status` VARCHAR(30) DEFAULT 'closed',
             INDEX (`user_id`),
             INDEX (`username`),
+            INDEX (`close_date`),
             INDEX (`closed_at`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } else {
+        $colCheck = $conn->query("SHOW COLUMNS FROM `account_close_logs` LIKE 'close_date'");
+        if ($colCheck && $colCheck->num_rows == 0) {
+            $conn->query("ALTER TABLE `account_close_logs` ADD COLUMN `close_date` DATE NULL DEFAULT NULL AFTER `closed_by`, ADD INDEX (`close_date`)");
+            $conn->query("UPDATE `account_close_logs` SET `close_date` = DATE(`closed_at`) WHERE `close_date` IS NULL");
+        }
     }
 }
 

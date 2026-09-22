@@ -450,7 +450,11 @@ $stmt->close();
                                             $is_now_frozen = intval($log['current_is_frozen'] ?? 0) === 1;
                                             $freeze_time_display = date('h:i:s A', strtotime($log['closed_at']));
                                             $freeze_date_display = date('d-M-Y (l)', strtotime($log['closed_at']));
-                                            $frozen_until_display = !empty($log['frozen_until']) ? date('d-M-Y h:i A', strtotime($log['frozen_until'])) : 'Until Master Unfreeze';
+                                            if ($log['status'] === 'received_by_master') {
+                                                $frozen_until_display = 'Not Frozen (Cash Handover)';
+                                            } else {
+                                                $frozen_until_display = !empty($log['frozen_until']) ? date('d-M-Y h:i A', strtotime($log['frozen_until'])) : 'Until Master Unfreeze';
+                                            }
                                         ?>
                                             <tr>
                                                 <td class="text-muted fw-bold"><?php echo $sn++; ?></td>
@@ -473,6 +477,13 @@ $stmt->close();
                                                         <span class="date-subtext">
                                                             <i class="far fa-calendar-alt me-1"></i> <?php echo $freeze_date_display; ?>
                                                         </span>
+                                                        <?php if (!empty($log['close_date']) && $log['close_date'] !== date('Y-m-d', strtotime($log['closed_at']))): ?>
+                                                            <div class="mt-1">
+                                                                <span class="badge bg-secondary-subtle text-dark border" style="font-size: 10px;">
+                                                                    For Date: <?php echo date('d-M-Y', strtotime($log['close_date'])); ?>
+                                                                </span>
+                                                            </div>
+                                                        <?php endif; ?>
                                                     </div>
                                                 </td>
                                                 <td>
@@ -507,6 +518,8 @@ $stmt->close();
                                                         <a href="account_close_log.php?unfreeze_user=<?php echo $log['user_id']; ?>&log_id=<?php echo $log['id']; ?>" class="btn btn-sm btn-outline-success" onclick="return confirm('Are you sure you want to unfreeze user \'<?php echo htmlspecialchars(addslashes($log['username'])); ?>\' now?');">
                                                             <i class="fas fa-unlock me-1"></i> Unfreeze
                                                         </a>
+                                                    <?php elseif ($log['status'] === 'received_by_master'): ?>
+                                                        <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="fas fa-hand-holding-usd me-1"></i> Cash Handover</span>
                                                     <?php else: ?>
                                                         <span class="badge bg-light text-success border border-success-subtle"><i class="fas fa-check-circle me-1"></i> Active</span>
                                                     <?php endif; ?>

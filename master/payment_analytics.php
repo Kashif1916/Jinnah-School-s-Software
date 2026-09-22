@@ -78,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 $success = '';
 $error = '';
 
-// Handle Close Account Action for specific clerk
+// Handle Close Account Action for specific clerk (Today's shift closure)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['close_clerk_account'])) {
     $target_clerk = isset($_POST['target_clerk']) ? sanitize_input($_POST['target_clerk']) : '';
     
@@ -95,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['close_clerk_account']
             if ($user_res && $user_res->num_rows > 0) {
                 $user_data = $user_res->fetch_assoc();
                 $clerk_user_id = $user_data['id'];
+                $today_date = date('Y-m-d');
                 $next_midnight = date('Y-m-d 00:00:00', strtotime('tomorrow'));
                 
                 $query = "UPDATE users SET is_frozen = 1, frozen_until = ? WHERE id = ?";
@@ -107,9 +108,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['close_clerk_account']
                         // Log this account close event
                         $master_username = get_username();
                         $ip_address = $_SERVER['REMOTE_ADDR'] ?? '';
-                        $log_stmt = $conn->prepare("INSERT INTO account_close_logs (user_id, username, role, closed_by, closed_at, frozen_until, ip_address, status) VALUES (?, ?, 'finance', ?, NOW(), ?, ?, 'closed_by_master')");
+                        $log_stmt = $conn->prepare("INSERT INTO account_close_logs (user_id, username, role, closed_by, close_date, closed_at, frozen_until, ip_address, status) VALUES (?, ?, 'finance', ?, ?, NOW(), ?, ?, 'closed_by_master')");
                         if ($log_stmt) {
-                            $log_stmt->bind_param('issss', $clerk_user_id, $target_clerk, $master_username, $next_midnight, $ip_address);
+                            $log_stmt->bind_param('isssss', $clerk_user_id, $target_clerk, $master_username, $today_date, $next_midnight, $ip_address);
                             $log_stmt->execute();
                             $log_stmt->close();
                         }
@@ -121,6 +122,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['close_clerk_account']
                     }
                 } else {
                     $error = 'Database query error: ' . $conn->error;
+                }
+            } else {
+                $error = "Selected clerk user was not found in database.";
+            }
+            $user_query->close();
+        }
+    }
+}
+
+// Handle Receive Past Cash Action (Without freezing clerk)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive_past_cash'])) {
+    $target_clerk = isset($_POST['target_clerk']) ? sanitize_input($_POST['target_clerk']) : '';
+    
+    if (empty($target_clerk) || $target_clerk === 'all') {
+        $error = "Please select a specific clerk first from the filter option above to mark cash received!";
+    } else {
+        $user_query = $conn->prepare("SELECT id FROM users WHERE username = ?");
+        if ($user_query) {
+            $user_query->bind_param('s', $target_clerk);
+            $user_query->execute();
+            $user_res = $user_query->get_result();
+            
+            if ($user_res && $user_res->num_rows > 0) {
+                $user_data = $user_res->fetch_assoc();
+                $clerk_user_id = intval($user_data['id']);
+                
+                $dates_to_receive = [];
+                if (!empty($_POST['receive_single_date'])) {
+                    $dates_to_receive[] = sanitize_input($_POST['receive_single_date']);
+                } elseif (!empty($_POST['receive_date'])) {
+                    $dates_to_receive[] = sanitize_input($_POST['receive_date']);
+                } elseif (!empty($_POST['receive_dates'])) {
+                    $raw_dates = explode(',', sanitize_input($_POST['receive_dates']));
+                    foreach ($raw_dates as $rd) {
+                        $rd = trim($rd);
+                        if (!empty($rd)) $dates_to_receive[] = $rd;
+                    }
+                }
+                
+                if (empty($dates_to_receive)) {
+                    $error = "No date specified to mark cash as received.";
+                } else {
+                    $master_username = get_username();
+                    $ip_address = $_SERVER['REMOTE_ADDR'] ?? '';
+                    $success_count = 0;
+                    
+                    foreach ($dates_to_receive as $d_rec) {
+                        // Check if already logged for this date and clerk
+                        $chk = $conn->prepare("SELECT id FROM account_close_logs WHERE username = ? AND COALESCE(close_date, DATE(closed_at)) = ? AND status IN ('closed', 'closed_by_master', 'frozen_by_master', 'received_by_master') LIMIT 1");
+                        if ($chk) {
+                            $chk->bind_param('ss', $target_clerk, $d_rec);
+                            $chk->execute();
+                            $chk_res = $chk->get_result();
+                            $already_exists = ($chk_res && $chk_res->num_rows > 0);
+                            $chk->close();
+                            
+                            if (!$already_exists) {
+                                $ins = $conn->prepare("INSERT INTO account_close_logs (user_id, username, role, closed_by, close_date, closed_at, frozen_until, ip_address, status) VALUES (?, ?, 'finance', ?, ?, NOW(), NULL, ?, 'received_by_master')");
+                                if ($ins) {
+                                    $ins->bind_param('issss', $clerk_user_id, $target_clerk, $master_username, $d_rec, $ip_address);
+                                    if ($ins->execute()) {
+                                        $success_count++;
+                                    }
+                                    $ins->close();
+                                }
+                            } else {
+                                $success_count++;
+                            }
+                        }
+                    }
+                    
+                    if ($success_count > 0) {
+                        if (count($dates_to_receive) === 1) {
+                            $success = "Cash for clerk <strong>" . htmlspecialchars($target_clerk) . "</strong> for date <strong>" . date('d-M-Y', strtotime($dates_to_receive[0])) . "</strong> has been successfully marked as received! (Clerk account was NOT frozen since this is for a past date).";
+                        } else {
+                            $success = "Cash for clerk <strong>" . htmlspecialchars($target_clerk) . "</strong> for <strong>" . $success_count . " past day(s)</strong> has been successfully marked as received! (Clerk account was NOT frozen).";
+                        }
+                    } else {
+                        $error = "Failed to mark cash as received: " . $conn->error;
+                    }
                 }
             } else {
                 $error = "Selected clerk user was not found in database.";
@@ -317,11 +398,11 @@ $account_close_logs_by_date = [];
 $account_close_logs_by_date_clerk = [];
 
 if ($clerk_filter !== 'all') {
-    $stmt_close_log = $conn->prepare("SELECT id, user_id, username, closed_by, closed_at, status, DATE(closed_at) AS close_date
+    $stmt_close_log = $conn->prepare("SELECT id, user_id, username, closed_by, closed_at, status, COALESCE(close_date, DATE(closed_at)) AS close_date
                                        FROM account_close_logs
                                        WHERE username = ?
-                                         AND DATE(closed_at) BETWEEN ? AND ?
-                                         AND status IN ('closed', 'closed_by_master', 'frozen_by_master')
+                                         AND COALESCE(close_date, DATE(closed_at)) BETWEEN ? AND ?
+                                         AND status IN ('closed', 'closed_by_master', 'frozen_by_master', 'received_by_master')
                                        ORDER BY closed_at DESC");
     if ($stmt_close_log) {
         $stmt_close_log->bind_param('sss', $clerk_filter, $start_day, $end_day);
@@ -336,10 +417,10 @@ if ($clerk_filter !== 'all') {
         $stmt_close_log->close();
     }
 } else {
-    $stmt_close_log = $conn->prepare("SELECT id, user_id, username, closed_by, closed_at, status, DATE(closed_at) AS close_date
+    $stmt_close_log = $conn->prepare("SELECT id, user_id, username, closed_by, closed_at, status, COALESCE(close_date, DATE(closed_at)) AS close_date
                                        FROM account_close_logs
-                                       WHERE DATE(closed_at) BETWEEN ? AND ?
-                                         AND status IN ('closed', 'closed_by_master', 'frozen_by_master')
+                                       WHERE COALESCE(close_date, DATE(closed_at)) BETWEEN ? AND ?
+                                         AND status IN ('closed', 'closed_by_master', 'frozen_by_master', 'received_by_master')
                                        ORDER BY closed_at DESC");
     if ($stmt_close_log) {
         $stmt_close_log->bind_param('ss', $start_day, $end_day);
@@ -899,9 +980,12 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                         if ($clerk_filter !== 'all') {
                             if ($is_single_day) {
                                 if (!empty($days_received)) {
-                                    echo "<span style='color: #1f5f46; font-weight: bold;'>✓ Amount Received & Account Closed</span> (Closed at " . date('d-M h:i A', strtotime($days_received[0]['log']['closed_at'])) . " by " . htmlspecialchars($days_received[0]['log']['closed_by']) . ")";
+                                    $dr_log = $days_received[0]['log'];
+                                    $is_past = ($start_day < date('Y-m-d'));
+                                    $status_msg = ($dr_log['status'] === 'received_by_master' || $is_past) ? 'Cash Received' : 'Amount Received & Account Closed';
+                                    echo "<span style='color: #1f5f46; font-weight: bold;'>✓ " . $status_msg . "</span> (Received at " . date('d-M h:i A', strtotime($dr_log['closed_at'])) . " by " . htmlspecialchars($dr_log['closed_by']) . ")";
                                 } else {
-                                    echo "<span style='color: #dc3545; font-weight: bold;'>✗ Cash NOT Received (Account Not Frozen for " . date('d-M-Y', strtotime($start_day)) . ")</span>";
+                                    echo "<span style='color: #dc3545; font-weight: bold;'>✗ Cash NOT Received (Pending Handover for " . date('d-M-Y', strtotime($start_day)) . ")</span>";
                                 }
                             } else {
                                 echo "<span style='color: #1f5f46; font-weight: bold;'>" . count($days_received) . " Day(s) Received</span> | <span style='color: #dc3545; font-weight: bold;'>" . count($days_not_received) . " Day(s) Cash NOT Received</span>";
@@ -1018,10 +1102,14 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
 
                 <!-- Account Freeze & Cash Handover Audit Section (Screen) -->
                 <div class="account-freeze-audit-card mb-4 no-print">
-                    <?php if ($clerk_filter !== 'all'): ?>
+                    <?php 
+                    $today_date_str = date('Y-m-d');
+                    if ($clerk_filter !== 'all'): ?>
                         <?php if ($is_single_day): ?>
                             <?php if (!empty($days_received)): 
                                 $rec_entry = $days_received[0];
+                                $is_past_day = ($start_day < $today_date_str);
+                                $is_rec_status = ($rec_entry['log']['status'] === 'received_by_master');
                             ?>
                                 <div class="alert alert-success border-2 shadow-sm d-flex align-items-center justify-content-between p-3 mb-0" style="border-radius: 10px; border-left: 6px solid #198754 !important;">
                                     <div class="d-flex align-items-center gap-3">
@@ -1030,25 +1118,31 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                                         </div>
                                         <div>
                                             <h5 class="alert-heading mb-1 text-success fw-bold">
-                                                <i class="fas fa-calendar-check me-1"></i> Amount Received for this Day (<?php echo date('d-M-Y', strtotime($start_day)); ?>)
+                                                <i class="fas fa-calendar-check me-1"></i> Cash Received for this Day (<?php echo date('d-M-Y', strtotime($start_day)); ?>)
                                             </h5>
                                             <div class="text-dark">
-                                                Clerk <strong><?php echo htmlspecialchars($clerk_filter); ?></strong>'s account was frozen and cash was received: 
+                                                Clerk <strong><?php echo htmlspecialchars($clerk_filter); ?></strong>'s reconciled amount for <?php echo date('d-M-Y', strtotime($start_day)); ?> was received: 
                                                 <strong class="text-success fs-5"><?php echo format_currency($rec_entry['net_cash']); ?></strong>.
                                             </div>
                                             <small class="text-muted">
-                                                <i class="fas fa-lock me-1"></i> Account closed & frozen at 
+                                                <i class="fas fa-user-check me-1 text-success"></i> Cash received at 
                                                 <strong><?php echo date('d-M-Y h:i A', strtotime($rec_entry['log']['closed_at'])); ?></strong> 
                                                 by <strong><?php echo htmlspecialchars($rec_entry['log']['closed_by']); ?></strong>.
+                                                <?php if ($is_past_day || $is_rec_status): ?>
+                                                    <span class="badge bg-success-subtle text-success border border-success ms-1">Past Day Handover</span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-warning-subtle text-dark border border-warning ms-1">Closed Today Until Midnight</span>
+                                                <?php endif; ?>
                                             </small>
                                         </div>
                                     </div>
                                     <span class="badge bg-success fs-6 px-3 py-2 text-uppercase shadow-sm">
-                                        <i class="fas fa-check-double me-1"></i> Amount Received
+                                        <i class="fas fa-check-double me-1"></i> Cash Received
                                     </span>
                                 </div>
                             <?php else: 
                                 $not_rec_entry = $days_not_received[0];
+                                $is_past_day = ($start_day < $today_date_str);
                             ?>
                                 <div class="alert alert-danger border-2 shadow-sm d-flex align-items-center justify-content-between p-3 mb-0" style="border-radius: 10px; border-left: 6px solid #dc3545 !important;">
                                     <div class="d-flex align-items-center gap-3">
@@ -1059,9 +1153,17 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                                             <h5 class="alert-heading mb-1 text-danger fw-bold">
                                                 <i class="fas fa-exclamation-triangle me-1"></i> Cash NOT Received for this Day (<?php echo date('d-M-Y', strtotime($start_day)); ?>)
                                             </h5>
-                                            
+                                            <div class="text-dark">
+                                                Clerk <strong><?php echo htmlspecialchars($clerk_filter); ?></strong>'s cash in drawer:
+                                                <strong class="text-danger fs-5"><?php echo format_currency($not_rec_entry['net_cash']); ?></strong> (Pending Handover).
+                                            </div>
                                             <small class="text-muted">
-                                                <i class="fas fa-info-circle me-1"></i> Cash has not been handed over yet. Use the "Received and Close Account" button in the Drawer Reconciliation panel below after physically collecting the cash.
+                                                <i class="fas fa-info-circle me-1"></i> 
+                                                <?php if ($is_past_day): ?>
+                                                    Cash has not been handed over yet. Use the green <strong>"Received Cash"</strong> button in the Drawer Reconciliation panel below after physically collecting the cash.
+                                                <?php else: ?>
+                                                    Cash has not been handed over yet. Use the <strong>"Received and Close Account"</strong> button in the Drawer Reconciliation panel below after physically collecting the cash.
+                                                <?php endif; ?>
                                             </small>
                                         </div>
                                     </div>
@@ -1154,9 +1256,12 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                                                         <td class="text-danger fw-bold">- <?php echo format_currency($exp); ?></td>
                                                         <td class="fw-bold fs-6"><?php echo format_currency($net); ?></td>
                                                         <td>
-                                                            <?php if ($is_rec): ?>
+                                                            <?php if ($is_rec): 
+                                                                $is_past = ($d < $today_date_str);
+                                                                $is_rec_status = ($log_item['status'] === 'received_by_master');
+                                                            ?>
                                                                 <span class="badge bg-success text-white">
-                                                                    <i class="fas fa-check-circle me-1"></i> Amount Received & Frozen
+                                                                    <i class="fas fa-check-circle me-1"></i> <?php echo ($is_past || $is_rec_status) ? 'Cash Received' : 'Amount Received & Frozen'; ?>
                                                                 </span>
                                                             <?php else: ?>
                                                                 <span class="badge bg-danger text-white">
@@ -1174,7 +1279,20 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                                                                     <?php echo date('d-M-Y h:i A', strtotime($log_item['closed_at'])); ?>
                                                                 </span>
                                                             <?php else: ?>
-                                                                <span class="text-danger fw-bold"><i class="fas fa-lock-open me-1"></i> Account Not Frozen</span>
+                                                                <?php if ($d < $today_date_str): ?>
+                                                                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-1">
+                                                                        <span class="text-danger fw-bold"><i class="fas fa-times-circle me-1"></i> Not Received</span>
+                                                                        <form method="POST" class="d-inline" onsubmit="return confirm('Mark cash for <?php echo date('d-M-Y', strtotime($d)); ?> as received for clerk (<?php echo htmlspecialchars(addslashes($clerk_filter)); ?>)? (Clerk account will NOT be frozen).');">
+                                                                            <input type="hidden" name="target_clerk" value="<?php echo htmlspecialchars($clerk_filter); ?>">
+                                                                            <input type="hidden" name="receive_single_date" value="<?php echo $d; ?>">
+                                                                            <button type="submit" name="receive_past_cash" class="btn btn-sm btn-outline-success py-1 px-2 fw-bold" style="font-size: 11px;" title="Mark cash as received for this day">
+                                                                                <i class="fas fa-hand-holding-usd me-1"></i> Receive Cash
+                                                                            </button>
+                                                                        </form>
+                                                                    </div>
+                                                                <?php else: ?>
+                                                                    <span class="text-danger fw-bold"><i class="fas fa-lock-open me-1"></i> Account Not Frozen</span>
+                                                                <?php endif; ?>
                                                             <?php endif; ?>
                                                         </td>
                                                     </tr>
@@ -1470,20 +1588,121 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
 
                             <!-- Button under Drawer Reconciliation Statement -->
                             <div class="mt-4 pt-3 border-top text-center no-print">
-                                <form method="POST" onsubmit="return handleCloseAccountSubmit(event, '<?php echo $clerk_filter; ?>')">
-                                    <input type="hidden" name="target_clerk" value="<?php echo htmlspecialchars($clerk_filter); ?>">
-                                    <button type="submit" name="close_clerk_account" class="btn btn-danger btn-lg w-100 py-3 fw-bold" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);">
-                                        <i class="fas fa-lock me-2"></i> Received and Close Account
-                                    </button>
-                                </form>
                                 <?php if ($clerk_filter === 'all'): ?>
+                                    <button class="btn btn-secondary btn-lg w-100 py-3 fw-bold disabled" style="border-radius: 10px; opacity: 0.7;">
+                                        <i class="fas fa-lock me-2"></i> Select Clerk to Receive Cash
+                                    </button>
                                     <small class="text-danger d-block mt-2">
-                                        <i class="fas fa-info-circle"></i> Select a specific clerk above to enable close action.
+                                        <i class="fas fa-info-circle"></i> Please select a specific clerk from the top filter to enable cash receiving / account closing.
                                     </small>
                                 <?php else: ?>
-                                    <small class="text-muted d-block mt-2">
-                                        Closing account for clerk: <strong><?php echo htmlspecialchars($clerk_filter); ?></strong> until midnight.
-                                    </small>
+                                    <?php
+                                    $today_date_str = date('Y-m-d');
+                                    if ($is_single_day):
+                                        $is_past_day = ($start_day < $today_date_str);
+                                        $is_already_rec = !empty($days_received);
+                                    ?>
+                                        <?php if ($is_past_day): ?>
+                                            <?php if ($is_already_rec): ?>
+                                                <div class="alert alert-success border-success d-flex align-items-center justify-content-between p-3 mb-0" style="border-radius: 10px; background-color: #d1e7dd;">
+                                                    <div class="text-start">
+                                                        <strong class="text-success fs-6"><i class="fas fa-check-circle me-1"></i> Cash Already Received</strong>
+                                                        <div class="small text-dark mt-1">
+                                                            Cash for <strong><?php echo date('d-M-Y', strtotime($start_day)); ?></strong> was received:
+                                                            <strong><?php echo format_currency($days_received[0]['net_cash']); ?></strong>.
+                                                        </div>
+                                                        <small class="text-muted">
+                                                            Received on <?php echo date('d-M-Y h:i A', strtotime($days_received[0]['log']['closed_at'])); ?> 
+                                                            by <?php echo htmlspecialchars($days_received[0]['log']['closed_by']); ?>.
+                                                        </small>
+                                                    </div>
+                                                    <span class="badge bg-success fs-6 px-3 py-2 shadow-sm"><i class="fas fa-check-double me-1"></i> Received</span>
+                                                </div>
+                                            <?php else: ?>
+                                                <form method="POST" onsubmit="return handleReceivePastCashSubmit(event, '<?php echo htmlspecialchars(addslashes($clerk_filter)); ?>', '<?php echo date('d-M-Y', strtotime($start_day)); ?>')">
+                                                    <input type="hidden" name="target_clerk" value="<?php echo htmlspecialchars($clerk_filter); ?>">
+                                                    <input type="hidden" name="receive_date" value="<?php echo $start_day; ?>">
+                                                    <button type="submit" name="receive_past_cash" class="btn btn-success btn-lg w-100 py-3 fw-bold" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);">
+                                                        <i class="fas fa-hand-holding-usd me-2"></i> Received Cash
+                                                    </button>
+                                                </form>
+                                                <small class="text-success d-block mt-2 fw-semibold">
+                                                    <i class="fas fa-info-circle me-1"></i> Past date selected (<strong><?php echo date('d-M-Y', strtotime($start_day)); ?></strong>): Only cash will be marked received. Clerk account will <strong>NOT</strong> be frozen.
+                                                </small>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <!-- Today / Current Date Single Day -->
+                                            <?php if ($is_already_rec): ?>
+                                                <div class="alert alert-success border-success d-flex align-items-center justify-content-between p-3 mb-0" style="border-radius: 10px; background-color: #d1e7dd;">
+                                                    <div class="text-start">
+                                                        <strong class="text-success fs-6"><i class="fas fa-check-circle me-1"></i> Account Closed for Today</strong>
+                                                        <div class="small text-dark mt-1">
+                                                            Cash was received: <strong><?php echo format_currency($days_received[0]['net_cash']); ?></strong>.
+                                                        </div>
+                                                        <small class="text-muted">
+                                                            Closed at <?php echo date('h:i A', strtotime($days_received[0]['log']['closed_at'])); ?> 
+                                                            by <?php echo htmlspecialchars($days_received[0]['log']['closed_by']); ?>. Unfreezes at midnight.
+                                                        </small>
+                                                    </div>
+                                                    <a href="account_close_log.php?user_filter=<?php echo urlencode($clerk_filter); ?>" class="btn btn-sm btn-outline-success">Manage</a>
+                                                </div>
+                                            <?php else: ?>
+                                                <form method="POST" onsubmit="return handleCloseAccountSubmit(event, '<?php echo htmlspecialchars(addslashes($clerk_filter)); ?>')">
+                                                    <input type="hidden" name="target_clerk" value="<?php echo htmlspecialchars($clerk_filter); ?>">
+                                                    <button type="submit" name="close_clerk_account" class="btn btn-danger btn-lg w-100 py-3 fw-bold" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);">
+                                                        <i class="fas fa-lock me-2"></i> Received and Close Account
+                                                    </button>
+                                                </form>
+                                                <small class="text-muted d-block mt-2">
+                                                    Closing account for clerk: <strong><?php echo htmlspecialchars($clerk_filter); ?></strong> for today until midnight.
+                                                </small>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <!-- Multiple Days Range -->
+                                        <?php
+                                        $unreceived_past = array_filter($days_not_received, function($it) use ($today_date_str) {
+                                            return $it['date'] < $today_date_str;
+                                        });
+                                        $unreceived_today = array_filter($days_not_received, function($it) use ($today_date_str) {
+                                            return $it['date'] == $today_date_str;
+                                        });
+                                        ?>
+                                        <?php if (!empty($unreceived_past)): ?>
+                                            <form method="POST" onsubmit="return handleReceivePastCashSubmit(event, '<?php echo htmlspecialchars(addslashes($clerk_filter)); ?>', '<?php echo count($unreceived_past); ?> unreceived past day(s)')">
+                                                <input type="hidden" name="target_clerk" value="<?php echo htmlspecialchars($clerk_filter); ?>">
+                                                <input type="hidden" name="receive_dates" value="<?php echo implode(',', array_column($unreceived_past, 'date')); ?>">
+                                                <button type="submit" name="receive_past_cash" class="btn btn-success btn-lg w-100 py-3 fw-bold mb-2" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);">
+                                                    <i class="fas fa-hand-holding-usd me-2"></i> Received Cash (<?php echo count($unreceived_past); ?> Past Day<?php echo count($unreceived_past) > 1 ? 's' : ''; ?>)
+                                                </button>
+                                            </form>
+                                            <small class="text-success d-block mb-3 fw-semibold">
+                                                <i class="fas fa-info-circle me-1"></i> Marking <?php echo count($unreceived_past); ?> past day(s) cash as received. Clerk account will <strong>NOT</strong> be frozen.
+                                            </small>
+                                        <?php endif; ?>
+
+                                        <?php if (!empty($unreceived_today)): ?>
+                                            <form method="POST" onsubmit="return handleCloseAccountSubmit(event, '<?php echo htmlspecialchars(addslashes($clerk_filter)); ?>')">
+                                                <input type="hidden" name="target_clerk" value="<?php echo htmlspecialchars($clerk_filter); ?>">
+                                                <button type="submit" name="close_clerk_account" class="btn btn-danger btn-lg w-100 py-3 fw-bold mb-2" style="border-radius: 10px; box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);">
+                                                    <i class="fas fa-lock me-2"></i> Received and Close Account (Today)
+                                                </button>
+                                            </form>
+                                            <small class="text-muted d-block mt-2">
+                                                Closing today's account for: <strong><?php echo htmlspecialchars($clerk_filter); ?></strong> until midnight.
+                                            </small>
+                                        <?php endif; ?>
+
+                                        <?php if (empty($unreceived_past) && empty($unreceived_today)): ?>
+                                            <div class="alert alert-success border-success d-flex align-items-center justify-content-between p-3 mb-0" style="border-radius: 10px; background-color: #d1e7dd;">
+                                                <div class="text-start">
+                                                    <strong class="text-success fs-6"><i class="fas fa-check-double me-1"></i> All Selected Days Received</strong>
+                                                    <small class="text-muted d-block mt-1">Cash for all <?php echo count($days_received); ?> days in this range has already been recorded.</small>
+                                                </div>
+                                                <span class="badge bg-success fs-6 px-3 py-2 shadow-sm"><i class="fas fa-check-double me-1"></i> All Received</span>
+                                            </div>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
 
@@ -1497,14 +1716,14 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                                     <div class="alert alert-success d-flex align-items-start gap-2 mt-3 mb-4">
                                         <i class="fas fa-check-circle mt-1 text-success fs-5"></i>
                                         <div>
-                                            <strong>Amount received and account closed.</strong>
+                                            <strong>Amount received <?php echo ($start_day < $today_date_str || $single_rec['log']['status'] === 'received_by_master') ? 'successfully.' : 'and account closed.'; ?></strong>
                                             <div>
                                                 <?php echo htmlspecialchars($clerk_filter); ?>'s reconciled amount for
                                                 <?php echo date('d-M-Y', strtotime($start_day)); ?> was received:
                                                 <strong><?php echo format_currency($single_rec['net_cash']); ?></strong>.
                                             </div>
                                             <small class="text-muted">
-                                                Closed at <?php echo date('d-M-Y h:i A', strtotime($single_rec['log']['closed_at'])); ?>
+                                                <?php echo ($start_day < $today_date_str || $single_rec['log']['status'] === 'received_by_master') ? 'Received at' : 'Closed at'; ?> <?php echo date('d-M-Y h:i A', strtotime($single_rec['log']['closed_at'])); ?>
                                                 by <?php echo htmlspecialchars($single_rec['log']['closed_by']); ?>.
                                             </small>
                                         </div>
@@ -1515,14 +1734,14 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                                     <div class="alert alert-danger d-flex align-items-start gap-2 mt-3 mb-4">
                                         <i class="fas fa-times-circle mt-1 text-danger fs-5"></i>
                                         <div>
-                                            <strong>Cash NOT Received </strong>
+                                            <strong>Cash NOT Received</strong>
                                             <div>
                                                 <?php echo htmlspecialchars($clerk_filter); ?>'s cash in drawer for
                                                 <?php echo date('d-M-Y', strtotime($start_day)); ?> is pending handover:
                                                 <strong><?php echo format_currency($single_not_rec['net_cash']); ?></strong>.
                                             </div>
                                             <small class="text-muted">
-                                                Click the red button above once cash is physically collected.
+                                                Click the <?php echo ($start_day < $today_date_str) ? 'green' : 'red'; ?> button above once cash is physically collected.
                                             </small>
                                         </div>
                                     </div>
@@ -1680,6 +1899,15 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
             return false;
         }
         return confirm('Are you sure you want to receive cash and close the account for clerk (' + currentClerk + ')? The account will remain frozen until 12:00 AM midnight.');
+    }
+
+    function handleReceivePastCashSubmit(event, currentClerk, dateLabel) {
+        if (!currentClerk || currentClerk === 'all') {
+            alert('Please select a specific clerk first from the top filter!');
+            event.preventDefault();
+            return false;
+        }
+        return confirm('Are you sure you want to mark cash as received for clerk (' + currentClerk + ') for ' + dateLabel + '? (Clerk account will NOT be frozen today).');
     }
 
     <?php if ($clerk_filter !== 'all'): ?>

@@ -12,7 +12,7 @@ require_once '../includes/helpers.php';
 require_login();
 
 $payment_ids_str = isset($_GET['payment_ids']) ? $_GET['payment_ids'] : '';
-$fee_id = isset($_GET['fee_id']) ? intval($_GET['fee_id']) : 0; // Keep for backward compatibility or single fee receipt
+$fee_id = isset($_GET['fee_id']) ? intval($_GET['fee_id']) : 0;
 
 $payments_to_display = [];
 $student_info = null;
@@ -34,18 +34,17 @@ if (!empty($payment_ids_str)) {
     $stmt->close();
 
     if (!empty($payments_to_display)) {
-        // Assuming all payments are for the same student for a combined receipt
         $student_info = $payments_to_display[0];
         foreach ($payments_to_display as $payment) {
             $total_amount_paid += $payment['amount'];
         }
     }
-} elseif ($fee_id) { // Fallback for single fee_id if payment_ids not provided
+} elseif ($fee_id) {
     $query = "SELECT f.*, s.name, s.father_name, s.class, s.section, s.monthly_fee, s.fixed_monthly_fee, s.package_amount, s.is_package, s.concession_amount, s.contact_number, p.amount as paid_amount, p.payment_date as payment_recorded_date, p.received_by, p.payment_mode
               FROM fee_records f 
               JOIN students s ON f.student_id = s.id 
               LEFT JOIN payments p ON f.student_id = p.student_id AND f.month = p.paid_for_month AND f.payment_date = p.payment_date
-              WHERE f.id = ? ORDER BY p.payment_date DESC LIMIT 1"; // Get the latest payment for this fee record
+              WHERE f.id = ? ORDER BY p.payment_date DESC LIMIT 1";
     $stmt = $conn->prepare($query);
     $stmt->bind_param('i', $fee_id);
     $stmt->execute();
@@ -84,7 +83,6 @@ if (!empty($payments_to_display)) {
         $p_month = $payment['paid_for_month'] ?? $payment['month'] ?? '';
         
         if ($stud_id && $p_month && !in_array($p_month, ['Fine', 'Other', 'Other Payment'])) {
-            // Fetch student details for pending section
             $q = "SELECT f.amount, f.status, s.name, s.father_name 
                   FROM fee_records f 
                   JOIN students s ON f.student_id = s.id 
@@ -118,7 +116,6 @@ if (!empty($payments_to_display)) {
         $is_fine = (trim($paid_month) === 'Fine' || strpos($paid_month, 'Fine') !== false);
         $is_other = (trim($paid_month) === 'Other' || trim($paid_month) === 'Other Payment');
         
-        // Check if this is a custom scheduled other fee (e.g. Exam Fee, Party Fee, Photo Fee, etc.)
         $is_custom_other = false;
         if (!$is_admission && !$is_prev_year && !$is_fine && !$is_other) {
             if (!preg_match('/^[A-Za-z]{3}-[0-9]{4}$/', trim($paid_month)) && stripos($paid_month, 'package') === false) {
@@ -156,6 +153,7 @@ if (!empty($payments_to_display)) {
         
         if (!isset($grouped_payments[$group_key])) {
             $grouped_payments[$group_key] = [
+                'student_id' => $student_id,
                 'name' => $payment['name'],
                 'father_name' => $payment['father_name'],
                 'class' => $payment['class'],
@@ -228,6 +226,7 @@ ob_start();
             color: #0c0c0c;
             font-size: 12px;
         }
+        /* Restored Center Alignment for Receipt Summary Details */
         .receipt-number p {
             margin: 1mm 0;
             font-size: 11px;
@@ -258,13 +257,11 @@ ob_start();
             white-space: nowrap;
         }
         
-        /* Total Row Container for relative positioning */
         .total-row-container {
             position: relative;
             font-weight: bold;
         }
         
-        /* PAID Stamp exactly inside Total Row Area */
         .paid-stamp-total {
             position: absolute;
             top: 50%;
@@ -272,8 +269,9 @@ ob_start();
             transform: translate(-50%, -50%) rotate(-8deg);
             font-size: 32px;
             font-weight: 900;
-            color: rgba(0, 0, 0, 0.22);
-            border: 3px solid rgba(0, 0, 0, 0.22);
+            color: rgb(7, 7, 7);
+            border: 3px solid rgb(7, 7, 7);
+            
             padding: 1px 12px;
             z-index: 1;
             pointer-events: none;
@@ -331,13 +329,14 @@ ob_start();
         </div>
         
         <div style="position: relative; z-index: 2;">
+            <!-- Centered Header Details -->
             <div class="receipt-number">
                 <p><strong>Receipt #:</strong> <?php echo !empty($payments_to_display[0]['receipt_number']) ? htmlspecialchars($payments_to_display[0]['receipt_number']) : str_pad($payments_to_display[0]['id'], 6, '0', STR_PAD_LEFT); ?></p>
                 <p><strong>Date:</strong> <?php echo date('d-m-Y h:i A'); ?></p>
                 <p><strong>Paid By:</strong> <?php echo htmlspecialchars($payments_to_display[0]['received_by'] ?? 'System'); ?></p>
                 <p><strong>Method:</strong> <?php echo strtoupper(str_replace('_', ' ', $payments_to_display[0]['payment_mode'] ?? 'cash')); ?></p>
-                <p><strong>Phone:</strong>03096684856</p>
-                <p><strong></strong>jinnahschoolandintercollegekhb@gmail.com</p>
+                <p><strong>Phone:</strong> 03096684856</p>
+                <p><strong></strong> jinnahschoolandintercollegekhb@gmail.com</p>
             </div>
             
             <div class="section payment-details">
@@ -358,10 +357,13 @@ ob_start();
                                         <strong style="font-size: 14px;">Other Payment / Charges</strong>
                                     <?php elseif (!empty($group['is_custom_other'])): ?>
                                         <strong style="font-size: 14px;"><?php echo htmlspecialchars($group['custom_title']); ?><?php echo !empty($group['is_pending']) ? ' Arrears' : ''; ?></strong>
-                                        <br><small class="text-muted" style="font-size: 11px; color: #0c0c0c;"><?php echo htmlspecialchars($group['name']) . ' / ' . htmlspecialchars($group['father_name']); ?> (<?php echo htmlspecialchars($group['class']) . '-' . htmlspecialchars($group['section']); ?>)</small>
+                                        <br><small class="text-muted" style="font-size: 11px; color: #0c0c0c;"><?php echo htmlspecialchars($group['name']); ?> / <?php echo htmlspecialchars($group['father_name']); ?></small>
+                                        <br>ID: <?php echo $group['student_id']; ?> | <?php echo htmlspecialchars($group['class']) . '-' . htmlspecialchars($group['section']); ?>
                                     <?php else: ?>
-                                        <strong style="font-size: 14px;"><?php echo htmlspecialchars($group['name']) . ' / ' . htmlspecialchars($group['father_name']); ?></strong><br>
-                                        <?php echo htmlspecialchars($group['class']) . '-' . htmlspecialchars($group['section']); ?> | <?php echo implode(', ', $group['months']); ?>
+                                        <!-- Clean Name and Father Name -->
+                                        <strong style="font-size: 14px;"><?php echo htmlspecialchars($group['name']); ?> / <?php echo htmlspecialchars($group['father_name']); ?></strong><br>
+                                        <!-- ID Shifted before Class-Section with same font size & style -->
+                                        ID: <?php echo $group['student_id']; ?> | <?php echo htmlspecialchars($group['class']) . '-' . htmlspecialchars($group['section']); ?> | <?php echo implode(', ', $group['months']); ?>
                                         <?php 
                                         if (empty($group['is_admission']) && empty($group['is_prev_year'])) {
                                             $is_pkg = (!empty($group['is_package']) || is_college_class($group['class']) || in_array('Yearly Package', $group['months']) || strpos(implode(',', $group['months']), 'Package') !== false);
@@ -420,8 +422,8 @@ ob_start();
             </div>
             
             <?php if (!empty($pending_balances)): ?>
-                <div style="margin-top: 2mm; border: 1px dashed #c0392b; padding: 2mm; font-size: 10px; background-color: #fdf2f2; border-radius: 4px;">
-                    <strong style="color: #c0392b;"><i class="fas fa-exclamation-triangle"></i> Pending Fee:</strong><br>
+                <div style="margin-top: 2mm; border: 3px dashed #0f0f0f; padding: 2mm; font-size: 10px; background-color: #fdf2f2; border-radius: 4px;">
+                    <strong style="color: #0c0c0c; font-size: 15px;"><i class="fas fa-exclamation-triangle"></i> Pending Fee:</strong><br>
                     <?php foreach ($pending_balances as $pending): ?>
                         • <?php echo $pending['student_name'] . ' / ' . $pending['father_name']; ?> (<?php echo $pending['month']; ?>): <strong><?php echo format_currency($pending['amount']); ?></strong><br>
                     <?php endforeach; ?>

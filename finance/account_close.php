@@ -132,28 +132,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['close_account'])) {
                         <div class="mb-4">
                             <i class="fas fa-user-shield text-danger" style="font-size: 70px;"></i>
                         </div>
-                        <h3 class="mb-3" style="color: #2c3e50; font-weight: 700;">Account Close for Today</h3>
+                        <h3 class="mb-3" style="color: #2c3e50; font-weight: 700;">This feature is removed due to some reasons.</h3>
                         
-                        <div class="alert alert-warning text-start mb-4" style="line-height: 1.6; border-left: 5px solid #f39c12; background-color: #fef9e7;">
-                            <h5 class="alert-heading fw-bold"><i class="fas fa-exclamation-triangle"></i> Important Notice:</h5>
-                            <p class="mb-0">
-                                Once you close your account for today:
-                                <ul class="mt-2 mb-0">
-                                    <li>You will be automatically logged out of the system.</li>
-                                    <li>Your account will be <strong>frozen</strong> and you will be blocked from logging back in.</li>
-                                    <li>Re-activation is automatic at <strong>12:00 AM (midnight)</strong> of the next day.</li>
-                                    <li>The Principal (Master) can also manually unfreeze your account at any time if required.</li>
-                                </ul>
-                            </p>
-                        </div>
-                        
-                        <form method="POST" onsubmit="return confirm('Are you sure you want to close your account for today? You will be logged out immediately and blocked until tomorrow.')">
-                            <button type="submit" name="close_account" class="btn btn-danger btn-lg px-5 py-3 fw-bold" style="border-radius: 30px; box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);">
-                                <i class="fas fa-lock me-2"></i> Confirm Account Close
-                            </button>
-                        </form>
-                    </div>
-                </div>
             </div>
         </main>
     </div>

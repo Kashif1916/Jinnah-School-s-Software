@@ -91,8 +91,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 if (!$is_other) {
                     // Remove this item and all subsequent regular fee items for the same student to avoid gap payment
                     $new_cart = [];
-                    $stop_adding = false;
-
                     foreach ($_SESSION['fee_cart'] as $key => $item) {
                         if ($item['student_id'] == $remove_student_id) {
                             $is_item_other = !in_array($item['month'], ['Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Package-12']) && !preg_match('/^[A-Za-z]{3}-[0-9]{4}$/', $item['month']) && strpos($item['month'], 'Package') === false;
@@ -124,16 +122,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $_SESSION['other_amount'] = 0;
         $success = "Batch list cleared.";
     } elseif (isset($_POST['action']) && $_POST['action'] == 'search') {
+        $search_id = sanitize_input($_POST['search_id'] ?? '');
         $search_name = sanitize_input($_POST['search_name'] ?? '');
         $search_father_name = sanitize_input($_POST['search_father_name'] ?? '');
         $search_class = sanitize_input($_POST['search_class'] ?? '');
         $search_section = sanitize_input($_POST['search_section'] ?? '');
         
-        if (!empty($search_name) || !empty($search_father_name) || !empty($search_class) || !empty($search_section)) {
+        if (!empty($search_id) || !empty($search_name) || !empty($search_father_name) || !empty($search_class) || !empty($search_section)) {
             $query = "SELECT * FROM students WHERE status = 'active'";
             $params = [];
             $param_types = '';
             
+            if (!empty($search_id)) {
+                $query .= " AND id = ?";
+                $params[] = intval($search_id);
+                $param_types .= 'i';
+            }
+
             if (!empty($search_name)) {
                 $query .= " AND name LIKE ?";
                 $params[] = '%' . $search_name . '%';
@@ -264,18 +269,15 @@ if (isset($_GET['id'])) {
             $is_a_other = !in_array($a['month'], ['Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Package-12']) && !preg_match('/^[A-Za-z]{3}-[0-9]{4}$/', $a['month']) && strpos($a['month'], 'Package') === false;
             $is_b_other = !in_array($b['month'], ['Admission', 'Pre_Year', 'Prev-Year', 'Pre-Year', 'Yearly Package', 'Package-12']) && !preg_match('/^[A-Za-z]{3}-[0-9]{4}$/', $b['month']) && strpos($b['month'], 'Package') === false;
 
-            // Priority 1: Other Custom Fees (Exam Fee, Party Fee, Photo Fee, etc.) come FIRST
             if ($is_a_other && !$is_b_other) return -1;
             if (!$is_a_other && $is_b_other) return 1;
             if ($is_a_other && $is_b_other) {
                 return $a['id'] - $b['id'];
             }
 
-            // Priority 2: Admission Fees
             if ($a['month'] === 'Admission') return -1;
             if ($b['month'] === 'Admission') return 1;
 
-            // Priority 3: Pre-Year Fees
             $pre_years = ['Pre_Year', 'Prev-Year', 'Pre-Year'];
             if (in_array($a['month'], $pre_years) && !in_array($b['month'], $pre_years)) return -1;
             if (!in_array($a['month'], $pre_years) && in_array($b['month'], $pre_years)) return 1;
@@ -342,98 +344,38 @@ if (isset($_GET['id'])) {
                 <div class="module-nav-panel">
                     <div class="module-nav-row">
                         <?php if ($panel_role == 'master'): ?>
-                            <a href="dashboard.php" class="module-nav-btn">
-                                <i class="fas fa-chart-bar"></i> Dashboard
-                            </a>
-                            <a href="add_student.php" class="module-nav-btn">
-                                <i class="fas fa-user-plus"></i> Add Student
-                            </a>
-                            <a href="student_record.php" class="module-nav-btn">
-                                <i class="fas fa-address-book"></i> Student Record
-                            </a>
-                            <a href="student_add_details.php" class="module-nav-btn">
-                                <i class="fas fa-history"></i> Add Log
-                            </a>
-                            <a href="fee_schedule.php" class="module-nav-btn">
-                                <i class="fas fa-calendar-alt"></i> Fee Schedule
-                            </a>
-                            <a href="fee_management.php" class="module-nav-btn active">
-                                <i class="fas fa-money-bill-wave"></i> Fee Management
-                            </a>
-                            <a href="defaulter_list.php" class="module-nav-btn">
-                                <i class="fas fa-list"></i> Pending List
-                            </a>
-                            <a href="paid_students.php" class="module-nav-btn">
-                                <i class="fas fa-check-circle text-success"></i> Paid Students
-                            </a>
-                            <a href="payment_analytics.php" class="module-nav-btn">
-                                <i class="fas fa-chart-line"></i> Analytics
-                            </a>
-                            <a href="receipt_analysis.php" class="module-nav-btn">
-                                <i class="fas fa-receipt"></i> Receipt Analysis
-                            </a>
-                            <a href="expenses.php" class="module-nav-btn">
-                                <i class="fas fa-wallet"></i> Expenses
-                            </a>
-                            <a href="data_correction.php" class="module-nav-btn">
-                                <i class="fas fa-edit"></i> Data Correction
-                            </a>
-                            <a href="promotion.php" class="module-nav-btn">
-                                <i class="fas fa-arrow-up"></i> Promotion
-                            </a>
-                            <a href="drop_student.php" class="module-nav-btn">
-                                <i class="fas fa-trash"></i> Drop Student
-                            </a>
-                            <a href="delete_student.php" class="module-nav-btn">
-                                <i class="fas fa-user-minus text-success"></i> Delete Student
-                            </a>
-                            <a href="users.php" class="module-nav-btn">
-                                <i class="fas fa-users-cog"></i> Users
-                            </a>
-                            <a href="account_close_log.php" class="module-nav-btn">
-                                <i class="fas fa-lock"></i> Close Logs
-                            </a>
-                            <a href="receipt_note.php" class="module-nav-btn">
-                                <i class="fas fa-sticky-note"></i> Receipt Note
-                            </a>
+                            <a href="dashboard.php" class="module-nav-btn"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            <a href="add_student.php" class="module-nav-btn"><i class="fas fa-user-plus"></i> Add Student</a>
+                            <a href="student_record.php" class="module-nav-btn"><i class="fas fa-address-book"></i> Student Record</a>
+                            <a href="student_add_details.php" class="module-nav-btn"><i class="fas fa-history"></i> Add Log</a>
+                            <a href="fee_schedule.php" class="module-nav-btn"><i class="fas fa-calendar-alt"></i> Fee Schedule</a>
+                            <a href="fee_management.php" class="module-nav-btn active"><i class="fas fa-money-bill-wave"></i> Fee Management</a>
+                            <a href="defaulter_list.php" class="module-nav-btn"><i class="fas fa-list"></i> Pending List</a>
+                            <a href="paid_students.php" class="module-nav-btn"><i class="fas fa-check-circle text-success"></i> Paid Students</a>
+                            <a href="payment_analytics.php" class="module-nav-btn"><i class="fas fa-chart-line"></i> Analytics</a>
+                            <a href="receipt_analysis.php" class="module-nav-btn"><i class="fas fa-receipt"></i> Receipt Analysis</a>
+                            <a href="expenses.php" class="module-nav-btn"><i class="fas fa-wallet"></i> Expenses</a>
+                            <a href="data_correction.php" class="module-nav-btn"><i class="fas fa-edit"></i> Data Correction</a>
+                            <a href="promotion.php" class="module-nav-btn"><i class="fas fa-arrow-up"></i> Promotion</a>
+                            <a href="drop_student.php" class="module-nav-btn"><i class="fas fa-trash"></i> Drop Student</a>
+                            <a href="delete_student.php" class="module-nav-btn"><i class="fas fa-user-minus text-success"></i> Delete Student</a>
+                            <a href="users.php" class="module-nav-btn"><i class="fas fa-users-cog"></i> Users</a>
+                            <a href="account_close_log.php" class="module-nav-btn"><i class="fas fa-lock"></i> Close Logs</a>
+                            <a href="receipt_note.php" class="module-nav-btn"><i class="fas fa-sticky-note"></i> Receipt Note</a>
                         <?php else: ?>
-                            <a href="dashboard.php" class="module-nav-btn">
-                                <i class="fas fa-chart-bar"></i> Dashboard
-                            </a>
-                            <a href="add_student.php" class="module-nav-btn">
-                                <i class="fas fa-list"></i> Add Student
-                            </a>
-                            <a href="student_record.php" class="module-nav-btn">
-                                <i class="fas fa-address-book"></i> Student Record
-                            </a>
-                            <a href="fee_payment.php" class="module-nav-btn active">
-                                <i class="fas fa-money-bill-wave"></i> Fee Payment
-                            </a>
-                            <a href="defaulter_list.php" class="module-nav-btn">
-                                <i class="fas fa-list"></i> Pending List
-                            </a>
-                            <a href="paid_students.php" class="module-nav-btn">
-                                <i class="fas fa-check-circle text-success"></i> Paid Students
-                            </a>
-                            <a href="payment_analytics.php" class="module-nav-btn">
-                                <i class="fas fa-chart-line"></i> Analytics
-                            </a>
-                            <a href="receipt_analysis.php" class="module-nav-btn">
-                                <i class="fas fa-receipt"></i> Receipt Analysis
-                            </a>
-                            <a href="expenses.php" class="module-nav-btn">
-                                <i class="fas fa-wallet"></i> Expenses
-                            </a>
-                            <a href="drop_student.php" class="module-nav-btn">
-                                <i class="fas fa-trash text-success"></i> Drop Student
-                            </a>
-                            <a href="account_close.php" class="module-nav-btn">
-                                <i class="fas fa-lock"></i> Close Account
-                            </a>
+                            <a href="dashboard.php" class="module-nav-btn"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            <a href="add_student.php" class="module-nav-btn"><i class="fas fa-list"></i> Add Student</a>
+                            <a href="student_record.php" class="module-nav-btn"><i class="fas fa-address-book"></i> Student Record</a>
+                            <a href="fee_payment.php" class="module-nav-btn active"><i class="fas fa-money-bill-wave"></i> Fee Payment</a>
+                            <a href="defaulter_list.php" class="module-nav-btn"><i class="fas fa-list"></i> Pending List</a>
+                            <a href="paid_students.php" class="module-nav-btn"><i class="fas fa-check-circle text-success"></i> Paid Students</a>
+                            <a href="payment_analytics.php" class="module-nav-btn"><i class="fas fa-chart-line"></i> Analytics</a>
+                            <a href="receipt_analysis.php" class="module-nav-btn"><i class="fas fa-receipt"></i> Receipt Analysis</a>
+                            <a href="expenses.php" class="module-nav-btn"><i class="fas fa-wallet"></i> Expenses</a>
+                            <a href="drop_student.php" class="module-nav-btn"><i class="fas fa-trash text-success"></i> Drop Student</a>
+                            <a href="account_close.php" class="module-nav-btn"><i class="fas fa-lock"></i> Close Account</a>
                         <?php endif; ?>
-                        <a href="../help.php" class="module-nav-btn">
-                            <i class="fas fa-question-circle text-success"></i> Help & About
-                        </a>
+                        <a href="../help.php" class="module-nav-btn"><i class="fas fa-question-circle text-success"></i> Help & About</a>
                     </div>
                 </div>
 
@@ -473,7 +415,7 @@ if (isset($_GET['id'])) {
                                             $batch_total += $item['amount'];
                                         ?>
                                             <tr>
-                                                <td><strong><?php echo $item['name']; ?></strong></td>
+                                                <td><strong><?php echo $item['name']; ?></strong> (ID: <?php echo $item['student_id']; ?>)</td>
                                                 <td><?php echo $item['class_info']; ?></td>
                                                 <td><?php echo $item['month']; ?></td>
                                                 <td><?php echo format_currency($item['amount']); ?></td>
@@ -490,9 +432,7 @@ if (isset($_GET['id'])) {
                                         <input type="hidden" name="remove_record_id" id="remove_record_id" value="">
                                         
                                         <tr class="table-warning">
-                                            <td>
-                                                <strong class="text-danger"><i class="fas fa-exclamation-circle me-1"></i> Fine </strong>
-                                            </td>
+                                            <td><strong class="text-danger"><i class="fas fa-exclamation-circle me-1"></i> Fine </strong></td>
                                             <td>-</td>
                                             <td><span class="badge bg-danger">Fine</span></td>
                                             <td>
@@ -504,8 +444,6 @@ if (isset($_GET['id'])) {
                                             </td>
                                             <td></td>
                                         </tr>
-
-                                        
 
                                         <tr class="fw-bold table-light">
                                             <td colspan="3" class="text-end">Batch Total:</td>
@@ -548,6 +486,13 @@ if (isset($_GET['id'])) {
                             <form method="POST" class="search-form" action="<?php echo $self_url; ?>">
                                 <input type="hidden" name="action" value="search">
                                 <div class="row g-3 align-items-end">
+                                    <!-- Added Student ID (Roll No.) Search Field -->
+                                    <div class="col-md-2">
+                                        <label for="search_id" class="form-label font-weight-bold">Student ID</label>
+                                        <input type="number" id="search_id" name="search_id" class="form-control" 
+                                               value="<?php echo htmlspecialchars($_POST['search_id'] ?? ''); ?>" placeholder="ID...">
+                                    </div>
+
                                     <div class="col-md-3">
                                         <label for="search_name" class="form-label">Student Name</label>
                                         <input type="text" id="search_name" name="search_name" class="form-control" 
@@ -580,9 +525,9 @@ if (isset($_GET['id'])) {
                                         </select>
                                     </div>
                                     
-                                    <div class="col-md-2">
-                                        <button type="submit" class="btn btn-primary w-100 py-2">
-                                            <i class="fas fa-search"></i> Search
+                                    <div class="col-md-12 text-end mt-3">
+                                        <button type="submit" class="btn btn-primary px-4 py-2">
+                                            <i class="fas fa-search"></i> Search Student
                                         </button>
                                     </div>
                                 </div>
@@ -594,7 +539,7 @@ if (isset($_GET['id'])) {
                                     <table class="table table-hover">
                                         <thead>
                                             <tr>
-                                                <th>ID</th>
+                                                <th>ID (Roll No.)</th>
                                                 <th>Name</th>
                                                 <th>Father Name</th>
                                                 <th>Class</th>
@@ -608,7 +553,7 @@ if (isset($_GET['id'])) {
                                             ?>
                                                 <tr>
                                                     <td><strong><?php echo $res['id']; ?></strong></td>
-                                                    <td><?php echo htmlspecialchars($res['name']); ?></td>
+                                                    <td><strong><?php echo htmlspecialchars($res['name']); ?></strong></td>
                                                     <td><?php echo htmlspecialchars($res['father_name']); ?></td>
                                                     <td><?php echo htmlspecialchars($res['class']); ?></td>
                                                     <td><?php echo htmlspecialchars($res['section']); ?></td>
@@ -631,7 +576,7 @@ if (isset($_GET['id'])) {
                         <div class="fee-details">
                             <div class="fee-header">
                                 <div>
-                                    <h4><?php echo htmlspecialchars($student['name']); ?> (<?php echo htmlspecialchars($student['class']); ?>-<?php echo htmlspecialchars($student['section']); ?>)</h4>
+                                    <h4><?php echo htmlspecialchars($student['name']); ?> <span class="badge bg-success ms-1">ID: <?php echo htmlspecialchars($student['id']); ?></span> (<?php echo htmlspecialchars($student['class']); ?>-<?php echo htmlspecialchars($student['section']); ?>)</h4>
                                     <p>Father: <?php echo htmlspecialchars($student['father_name']); ?> | Contact: <?php echo htmlspecialchars($student['contact_number']); ?></p>
                                 </div>
                                 <div class="fee-summary">
@@ -817,7 +762,6 @@ if (isset($_GET['id'])) {
                 }
             }
 
-            // Sequential checking for Regular Monthly / Package Fees
             regularCheckboxes.forEach((cb, index) => {
                 cb.addEventListener('change', function() {
                     const feeId = this.value;
@@ -855,7 +799,6 @@ if (isset($_GET['id'])) {
                 });
             });
 
-            // Independent checking for Other / Custom Fees
             otherCheckboxes.forEach((cb) => {
                 cb.addEventListener('change', function() {
                     const feeId = this.value;
