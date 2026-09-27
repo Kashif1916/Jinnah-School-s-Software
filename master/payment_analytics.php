@@ -222,14 +222,43 @@ if (strtotime($start_date) > strtotime($end_date)) {
     $end_date = $temp;
 }
 
-// Get clerk filter. Clean up input for URL decoding (handles spaces and + symbols)
+// Get clerk filter.
 $clerk_filter = isset($_GET['clerk']) ? trim(sanitize_input($_GET['clerk'])) : 'all';
 if (empty($clerk_filter)) {
     $clerk_filter = 'all';
 }
 $selected_log_date = date('Y-m-d', strtotime($start_date));
 
-// Fetch calculator audit log for selected clerk and date
+// Fetch calculator audit logs for date range
+$audit_logs_map = [];
+$start_day_tmp = date('Y-m-d', strtotime($start_date));
+$end_day_tmp   = date('Y-m-d', strtotime($end_date));
+
+if ($clerk_filter !== 'all') {
+    $stmt_aud_map = $conn->prepare("SELECT log_date, difference FROM calculator_audit_logs WHERE username = ? AND log_date BETWEEN ? AND ?");
+    if ($stmt_aud_map) {
+        $stmt_aud_map->bind_param('sss', $clerk_filter, $start_day_tmp, $end_day_tmp);
+        $stmt_aud_map->execute();
+        $res_aud = $stmt_aud_map->get_result();
+        while ($r_aud = $res_aud->fetch_assoc()) {
+            $audit_logs_map[$r_aud['log_date']] = floatval($r_aud['difference']);
+        }
+        $stmt_aud_map->close();
+    }
+} else {
+    $stmt_aud_map = $conn->prepare("SELECT username, log_date, difference FROM calculator_audit_logs WHERE log_date BETWEEN ? AND ?");
+    if ($stmt_aud_map) {
+        $stmt_aud_map->bind_param('ss', $start_day_tmp, $end_day_tmp);
+        $stmt_aud_map->execute();
+        $res_aud = $stmt_aud_map->get_result();
+        while ($r_aud = $res_aud->fetch_assoc()) {
+            $audit_logs_map[$r_aud['log_date']][$r_aud['username']] = floatval($r_aud['difference']);
+        }
+        $stmt_aud_map->close();
+    }
+}
+
+// Fetch calculator audit log for single date view
 $master_audit_log = null;
 if ($clerk_filter !== 'all') {
     $stmt_m_audit = $conn->prepare("SELECT * FROM calculator_audit_logs WHERE username = ? AND log_date = ?");
@@ -255,7 +284,7 @@ if ($clerk_query) {
     }
 }
 
-// Fetch payments based on clerk filter (Using full datetime comparison)
+// Fetch payments based on clerk filter
 $payments = [];
 if ($clerk_filter === 'all') {
     $query_payments = "SELECT p.*, s.name, s.father_name, s.class, s.section FROM payments p 
@@ -283,7 +312,7 @@ if ($clerk_filter === 'all') {
     }
 }
 
-// Fetch expenses based on clerk filter (Using full datetime comparison)
+// Fetch expenses based on clerk filter
 $expenses = [];
 if ($clerk_filter === 'all') {
     $query_expenses = "SELECT * FROM expenses 
@@ -393,7 +422,7 @@ foreach ($expenses as $e) {
     $day_clerk_expenses[$e_day][$e_clerk] = ($day_clerk_expenses[$e_day][$e_clerk] ?? 0) + $e_amt;
 }
 
-// Fetch account close logs for the date range (Fixed parameter binding count)
+// Fetch account close logs for the date range
 $account_close_logs_by_date = [];
 $account_close_logs_by_date_clerk = [];
 
@@ -437,7 +466,7 @@ if ($clerk_filter !== 'all') {
     }
 }
 
-// Separate days into Received (Account Frozen) vs Not Received
+// Separate days into Received vs Not Received
 $days_received = [];
 $days_not_received = [];
 
@@ -467,7 +496,6 @@ if ($clerk_filter !== 'all') {
         }
     }
 } else {
-    // Combined / All Clerks mode
     foreach ($period_days as $d) {
         $active_clerks = [];
         if (isset($day_clerk_cash[$d])) {
@@ -508,7 +536,6 @@ if ($clerk_filter !== 'all') {
     }
 }
 
-// For backwards compatibility with single-day components
 $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_date[$selected_log_date])) ? $account_close_logs_by_date[$selected_log_date] : null;
 ?>
 <!DOCTYPE html>
@@ -521,7 +548,6 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css" rel="stylesheet">
     <style>
-        /* Screen styling */
         .reconciliation-math-card {
             background: linear-gradient(135deg, #ffffff 0%, #f9fbf9 100%);
             border-left: 5px solid var(--primary-color);
@@ -532,7 +558,6 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
             position: relative;
             overflow: hidden;
         }
-        
         .reconciliation-math-card::after {
             content: "\f53d";
             font-family: "Font Awesome 6 Free";
@@ -544,7 +569,6 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
             color: rgba(31, 95, 70, 0.04);
             pointer-events: none;
         }
-
         .math-line {
             display: flex;
             justify-content: space-between;
@@ -553,23 +577,19 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
             border-bottom: 1px dashed rgba(0,0,0,0.08);
             font-size: 1.05rem;
         }
-
         .math-line.subtraction {
             color: var(--danger-color);
         }
-
         .math-line.subtotal {
             border-bottom: 2px solid var(--border-color);
             font-weight: 600;
             color: var(--dark-text);
         }
-
         .math-line.final-total {
             border-bottom: none;
             padding-top: 20px;
             margin-top: 10px;
         }
-
         .net-cash-large-box {
             text-align: right;
             padding: 15px 25px;
@@ -579,14 +599,12 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
             box-shadow: var(--shadow-medium);
             display: inline-block;
         }
-
         .net-cash-large-box h2 {
             font-size: 2.2rem;
             font-weight: 700;
             margin: 0;
             letter-spacing: 0.5px;
         }
-
         .net-cash-large-box span {
             font-size: 0.85rem;
             text-transform: uppercase;
@@ -595,7 +613,6 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
             display: block;
             margin-bottom: 4px;
         }
-
         .section-sub-title {
             font-weight: 600;
             color: var(--primary-color);
@@ -606,21 +623,16 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
             align-items: center;
             gap: 8px;
         }
-
-        /* HIGH-CONTRAST BLACK TEXT STYLING FOR BADGES AND SUMMARY CARDS */
         .audit-badge-dark {
             color: #111111 !important;
             font-weight: 700 !important;
             font-size: 12px !important;
             border: 1px solid rgba(0,0,0,0.2) !important;
         }
-
         .text-dark-contrast {
             color: #111111 !important;
             font-weight: 600 !important;
         }
-
-        /* CLERK CALCULATOR AUDIT LOG CARD STYLING */
         .denomination-card {
             background: #ffffff;
             border: 1px solid rgba(0,0,0,0.1);
@@ -710,12 +722,10 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
             font-weight: 700;
             font-size: 1.1rem;
         }
-
         .report-logo {
             width: 80px !important;
             height: auto !important;
         }
-
         .print-only-header {
             display: none;
         }
@@ -725,7 +735,6 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                 size: A4 portrait;
                 margin: 0.3cm !important;
             }
-
             body {
                 background: #ffffff !important;
                 color: #000000 !important;
@@ -736,39 +745,33 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
-
             .topbar, .module-nav-panel, .no-print, button, form, 
             .form-text, .alert-success, .stats-grid, .stat-card {
                 display: none !important;
             }
-
             .print-only-header {
                 display: block !important;
                 border-bottom: none !important;
                 padding-bottom: 0px !important;
                 margin-bottom: 10px !important;
             }
-
             .print-only-header h1 {
                 font-size: 16px !important;
                 color: #1f5f46 !important;
                 font-weight: bold !important;
                 margin: 0 !important;
             }
-
             .print-only-header h3 {
                 font-size: 11px !important;
                 color: #333 !important;
                 margin: 3px 0 !important;
             }
-
             .print-meta-grid {
                 display: flex !important;
                 justify-content: space-between !important;
                 font-size: 9px !important;
                 margin-top: 3px !important;
             }
-
             .row {
                 display: flex !important;
                 flex-direction: row !important;
@@ -776,35 +779,29 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                 gap: 12px !important;
                 width: 100% !important;
             }
-
             .col-lg-7 {
                 width: 60% !important;
                 flex: 0 0 60% !important;
                 max-width: 60% !important;
             }
-
             .col-lg-5 {
                 width: 38% !important;
                 flex: 0 0 38% !important;
                 max-width: 38% !important;
             }
-
             .table-responsive {
                 overflow: visible !important;
             }
-
             table {
                 width: 100% !important;
                 border-collapse: collapse !important;
                 margin-bottom: 10px !important;
                 font-size: 9px !important;
             }
-
             table th, table td {
                 padding: 4px 5px !important;
                 border: 1px solid #ddd !important;
             }
-
             .reconciliation-math-card {
                 border: 1px solid #ccc !important;
                 border-left: 4px solid #1f5f46 !important;
@@ -812,13 +809,11 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                 background: #fdfdfd !important;
                 box-shadow: none !important;
             }
-
             .math-line, .reconciliation-math-card div, .reconciliation-math-card p {
                 padding: 4px 0 !important;
                 font-size: 8.5px !important;
                 line-height: 1.2 !important;
             }
-
             .net-cash-large-box {
                 background: #1f5f46 !important;
                 color: #ffffff !important;
@@ -826,17 +821,14 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                 border-radius: 4px !important;
                 margin-top: 8px !important;
             }
-
             .net-cash-large-box h2, .net-cash-large-box .h2 {
                 font-size: 13px !important;
                 font-weight: 700 !important;
                 margin: 0 !important;
             }
-
             .net-cash-large-box span, .net-cash-large-box small {
                 font-size: 8px !important;
             }
-
             .denomination-card {
                 display: block !important;
                 border: 1px solid #ddd !important;
@@ -1238,7 +1230,7 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                                                     <th>Cash Received</th>
                                                     <th>Expenses</th>
                                                     <th>Net Cash (Drawer)</th>
-                                                    <th>Freeze / Handover Status</th>
+                                                    <th>Difference</th>
                                                     <th>Closed By / At</th>
                                                 </tr>
                                             </thead>
@@ -1249,6 +1241,9 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                                                     $c_in = $day_cash_payments[$d] ?? 0;
                                                     $exp = $day_expenses_map[$d] ?? 0;
                                                     $net = $c_in - $exp;
+
+                                                    // Fetch audit log difference for this day
+                                                    $day_diff = $audit_logs_map[$d] ?? null;
                                                 ?>
                                                     <tr class="<?php echo $is_rec ? 'table-success-subtle' : 'table-danger-subtle'; ?>">
                                                         <td><strong><?php echo date('d-M-Y (D)', strtotime($d)); ?></strong></td>
@@ -1256,18 +1251,19 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                                                         <td class="text-danger fw-bold">- <?php echo format_currency($exp); ?></td>
                                                         <td class="fw-bold fs-6"><?php echo format_currency($net); ?></td>
                                                         <td>
-                                                            <?php if ($is_rec): 
-                                                                $is_past = ($d < $today_date_str);
-                                                                $is_rec_status = ($log_item['status'] === 'received_by_master');
+                                                            <?php 
+                                                            if ($day_diff !== null) {
+                                                                if ($day_diff > 0) {
+                                                                    echo '<strong class="text-success" style="font-size: 13px;">+ ' . number_format(abs($day_diff), 2) . '</strong>';
+                                                                } elseif ($day_diff < 0) {
+                                                                    echo '<strong class="text-danger" style="font-size: 13px;">- ' . number_format(abs($day_diff), 2) . '</strong>';
+                                                                } else {
+                                                                    echo '<strong class="text-dark" style="font-size: 13px;">0.00</strong>';
+                                                                }
+                                                            } else {
+                                                                echo '<span class="text-muted small">-</span>';
+                                                            }
                                                             ?>
-                                                                <span class="badge bg-success text-white">
-                                                                    <i class="fas fa-check-circle me-1"></i> <?php echo ($is_past || $is_rec_status) ? 'Cash Received' : 'Amount Received & Frozen'; ?>
-                                                                </span>
-                                                            <?php else: ?>
-                                                                <span class="badge bg-danger text-white">
-                                                                    <i class="fas fa-times-circle me-1"></i> Cash NOT Received
-                                                                </span>
-                                                            <?php endif; ?>
                                                         </td>
                                                         <td class="small">
                                                             <?php if ($is_rec): ?>
@@ -1304,7 +1300,7 @@ $account_close_log = ($clerk_filter !== 'all' && isset($account_close_logs_by_da
                             </div>
                         <?php endif; ?>
                     <?php else: ?>
-                        <!-- Combined / All Clerks Mode (HIGH-CONTRAST TEXT UPDATE) -->
+                        <!-- Combined / All Clerks Mode -->
                         <div class="card shadow-sm border-0 overflow-hidden" style="border-radius: 12px; border: 1px solid #dee2e6;">
                             <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <div>

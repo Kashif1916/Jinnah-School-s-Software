@@ -185,8 +185,8 @@ $stmt_coll->execute();
 $today_collection = round(floatval($stmt_coll->get_result()->fetch_assoc()['total'] ?? 0));
 $stmt_coll->close();
 
-// 2. Today's Total Receipts Count
-$stmt_rec = $conn->prepare("SELECT COUNT(DISTINCT payment_date) as count FROM payments WHERE received_by = ? AND DATE(payment_date) = ?");
+// 2. Today's Total Receipts Count (FIXED: Unique Receipt Numbers / IDs)
+$stmt_rec = $conn->prepare("SELECT COUNT(DISTINCT COALESCE(NULLIF(receipt_number, ''), id)) as count FROM payments WHERE received_by = ? AND DATE(payment_date) = ?");
 $stmt_rec->bind_param('ss', $current_user, $today_date);
 $stmt_rec->execute();
 $today_receipts = intval($stmt_rec->get_result()->fetch_assoc()['count'] ?? 0);
