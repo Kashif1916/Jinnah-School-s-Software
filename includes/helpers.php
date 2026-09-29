@@ -1036,7 +1036,7 @@ function calculate_month_late_fine($month, $today_date = null, $student_id = nul
     
     if ($today_time > $due_time) {
         $late_days = intval(floor(($today_time - $due_time) / 86400));
-        return $late_days * 20;
+        return $late_days * 10;
     }
     
     return 0;

@@ -108,6 +108,17 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
         $conn->query("ALTER TABLE `students` ADD COLUMN `address` VARCHAR(255) DEFAULT NULL AFTER `whatsapp_number`");
     }
 
+    // Dynamically ensure dob column exists in students table
+    $colCheckDob = $conn->query("SHOW COLUMNS FROM `students` LIKE 'dob'");
+    if ($colCheckDob && $colCheckDob->num_rows == 0) {
+        $colCheckDobAlt = $conn->query("SHOW COLUMNS FROM `students` LIKE 'date_of_birth'");
+        if ($colCheckDobAlt && $colCheckDobAlt->num_rows > 0) {
+            $conn->query("ALTER TABLE `students` CHANGE COLUMN `date_of_birth` `dob` DATE DEFAULT NULL");
+        } else {
+            $conn->query("ALTER TABLE `students` ADD COLUMN `dob` DATE DEFAULT NULL AFTER `b_form`");
+        }
+    }
+
     // Dynamically ensure settings table exists
     $tableCheckSettings = $conn->query("SHOW TABLES LIKE 'settings'");
     if ($tableCheckSettings && $tableCheckSettings->num_rows == 0) {

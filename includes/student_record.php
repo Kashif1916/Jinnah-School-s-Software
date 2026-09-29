@@ -115,6 +115,11 @@ if (!empty($params)) {
 $stmt->execute();
 $students = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+
+// Build URL query string for passing search filters to print pages
+$query_params = $_GET;
+unset($query_params['page']);
+$filter_query_str = http_build_query($query_params);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -217,7 +222,7 @@ $stmt->close();
                                 </div>
                             </div>
 
-                            <!-- Select Concession Reason(s) Multi-Checkbox Box (Shifted Up Here) -->
+                            <!-- Select Concession Reason(s) Multi-Checkbox Box -->
                             <div>
                                 <label class="form-label fw-bold">Concession Reason(s)</label>
                                 <div class="filter-checkbox-box">
@@ -241,11 +246,18 @@ $stmt->close();
                 </div>
 
                 <div class="table-section">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                         <h4>Total Students: <?php echo $total_students; ?> </h4>
-                        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#printColumnsModal">
-                            <i class="fas fa-print"></i> Print List
-                        </button>
+                        <div class="d-flex gap-2">
+                            <!-- PRINT STUDENT CARDS BUTTON (Points to master/print_student_cards.php) -->
+                            <a href="../master/print_student_cards.php?<?php echo $filter_query_str; ?>" target="_blank" class="btn btn-primary">
+                                <i class="fas fa-id-card me-1"></i> Print Student Cards
+                            </a>
+                            <!-- PRINT LIST BUTTON -->
+                            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#printColumnsModal">
+                                <i class="fas fa-print me-1"></i> Print List
+                            </button>
+                        </div>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-hover">

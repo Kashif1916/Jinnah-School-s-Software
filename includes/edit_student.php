@@ -82,6 +82,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name = sanitize_input($_POST['name'] ?? '');
         $father_name = sanitize_input($_POST['father_name'] ?? '');
         $b_form = sanitize_input($_POST['b_form'] ?? '');
+        $raw_dob = trim($_POST['dob'] ?? $_POST['date_of_birth'] ?? '');
+        $dob = null;
+        if (!empty($raw_dob)) {
+            $time = strtotime($raw_dob);
+            $dob = ($time !== false) ? date('Y-m-d', $time) : null;
+        }
         $address = sanitize_input($_POST['address'] ?? '');
         $class = sanitize_input($_POST['class'] ?? '');
         $section = sanitize_input($_POST['section'] ?? '');
@@ -126,10 +132,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $net_fee = $fixed_monthly_fee - $concession_amount;
                 if ($net_fee < 0) $net_fee = 0;
 
-                $query = "UPDATE students SET name = ?, father_name = ?, b_form = ?, address = ?, class = ?, section = ?, 
+                $query = "UPDATE students SET name = ?, father_name = ?, b_form = ?, dob = ?, address = ?, class = ?, section = ?, 
                           fixed_monthly_fee = ?, package_amount = ?, is_package = ?, contact_number = ?, contact_number2 = ?, whatsapp_number = ?, concession_amount = ?, concession_reason = ? WHERE id = ?";
                 $stmt = $conn->prepare($query);
-                $stmt->bind_param('ssssssddisssdsi', $name, $father_name, $b_form, $address, $class, $section, $fixed_monthly_fee, $package_amount, $is_package, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
+                $stmt->bind_param('sssssssddisssdsi', $name, $father_name, $b_form, $dob, $address, $class, $section, $fixed_monthly_fee, $package_amount, $is_package, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $student_id);
 
                 if ($stmt->execute()) {
                     if (!empty($selected_months)) {
@@ -284,11 +290,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <div class="row mb-3">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
+                                <label class="form-label" for="dob">Date of Birth</label>
+                                <?php 
+                                $dob_val = '';
+                                if (!empty($student['dob']) && $student['dob'] !== '0000-00-00') {
+                                    $dob_val = date('Y-m-d', strtotime($student['dob']));
+                                } elseif (!empty($student['date_of_birth']) && $student['date_of_birth'] !== '0000-00-00') {
+                                    $dob_val = date('Y-m-d', strtotime($student['date_of_birth']));
+                                }
+                                ?>
+                                <input type="date" id="dob" name="dob" class="form-control" value="<?php echo htmlspecialchars($dob_val); ?>">
+                            </div>
+                            <div class="col-md-4">
                                 <label class="form-label" for="b_form">B-Form / CNIC</label>
                                 <input type="text" id="b_form" name="b_form" class="form-control" value="<?php echo htmlspecialchars($student['b_form'] ?? ''); ?>" placeholder="">
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label class="form-label" for="address">Address</label>
                                 <input type="text" id="address" name="address" class="form-control" value="<?php echo htmlspecialchars($student['address'] ?? ''); ?>" placeholder="">
                             </div>

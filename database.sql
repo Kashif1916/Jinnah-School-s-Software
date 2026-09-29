@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS `students` (
   `name` VARCHAR(100) NOT NULL,
   `father_name` VARCHAR(100) NOT NULL,
   `b_form` VARCHAR(50) DEFAULT NULL,
+  `dob` DATE DEFAULT NULL,
   `class` VARCHAR(50) NOT NULL,
   `section` VARCHAR(10) NOT NULL,
   `monthly_fee` DECIMAL(10, 2) NOT NULL,

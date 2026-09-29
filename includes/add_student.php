@@ -32,6 +32,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $name = sanitize_input($_POST['name'] ?? '');
     $father_name = sanitize_input($_POST['father_name'] ?? '');
     $b_form = sanitize_input($_POST['b_form'] ?? '');
+    $raw_dob = trim($_POST['dob'] ?? $_POST['date_of_birth'] ?? '');
+    $dob = null;
+    if (!empty($raw_dob)) {
+        $time = strtotime($raw_dob);
+        $dob = ($time !== false) ? date('Y-m-d', $time) : null;
+    }
     $address = sanitize_input($_POST['address'] ?? '');
     $class = sanitize_input($_POST['class'] ?? '');
     $section = sanitize_input($_POST['section'] ?? '');
@@ -78,10 +84,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $check_stmt->close();
             // Insert student
             $created_by = get_username();
-            $query = "INSERT INTO students (name, father_name, b_form, address, class, section, fixed_monthly_fee, package_amount, is_package, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
+            $query = "INSERT INTO students (name, father_name, b_form, dob, address, class, section, fixed_monthly_fee, package_amount, is_package, admission_fee, contact_number, contact_number2, whatsapp_number, concession_amount, concession_reason, status, created_by) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)";
             $stmt = $conn->prepare($query);
-            $stmt->bind_param('ssssssddidsssdss', $name, $father_name, $b_form, $address, $class, $section, $fixed_monthly_fee, $package_amount, $is_package, $admission_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
+            $stmt->bind_param('sssssssddidsssdss', $name, $father_name, $b_form, $dob, $address, $class, $section, $fixed_monthly_fee, $package_amount, $is_package, $admission_fee, $contact_number, $contact_number2, $whatsapp_number, $concession_amount, $concession_reason, $created_by);
             
             if ($stmt->execute()) {
                 $student_id = $conn->insert_id;
@@ -141,11 +147,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         </div>
                     </div>
                     <div class="row mb-3">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <label class="form-label" for="dob">Date of Birth</label>
+                            <input type="date" id="dob" name="dob" class="form-control">
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label" for="b_form">B-Form / CNIC</label>
                             <input type="text" id="b_form" name="b_form" class="form-control" placeholder="">
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label" for="address">Address</label>
                             <input type="text" id="address" name="address" class="form-control" placeholder="">
                         </div>
