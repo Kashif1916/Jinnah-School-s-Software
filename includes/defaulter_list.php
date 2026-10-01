@@ -27,6 +27,7 @@ if (!is_array($section_filter)) {
     $section_filter = !empty($section_filter) ? [$section_filter] : [];
 }
 
+$student_id_filter = sanitize_input($_REQUEST['student_id'] ?? '');
 $name_filter = sanitize_input($_REQUEST['name'] ?? '');
 $father_name_filter = sanitize_input($_REQUEST['father_name'] ?? '');
 $months_filter = $_REQUEST['months'] ?? [];
@@ -35,7 +36,7 @@ $min_3_months = isset($_REQUEST['min_3_months']) ? 1 : 0; // 3+ Months Checkbox 
 $arrears_only = isset($_REQUEST['arrears_only']) ? 1 : 0; // Arrears (Partial Payment) Checkbox value
 
 // Check if user has applied any filter
-$is_filtered = (!empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($father_name_filter) || !empty($months_filter) || $min_2_months === 1 || $min_3_months === 1 || $arrears_only === 1);
+$is_filtered = (!empty($student_id_filter) || !empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($father_name_filter) || !empty($months_filter) || $min_2_months === 1 || $min_3_months === 1 || $arrears_only === 1);
 
 // Pagination Configuration (Only applies when NO filter is used)
 $limit = 20; // Default items per page
@@ -43,8 +44,8 @@ $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] :
 if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
 
-// Get defaulters (updated to accept multi-select class & section arrays)
-$defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter, $father_name_filter);
+// Get defaulters (updated to accept Student ID, multi-select class & section arrays)
+$defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter, $father_name_filter, $student_id_filter);
 $all_defaulter_list = [];
 if ($defaulters) {
     $all_defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
@@ -132,6 +133,12 @@ if (!$is_filtered) {
                     <h4>Filter Pending List</h4>
                     <form method="POST" class="filter-form">
                         <div class="form-grid">
+                            <!-- Student ID Filter -->
+                            <div class="form-group">
+                                <label for="student_id">Student ID</label>
+                                <input type="number" id="student_id" name="student_id" class="form-control" placeholder="Search by Student ID..." value="<?php echo htmlspecialchars($student_id_filter); ?>">
+                            </div>
+
                             <div class="form-group">
                                 <label for="name">Student Name</label>
                                 <input type="text" id="name" name="name" class="form-control" placeholder="Search by name..." value="<?php echo htmlspecialchars($name_filter); ?>">
@@ -248,6 +255,7 @@ if (!$is_filtered) {
 
                 <div class="table-section">
                     <form method="POST" action="../master/export_defaulter_challan.php" target="_blank" id="defaulterChallanForm">
+                        <input type="hidden" name="student_id" value="<?php echo htmlspecialchars($student_id_filter); ?>">
                         <?php foreach ((array)$class_filter as $c_f): ?>
                             <input type="hidden" name="class[]" value="<?php echo htmlspecialchars($c_f); ?>">
                         <?php endforeach; ?>
@@ -277,6 +285,7 @@ if (!$is_filtered) {
                                 </button>
                                 <?php 
                                     $query_data = [
+                                        'student_id' => $student_id_filter,
                                         'class' => $class_filter, 
                                         'section' => $section_filter, 
                                         'name' => $name_filter, 
@@ -301,6 +310,7 @@ if (!$is_filtered) {
                                         <th style="width: 40px;">
                                             <input type="checkbox" id="selectAllStudents" title="Select All">
                                         </th>
+                                        <th>ID</th>
                                         <th>Name</th>
                                         <th>Father Name</th>
                                         <th>Contact Number(s)</th>
@@ -328,6 +338,7 @@ if (!$is_filtered) {
                                             <td>
                                                 <input type="checkbox" name="student_ids[]" value="<?php echo $defaulter['id']; ?>" class="student-cb">
                                             </td>
+                                            <td><strong><?php echo htmlspecialchars($defaulter['id']); ?></strong></td>
                                             <td><?php echo htmlspecialchars($defaulter['name']); ?></td>
                                             <td><?php echo htmlspecialchars($defaulter['father_name']); ?></td>
                                             <td>

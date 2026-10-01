@@ -244,9 +244,9 @@ function get_total_paid_fees($student_id) {
 }
 
 /**
- * Get defaulters list (Supports Multi-Select Class & Section Arrays AND Other/Custom Fees)
+ * Get defaulters list (Supports Student ID Filter, Multi-Select Class & Section Arrays AND Other/Custom Fees)
  */
-function get_defaulters($class = '', $section = '', $months = [], $name = '', $father_name = '') {
+function get_defaulters($class = '', $section = '', $months = [], $name = '', $father_name = '', $student_id = '') {
     global $conn;
     
     // Default 12 months if empty
@@ -273,6 +273,10 @@ function get_defaulters($class = '', $section = '', $months = [], $name = '', $f
               FROM students s 
               INNER JOIN fee_records f ON s.id = f.student_id 
               WHERE s.status = 'active' AND f.status = 'unpaid'";
+
+    if (!empty($student_id)) {
+        $query .= " AND s.id = " . intval($student_id);
+    }
     
     if (!empty($class)) {
         if (is_array($class)) {

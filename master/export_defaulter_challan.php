@@ -100,6 +100,16 @@ if ($setting_res) {
         }
     }
 }
+
+// Check for finance signature image path in images folder
+$finance_sig_path = '';
+$possible_extensions = ['png', 'jpg', 'jpeg', 'gif'];
+foreach ($possible_extensions as $ext) {
+    if (file_exists(__DIR__ . '/../images/finance_signature.' . $ext)) {
+        $finance_sig_path = BASE_URL . 'images/finance_signature.' . $ext;
+        break;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -269,23 +279,44 @@ if ($setting_res) {
             padding: 3px 6px;
         }
 
+        /* Footer Spacing Fix */
         .challan-footer {
             display: flex;
             justify-content: space-between;
-            align-items: flex-end;
-            margin-top: 6px;
+            align-items: flex-start; /* Alignment set to top to eliminate gap */
+            margin-top: 4px;
             font-size: 9px;
             color: #666;
         }
 
         .signature-box {
             text-align: center;
-            border-top: 1px solid #333;
-            width: 110px;
-            padding-top: 2px;
+            width: 120px;
             font-weight: bold;
             color: #333;
             font-size: 9px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            margin-top: 2px;
+        }
+
+        .signature-box img {
+            max-width: 50px;
+            height: auto;
+            
+            margin-bottom: -2px;
+            display: block;
+        }
+
+        .signature-line-text {
+            border-top: 1px solid #333;
+            width: 70%;
+            padding-top: 2px;
+            font-size: 9px;
+            font-weight: bold;
+            color: #333;
         }
 
         @media print {
@@ -577,7 +608,7 @@ if ($setting_res) {
                                     <strong style="font-size: 10px; color: #dc3545;">
                                         <i class="fas fa-exclamation-circle me-1"></i> Late Fee Fine
                                     </strong>
-                                    <br><small style="font-size: 9px; color: #dc3545;">Late Payment Fine (Rs. 20/day after 10th of overdue month)</small>
+                                    <br><small style="font-size: 9px; color: #dc3545;">Late Payment Fine (Rs. 10/day after 10th of overdue month)</small>
                                 </td>
                                 <td style="text-align: right; font-weight: 600; color: #dc3545;"><?php echo number_format($student_fine, 2); ?></td>
                             </tr>
@@ -599,7 +630,10 @@ if ($setting_res) {
                         <?php endif; ?>
                     </div>
                     <div class="signature-box">
-                        Accounts / Office
+                        <?php if (!empty($finance_sig_path)): ?>
+                            <img src="<?php echo $finance_sig_path; ?>" alt="Finance Signature">
+                        <?php endif; ?>
+                        <div class="signature-line-text">Accounts / Office</div>
                     </div>
                 </div>
             </div>

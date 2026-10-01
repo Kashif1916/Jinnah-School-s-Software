@@ -494,8 +494,19 @@ if ($other_fee_res) {
                             </ul>
                         </div>
                     </div>
-                     
-                    <!-- ROW 2: CARD 6 -> Boys Paid Card -->
+
+                     <!-- ROW 2: CARD 6 -> Today's Total Receipts -->
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
+                            <i class="fas fa-university"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 style="white-space: nowrap;">Rs. <?php echo number_format($college_total_expected, 0); ?></h3>
+                            <p>College Total Fee (<?php echo $current_year_str; ?>)</p>
+                        </div>
+                    </div>
+
+                    <!-- ROW 2: CARD 7 -> Boys Paid Card -->
                     <div class="stat-card">
                         <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
                             <i class="fas fa-mars"></i>
@@ -509,7 +520,7 @@ if ($other_fee_res) {
                         </div>
                     </div>
 
-                    <!-- ROW 2: CARD 7 -> Girls Paid Card -->
+                    <!-- ROW 2: CARD 8 -> Girls Paid Card -->
                     <div class="stat-card">
                         <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
                             <i class="fas fa-venus"></i>
@@ -523,7 +534,9 @@ if ($other_fee_res) {
                         </div>
                     </div> 
                       
-                    <!-- ROW 2: CARD 8 -> Today's Total Receipts -->
+                    
+
+                    <!-- ROW 3: CARD 9 ->  -->
                     <div class="stat-card">
                         <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
                             <i class="fas fa-receipt"></i>
@@ -534,44 +547,8 @@ if ($other_fee_res) {
                         </div>
                     </div>
 
-                    <!-- ROW 3: CARD 9 -> College Paid Students (Fully Cleared Package Only) -->
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
-                            <i class="fas fa-user-shield"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3>
-                                <?php echo $college_paid_students_count; ?>
-                                <span class="stat-percentage"> (<?php echo $college_paid_percentage_std; ?>%)</span>
-                            </h3>
-                            <p>College Paid (<?php echo $current_year_str; ?>)</p>
-                        </div>
-                    </div>
-
-                    <!-- ROW 3: CARD 10 -> This Month College Fee Collected -->
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
-                            <i class="fas fa-calendar-check"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3 style="white-space: nowrap;">Rs. <?php echo number_format($college_month_collected, 0); ?></h3>
-                            <p>This Month College Fee (<?php echo date('M Y'); ?>)</p>
-                        </div>
-                    </div>
-
-                    <!-- ROW 3: CARD 11 -> College Total Fee (Current Year) -->
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
-                            <i class="fas fa-university"></i>
-                        </div>
-                        <div class="stat-content">
-                            <h3 style="white-space: nowrap;">Rs. <?php echo number_format($college_total_expected, 0); ?></h3>
-                            <p>College Total Fee (<?php echo $current_year_str; ?>)</p>
-                        </div>
-                    </div>
-
-                    <!-- ROW 3: CARD 12 -> College Received Fee (Current Year) + Percentage -->
-                    <div class="stat-card">
+                    <!-- ROW 3: CARD 10 -> -->
+                     <div class="stat-card">
                         <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
                             <i class="fas fa-hand-holding-usd"></i>
                         </div>
@@ -583,6 +560,30 @@ if ($other_fee_res) {
                             <p>College Received Fee (<?php echo $current_year_str; ?>)</p>
                         </div>
                     </div>
+                    
+                    <!-- ROW 3: CARD 11 ->  -->
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
+                            <i class="fas fa-tags"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 style="white-space: nowrap;">Rs. <?php echo number_format($this_month_other_fee, 0); ?></h3>
+                            <p>This Month Other Dues</p>
+                        </div>
+                    </div>
+                    
+
+                    <!-- ROW 3: CARD 12 ->  -->
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
+                            <i class="fas fa-exclamation-circle"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 style="white-space: nowrap;">Rs. <?php echo number_format($this_month_fine, 0); ?></h3>
+                            <p>This Month Fine</p>
+                        </div>
+                    </div>
+
 
                     <!-- ROW 4: CARD 13 -> My Today's Collection -->
                     <div class="stat-card">
@@ -595,27 +596,32 @@ if ($other_fee_res) {
                         </div>
                     </div>
 
-                    <!-- ROW 4: CARD 14 -> This Month Fine -->
-                    <div class="stat-card">
+                    <!-- ROW 4: CARD 14 ->  -->
+                     <div class="stat-card">
                         <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
-                            <i class="fas fa-exclamation-circle"></i>
+                            <i class="fas fa-calendar-check"></i>
                         </div>
                         <div class="stat-content">
-                            <h3 style="white-space: nowrap;">Rs. <?php echo number_format($this_month_fine, 0); ?></h3>
-                            <p>This Month Fine</p>
+                            <h3 style="white-space: nowrap;">Rs. <?php echo number_format($college_month_collected, 0); ?></h3>
+                            <p>This Month College Fee (<?php echo date('M Y'); ?>)</p>
                         </div>
                     </div>
+                    
 
                     <!-- ROW 4: CARD 15 -> This Month Other Fee -->
-                    <div class="stat-card">
+                     <div class="stat-card">
                         <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
-                            <i class="fas fa-tags"></i>
+                            <i class="fas fa-user-shield"></i>
                         </div>
                         <div class="stat-content">
-                            <h3 style="white-space: nowrap;">Rs. <?php echo number_format($this_month_other_fee, 0); ?></h3>
-                            <p>This Month Other Dues</p>
+                            <h3>
+                                <?php echo $college_paid_students_count; ?>
+                                <span class="stat-percentage"> (<?php echo $college_paid_percentage_std; ?>%)</span>
+                            </h3>
+                            <p>College Paid (<?php echo $current_year_str; ?>)</p>
                         </div>
                     </div>
+                    
                 </div>
                 
             </div>

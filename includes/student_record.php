@@ -249,7 +249,7 @@ $filter_query_str = http_build_query($query_params);
                     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                         <h4>Total Students: <?php echo $total_students; ?> </h4>
                         <div class="d-flex gap-2">
-                            <!-- PRINT STUDENT CARDS BUTTON (Points to master/print_student_cards.php) -->
+                            <!-- PRINT STUDENT CARDS BUTTON -->
                             <a href="../master/print_student_cards.php?<?php echo $filter_query_str; ?>" target="_blank" class="btn btn-primary">
                                 <i class="fas fa-id-card me-1"></i> Print Student Cards
                             </a>
@@ -267,6 +267,7 @@ $filter_query_str = http_build_query($query_params);
                                     <th>Name</th>
                                     <th>Father Name</th>
                                     <th>B-Form / CNIC</th>
+                                    <th>DOB</th>
                                     <th>Class</th>
                                     <th>Section</th>
                                     <th>Monthly Fee \ Package (Fixed)</th>
@@ -286,6 +287,7 @@ $filter_query_str = http_build_query($query_params);
                                             <td><strong><?php echo htmlspecialchars($s['name']); ?></strong></td>
                                             <td><?php echo htmlspecialchars($s['father_name']); ?></td>
                                             <td><?php echo !empty($s['b_form']) ? htmlspecialchars($s['b_form']) : '<span class="text-muted">-</span>'; ?></td>
+                                            <td><?php echo !empty($s['dob']) ? format_date($s['dob']) : '<span class="text-muted">-</span>'; ?></td>
                                             <td><?php echo htmlspecialchars($s['class']); ?></td>
                                             <td><?php echo htmlspecialchars($s['section']); ?></td>
                                             <td>
@@ -331,7 +333,7 @@ $filter_query_str = http_build_query($query_params);
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="13" class="text-center">No students found.</td>
+                                        <td colspan="14" class="text-center">No students found.</td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
@@ -389,6 +391,10 @@ $filter_query_str = http_build_query($query_params);
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="cols[b_form]" value="1" checked id="col_bform">
                                     <label class="form-check-label" for="col_bform">B-Form / CNIC</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="cols[dob]" value="1" checked id="col_dob">
+                                    <label class="form-check-label" for="col_dob">Date of Birth (DOB)</label>
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="cols[class_sec]" value="1" checked id="col_class_sec">
