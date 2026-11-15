@@ -1,6 +1,6 @@
 <?php
 /**
- * Defaulter Report - PDF Generation
+ * Defaulter Fee Summary Report - PDF / Printable View
  * School Finance Management System
  */
 
@@ -9,153 +9,69 @@ require_once '../config/db.php';
 require_once '../includes/session.php';
 require_once '../includes/helpers.php';
 
-// Allow Master, Finance, Admission, and Teacher roles to access this report
+// Allow Master, Finance, Admission, and Teacher roles
 require_login();
 if (!is_master() && !is_finance() && !is_admission() && !is_teacher()) {
     header('Location: ' . BASE_URL . 'index.php');
     exit();
 }
 
-$class_filter = isset($_GET['class']) ? sanitize_input($_GET['class']) : '';
-$section_filter = isset($_GET['section']) ? sanitize_input($_GET['section']) : '';
-$name_filter = isset($_GET['name']) ? sanitize_input($_GET['name']) : '';
-$father_name_filter = isset($_GET['father_name']) ? sanitize_input($_GET['father_name']) : '';
-$months_filter = isset($_GET['months']) ? (is_array($_GET['months']) ? $_GET['months'] : [sanitize_input($_GET['months'])]) : [];
-$min_2_months = (isset($_GET['min_2_months']) && $_GET['min_2_months'] == '1') ? 1 : 0;
-$min_3_months = (isset($_GET['min_3_months']) && $_GET['min_3_months'] == '1') ? 1 : 0;
-$arrears_only = (isset($_GET['arrears_only']) && $_GET['arrears_only'] == '1') ? 1 : 0;
+// Multi-select Class & Section Arrays Handling
+$class_filter = $_REQUEST['class'] ?? [];
+if (!is_array($class_filter)) {
+    $class_filter = !empty($class_filter) ? [sanitize_input($class_filter)] : [];
+}
 
-// Get defaulters
-$defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter, $father_name_filter);
-$defaulter_list = [];
-if ($defaulters) {
-    $defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
+$section_filter = $_REQUEST['section'] ?? [];
+if (!is_array($section_filter)) {
+    $section_filter = !empty($section_filter) ? [sanitize_input($section_filter)] : [];
+}
+
+$student_id_filter = sanitize_input($_REQUEST['student_id'] ?? '');
+$name_filter = sanitize_input($_REQUEST['name'] ?? '');
+$father_name_filter = sanitize_input($_REQUEST['father_name'] ?? '');
+$months_filter = isset($_REQUEST['months']) ? (is_array($_REQUEST['months']) ? $_REQUEST['months'] : [sanitize_input($_REQUEST['months'])]) : [];
+$min_2_months = (isset($_REQUEST['min_2_months']) && $_REQUEST['min_2_months'] == '1') ? 1 : 0;
+$min_3_months = (isset($_REQUEST['min_3_months']) && $_REQUEST['min_3_months'] == '1') ? 1 : 0;
+$arrears_only = (isset($_REQUEST['arrears_only']) && $_REQUEST['arrears_only'] == '1') ? 1 : 0;
+
+// Fetch defaulter students
+$defaulters_query = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter, $father_name_filter, $student_id_filter);
+$all_defaulter_list = [];
+if ($defaulters_query) {
+    $all_defaulter_list = $defaulters_query->fetch_all(MYSQLI_ASSOC);
 }
 
 // Apply 2+ months, 3+ months, or arrears filter
-$defaulter_list = filter_defaulters_by_criteria($defaulter_list, $min_2_months, $min_3_months, $arrears_only, $months_filter);
+$defaulter_list = filter_defaulters_by_criteria($all_defaulter_list, $min_2_months, $min_3_months, $arrears_only, $months_filter);
 
-// Check if any college student (11th / 12th) exists in the report list
-$has_college_students = false;
-if (!empty($class_filter) && is_college_class($class_filter)) {
-    $has_college_students = true;
-} else {
-    foreach ($defaulter_list as $st_check) {
-        if (is_college_class($st_check['class']) || (!empty($st_check['is_package']) && $st_check['is_package'] == 1)) {
-            $has_college_students = true;
-            break;
-        }
-    }
-}
 ?>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Pending Fees Students Report</title>
+    <title>Pending Fee Summary Report - <?php echo SITE_NAME; ?></title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 10mm;
-            background: white;
-        }
-        .report-container {
-            max-width: 210mm;
-            margin: 0 auto;
-            background: white;
-            padding: 15mm;
-            border: 1px solid #333;
-        }
-        .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 2px solid #1f5f46;
-            padding-bottom: 5mm;
-            margin-bottom: 10mm;
-        }
-        .report-logo {
-            width: 80px;
-            height: auto;
-        }
-        .header p {
-            margin: 2mm 0;
-            color: #666;
-            font-size: 11px;
-        }
-        .report-info {
-            background: #f5f5f5;
-            padding: 5mm;
-            margin-bottom: 10mm;
-            font-size: 11px;
-            border-radius: 3px;
-        }
-        .report-info p {
-            margin: 2mm 0;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 5mm;
-            font-size: 10px;
-        }
-        table th {
-            background: #1f5f46;
-            color: white;
-            border: 1px solid #555;
-            padding: 4mm;
-            text-align: left;
-            font-weight: bold;
-        }
-        table td {
-            border: 1px solid #ddd;
-            padding: 3mm;
-        }
-        table tr:nth-child(even) {
-            background: #f9f9f9;
-        }
-        .total-row {
-            background: #f0f0f0;
-            font-weight: bold;
-        }
-        .footer {
-            text-align: center;
-            font-size: 9px;
-            color: #999;
-            border-top: 1px solid #ddd;
-            padding-top: 5mm;
-            margin-top: 10mm;
-        }
-        .amount {
-            text-align: right;
-        }
-        .badge-package {
-            background-color: #0d6efd;
-            color: #ffffff;
-            font-size: 9px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            display: inline-block;
-            margin-bottom: 3px;
-            font-weight: bold;
-        }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 10mm; background: white; }
+        .report-container { max-width: 210mm; margin: 0 auto; background: white; padding: 10mm; border: 1px solid #333; }
+        .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #1f5f46; padding-bottom: 5mm; margin-bottom: 5mm; }
+        .report-logo { width: 80px; height: auto; }
+        .report-info { background: #f5f5f5; padding: 4mm; margin-bottom: 5mm; font-size: 11px; border-radius: 3px; }
+        .report-info p { margin: 2mm 0; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 5mm; font-size: 10px; }
+        table th { background: #1f5f46; color: white; border: 1px solid #555; padding: 5px 6px; text-align: left; font-weight: bold; }
+        table td { border: 1px solid #ddd; padding: 4px 6px; }
+        .contact-item { white-space: nowrap; line-height: 1.3; }
+        table tr:nth-child(even) { background: #f9f9f9; }
+        .footer { text-align: center; font-size: 9px; color: #999; border-top: 1px solid #ddd; padding-top: 4mm; margin-top: 5mm; }
+        .amount { text-align: right; font-weight: bold; }
+
         @media print {
-            body {
-                margin: 0;
-                padding: 0;
-            }
-            .report-container {
-                border: none;
-                box-shadow: none;
-            }
-            .badge-package {
-                background-color: #0d6efd !important;
-                color: #ffffff !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
+            body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .report-container { border: none; box-shadow: none; max-width: 100%; padding: 5mm; }
+            thead { display: table-row-group; }
+            tr { page-break-inside: avoid; }
         }
     </style>
 </head>
@@ -166,7 +82,7 @@ if (!empty($class_filter) && is_college_class($class_filter)) {
                 <?php echo render_system_logo('report-logo'); ?>
                 <div style="text-align: left;">
                     <h2 style="margin: 0; color: #1f5f46; font-size: 20px; font-weight: bold;"><?php echo SITE_NAME; ?></h2>
-                    <p style="margin: 5px 0 0 0; color: #666; font-size: 13px;">Pending Fees Students Report</p>
+                    <p style="margin: 5px 0 0 0; color: #666; font-size: 13px;">Pending Fee Summary Report</p>
                 </div>
             </div>
         </div>
@@ -174,16 +90,38 @@ if (!empty($class_filter) && is_college_class($class_filter)) {
         <div class="report-info">
             <p><strong>Report Criteria:</strong></p>
             <p>
-                Name: <?php echo !empty($name_filter) ? htmlspecialchars($name_filter) : 'All'; ?> |
-                Class: <?php echo !empty($class_filter) ? htmlspecialchars($class_filter) : 'All'; ?> |
-                Section: <?php echo !empty($section_filter) ? htmlspecialchars($section_filter) : 'All'; ?> |
-                Months: <?php echo !empty($months_filter) ? implode(', ', array_map('htmlspecialchars', $months_filter)) : 'All'; ?>
+                <strong>Student ID:</strong> <?php echo !empty($student_id_filter) ? htmlspecialchars($student_id_filter) : 'All'; ?> |
+                <strong>Name:</strong> <?php echo !empty($name_filter) ? htmlspecialchars($name_filter) : 'All'; ?> |
+                <strong>Class(es):</strong> 
+                <?php 
+                    if (!empty($class_filter)) {
+                        echo htmlspecialchars(is_array($class_filter) ? implode(', ', $class_filter) : $class_filter);
+                    } else {
+                        echo 'All';
+                    }
+                ?> |
+                <strong>Section(s):</strong> 
+                <?php 
+                    if (!empty($section_filter)) {
+                        echo htmlspecialchars(is_array($section_filter) ? implode(', ', $section_filter) : $section_filter);
+                    } else {
+                        echo 'All';
+                    }
+                ?> |
+                <strong>Month(s) / Fees:</strong> 
+                <?php 
+                    if (!empty($months_filter)) {
+                        echo htmlspecialchars(is_array($months_filter) ? implode(', ', $months_filter) : $months_filter);
+                    } else {
+                        echo 'All';
+                    }
+                ?>
                 <?php if ($min_3_months === 1): ?>
                     | <strong>Filter:</strong> 3+ Months Pending Only
                 <?php elseif ($min_2_months === 1): ?>
                     | <strong>Filter:</strong> 2+ Months Pending Only
                 <?php elseif ($arrears_only === 1): ?>
-                    | <strong>Filter:</strong> Arrears Only (Partial Payments)
+                    | <strong>Filter:</strong> Arrears Only
                 <?php endif; ?>
             </p>
             <p><strong>Total Pending Students:</strong> <?php echo count($defaulter_list); ?></p>
@@ -193,91 +131,93 @@ if (!empty($class_filter) && is_college_class($class_filter)) {
             <table>
                 <thead>
                     <tr>
-                        <th>#</th>
+                        <th style="width: 25px;">#</th>
+                        <th style="width: 45px;">ID</th>
                         <th>Student Name</th>
                         <th>Father Name</th>
-                        <th>Contact Number(s)</th>
                         <th>Class-Sec</th>
-                        <th>Pending</th>
-                        <th>Monthly Fee / Package</th> 
-                        <?php if ($has_college_students): ?>
-                            <th>Pending Dues (11th & 12th)</th>
-                        <?php endif; ?>
+                        <th>Contact Number(s)</th>
+                        <th>Pending Particulars / Months</th>
+                        <th style="text-align: right;">Monthly / Net Fee</th>
+                        <th style="text-align: right;">Pending Dues (Rs.)</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php 
-                    $total_unpaid = 0;
                     $counter = 1;
-                    foreach ($defaulter_list as $defaulter):
-                        $unpaid = get_total_unpaid_fees($defaulter['id']);
-                        $s_fine = calculate_student_fine($defaulter['id']);
-                        $total_unpaid += ($unpaid + $s_fine);
-                        
-                        // Check if student belongs to 11th or 12th class / college package
-                        $is_college = is_college_class($defaulter['class']) || (!empty($defaulter['is_package']) && $defaulter['is_package'] == 1);
+                    $grand_total_pending = 0;
+
+                    foreach ($defaulter_list as $d):
+                        $s_id = intval($d['id']);
+                        $unpaid_amount = floatval($d['filtered_unpaid_amount'] ?? 0);
+                        $s_fine = calculate_student_fine($s_id);
+                        $total_student_due = $unpaid_amount + $s_fine;
+                        $grand_total_pending += $total_student_due;
+
+                        $is_pkg = (!empty($d['is_package']) || floatval($d['package_amount'] ?? 0) > 0 || is_college_class($d['class']) || strpos($d['pending_months'] ?? '', 'Package') !== false);
                     ?>
                         <tr>
                             <td><?php echo $counter++; ?></td>
-                            <td><?php echo htmlspecialchars($defaulter['name']); ?></td>
-                            <td><?php echo htmlspecialchars($defaulter['father_name']); ?></td>
+                            <td><strong><?php echo htmlspecialchars($d['id']); ?></strong></td>
+                            <td><strong><?php echo htmlspecialchars($d['name']); ?></strong></td>
+                            <td><?php echo htmlspecialchars($d['father_name']); ?></td>
+                            <td><?php echo htmlspecialchars($d['class'] . '-' . $d['section']); ?></td>
                             <td>
-                                <?php echo !empty($defaulter['contact_number']) ? '<i class="fas fa-phone"></i> ' . htmlspecialchars($defaulter['contact_number']) . '<br>' : ''; ?>
-                                <?php echo !empty($defaulter['whatsapp_number']) ? '<i class="fab fa-whatsapp"></i> ' . htmlspecialchars($defaulter['whatsapp_number']) : ''; ?>
+                                <?php echo !empty($d['contact_number']) ? '<div class="contact-item"><i class="fas fa-phone"></i> ' . htmlspecialchars($d['contact_number']) . '</div>' : ''; ?>
+                                <?php echo !empty($d['whatsapp_number']) ? '<div class="contact-item"><i class="fab fa-whatsapp" style="color:#25D366;"></i> ' . htmlspecialchars($d['whatsapp_number']) . '</div>' : ''; ?>
                             </td>
-                            <td><?php echo htmlspecialchars($defaulter['class'] . '-' . $defaulter['section']); ?></td>
-                            <td>
-                                <?php if (!$is_college): ?>
-                                    <strong>(<?php echo htmlspecialchars($defaulter['pending_count']); ?> Month<?php echo ($arrears_only === 1) ? ' Arrears' : ''; ?>)</strong><br>
-                                <?php endif; ?>
-                                <?php echo htmlspecialchars(str_replace(',', ', ', $defaulter['pending_months'])); ?>
+                            <td style="font-size: 9.5px; max-width: 180px; word-break: break-word;">
+                                <strong>(<?php echo htmlspecialchars($d['pending_count']); ?> Fee)</strong><br>
+                                <?php echo htmlspecialchars(str_replace(',', ', ', $d['pending_months'])); ?>
                                 <?php if ($s_fine > 0): ?>
-                                    <br><span style="color: #dc3545; font-size: 10px; font-weight: bold;"><i class="fas fa-exclamation-circle"></i> Fine: <?php echo format_currency($s_fine); ?></span>
+                                    <br><span style="color: #dc3545; font-weight: bold;">Late Fine: <?php echo format_currency($s_fine); ?></span>
                                 <?php endif; ?>
                             </td>
                             <td class="amount">
-                                <?php if ($is_college): ?>
-                                    <span class="badge-package">Yearly Pkg</span><br>
-                                    <?php 
-                                        $pkg_amt = floatval($defaulter['package_amount'] ?? 0);
-                                        if ($pkg_amt <= 0) {
-                                            $pkg_amt = floatval($defaulter['fixed_monthly_fee'] ?? 0);
-                                        }
-                                        $concession = floatval($defaulter['concession_amount'] ?? 0);
-                                        $net_pkg = max(0, $pkg_amt - $concession);
-                                        echo format_currency($net_pkg);
-                                    ?>
-                                <?php else: ?>
-                                    <?php echo format_currency($defaulter['monthly_fee']); ?>
-                                <?php endif; ?>
+                                <?php 
+                                if ($is_pkg) {
+                                    $raw_pkg = floatval($d['package_amount'] ?? 0);
+                                    if ($raw_pkg <= 0) {
+                                        $raw_pkg = floatval($d['fixed_monthly_fee'] ?? 0);
+                                    }
+                                    $concession = floatval($d['concession_amount'] ?? 0);
+                                    $net_pkg = max(0, $raw_pkg - $concession);
+                                    echo format_currency($net_pkg) . '<br><small style="color: #0d6efd;">(Yearly Pkg)</small>';
+                                } else {
+                                    echo format_currency($d['monthly_fee']);
+                                }
+                                ?>
                             </td>
-                            
-                            <?php if ($has_college_students): ?>
-                                <td class="amount">
-                                    <?php if ($is_college): ?>
-                                        <strong style="color: #dc3545;"><?php echo format_currency($unpaid); ?></strong>
-                                    <?php else: ?>
-                                        <span style="color: #999;">-</span>
-                                    <?php endif; ?>
-                                </td>
-                            <?php endif; ?>
+                            <td class="amount" style="color: #1f5f46; font-size: 11px;">
+                                <?php echo format_currency($total_student_due); ?>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
+                <tfoot>
+                    <tr style="background: #eef5f2; font-weight: bold; font-size: 11px; color: #1f5f46;">
+                        <td colspan="8" style="text-align: right; padding: 6px;">GRAND TOTAL PENDING DUES:</td>
+                        <td class="amount" style="padding: 6px; font-size: 12px; border-top: 2px solid #1f5f46;">
+                            <?php echo format_currency($grand_total_pending); ?>
+                        </td>
+                    </tr>
+                </tfoot>
             </table>
         <?php else: ?>
-            <p style="text-align: center; color: #666;">No defaulters found with the given criteria.</p>
+            <p style="text-align: center; color: #666; margin: 30px 0;">No pending fee records found with the selected filter criteria.</p>
         <?php endif; ?>
         
         <div class="footer">
             <p>This report has been generated automatically by <?php echo SYSTEM_NAME; ?></p>
-            <p>For official purposes - Please verify the data before taking any action</p>
+            <p>For official purposes - Printed by <?php echo get_username(); ?> on <?php echo date('d-m-Y h:i A'); ?></p>
         </div>
     </div>
     
     <script>
         window.onload = function() {
-            window.print();
+            setTimeout(function() {
+                window.print();
+            }, 250);
         };
     </script>
 </body>

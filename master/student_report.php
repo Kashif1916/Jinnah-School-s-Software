@@ -24,7 +24,7 @@ $search_reasons = isset($_GET['search_reasons']) && is_array($_GET['search_reaso
 
 // Dynamic Column Selections
 $cols = isset($_GET['cols']) && is_array($_GET['cols']) ? $_GET['cols'] : [
-    'id' => 1, 'name' => 1, 'father_name' => 1, 'b_form' => 1, 'class_sec' => 1,
+    'id' => 1, 'name' => 1, 'father_name' => 1, 'b_form' => 1, 'dob' => 1, 'class_sec' => 1,
     'fixed_fee' => 1, 'concession' => 1, 'net_fee' => 1, 'concession_reason' => 1, 'contact' => 1, 'address' => 1, 'status' => 1
 ];
 
@@ -65,11 +65,29 @@ if (!empty($search_sections)) {
     }
 }
 if (!empty($search_reasons)) {
-    $placeholders = implode(',', array_fill(0, count($search_reasons), '?'));
-    $where_clauses[] = "concession_reason IN ($placeholders)";
+    $reason_conditions = [];
+    $standard_reasons = [];
+
     foreach ($search_reasons as $r) {
-        $params[] = sanitize_input($r);
-        $param_types .= 's';
+        $sanitized_r = sanitize_input($r);
+        if ($sanitized_r === 'Full Concession') {
+            $reason_conditions[] = "((fixed_monthly_fee > 0 AND (fixed_monthly_fee - concession_amount) <= 0) OR (package_amount > 0 AND (package_amount - concession_amount) <= 0) OR concession_reason = 'Full Concession')";
+        } else {
+            $standard_reasons[] = $sanitized_r;
+        }
+    }
+
+    if (!empty($standard_reasons)) {
+        $placeholders = implode(',', array_fill(0, count($standard_reasons), '?'));
+        $reason_conditions[] = "concession_reason IN ($placeholders)";
+        foreach ($standard_reasons as $sr) {
+            $params[] = $sr;
+            $param_types .= 's';
+        }
+    }
+
+    if (!empty($reason_conditions)) {
+        $where_clauses[] = "(" . implode(" OR ", $reason_conditions) . ")";
     }
 }
 
@@ -144,6 +162,7 @@ $stmt->close();
                         <?php if (isset($cols['name'])): ?><th>Student Name</th><?php endif; ?>
                         <?php if (isset($cols['father_name'])): ?><th>Father Name</th><?php endif; ?>
                         <?php if (isset($cols['b_form'])): ?><th>B-Form / CNIC</th><?php endif; ?>
+                        <?php if (isset($cols['dob'])): ?><th>DOB</th><?php endif; ?>
                         <?php if (isset($cols['class_sec'])): ?><th>Class-Sec</th><?php endif; ?>
                         <?php if (isset($cols['fixed_fee'])): ?><th>Monthly Fee (Fixed)</th><?php endif; ?>
                         <?php if (isset($cols['concession'])): ?><th>Concession</th><?php endif; ?>
@@ -169,6 +188,7 @@ $stmt->close();
                             <?php if (isset($cols['name'])): ?><td><strong><?php echo htmlspecialchars($s['name']); ?></strong></td><?php endif; ?>
                             <?php if (isset($cols['father_name'])): ?><td><?php echo htmlspecialchars($s['father_name']); ?></td><?php endif; ?>
                             <?php if (isset($cols['b_form'])): ?><td><?php echo !empty($s['b_form']) ? htmlspecialchars($s['b_form']) : '-'; ?></td><?php endif; ?>
+                            <?php if (isset($cols['dob'])): ?><td><?php echo !empty($s['dob']) ? format_date($s['dob']) : '-'; ?></td><?php endif; ?>
                             <?php if (isset($cols['class_sec'])): ?><td><?php echo htmlspecialchars($s['class'] . '-' . $s['section']); ?></td><?php endif; ?>
                             <?php if (isset($cols['fixed_fee'])): ?><td class="amount"><?php echo format_currency($raw_fee); ?></td><?php endif; ?>
                             <?php if (isset($cols['concession'])): ?><td class="amount"><?php echo format_currency($concession); ?></td><?php endif; ?>

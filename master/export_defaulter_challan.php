@@ -17,18 +17,19 @@ if (!is_master() && !is_finance() && !is_admission() && !is_teacher()) {
 }
 
 // Multi-select Class & Section Arrays Handling
-$class_filter = isset($_REQUEST['class']) ? $_REQUEST['class'] : '';
+$class_filter = $_REQUEST['class'] ?? [];
 if (!is_array($class_filter)) {
     $class_filter = !empty($class_filter) ? [sanitize_input($class_filter)] : [];
 }
 
-$section_filter = isset($_REQUEST['section']) ? $_REQUEST['section'] : '';
+$section_filter = $_REQUEST['section'] ?? [];
 if (!is_array($section_filter)) {
     $section_filter = !empty($section_filter) ? [sanitize_input($section_filter)] : [];
 }
 
-$name_filter = isset($_REQUEST['name']) ? sanitize_input($_REQUEST['name']) : '';
-$father_name_filter = isset($_REQUEST['father_name']) ? sanitize_input($_REQUEST['father_name']) : '';
+$student_id_filter = sanitize_input($_REQUEST['student_id'] ?? '');
+$name_filter = sanitize_input($_REQUEST['name'] ?? '');
+$father_name_filter = sanitize_input($_REQUEST['father_name'] ?? '');
 $months_filter = isset($_REQUEST['months']) ? (is_array($_REQUEST['months']) ? $_REQUEST['months'] : [sanitize_input($_REQUEST['months'])]) : [];
 $min_2_months = (isset($_REQUEST['min_2_months']) && $_REQUEST['min_2_months'] == '1') ? 1 : 0;
 $min_3_months = (isset($_REQUEST['min_3_months']) && $_REQUEST['min_3_months'] == '1') ? 1 : 0;
@@ -41,12 +42,10 @@ if (isset($_REQUEST['student_ids'])) {
     } else {
         $selected_student_ids = array_map('intval', explode(',', $_REQUEST['student_ids']));
     }
-} elseif (isset($_REQUEST['student_id'])) {
-    $selected_student_ids = [intval($_REQUEST['student_id'])];
 }
 
 // Fetch defaulter students
-$defaulters_query = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter, $father_name_filter);
+$defaulters_query = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter, $father_name_filter, $student_id_filter);
 $all_defaulter_list = [];
 if ($defaulters_query) {
     $all_defaulter_list = $defaulters_query->fetch_all(MYSQLI_ASSOC);
@@ -222,10 +221,11 @@ foreach ($possible_extensions as $ext) {
             text-transform: uppercase;
         }
 
+        /* 5 COLUMNS FOR STUDENT DETAILS GRID TO INCLUDE STUDENT ID */
         .student-details-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 4px 8px;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px 6px;
             background: #f8f9fa;
             padding: 4px 8px;
             border-radius: 4px;
@@ -279,11 +279,10 @@ foreach ($possible_extensions as $ext) {
             padding: 3px 6px;
         }
 
-        /* Footer Spacing Fix */
         .challan-footer {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start; /* Alignment set to top to eliminate gap */
+            align-items: flex-start;
             margin-top: 4px;
             font-size: 9px;
             color: #666;
@@ -305,7 +304,6 @@ foreach ($possible_extensions as $ext) {
         .signature-box img {
             max-width: 50px;
             height: auto;
-            
             margin-bottom: -2px;
             display: block;
         }
@@ -454,7 +452,7 @@ foreach ($possible_extensions as $ext) {
             $unpaid_records = $stmt_unpaid->get_result()->fetch_all(MYSQLI_ASSOC);
             $stmt_unpaid->close();
 
-            // Calculate late fee fine for this student (Zero fee and arrears exempted)
+            // Calculate late fee fine
             $student_fine = calculate_student_fine($student_id, $unpaid_records);
 
             // Direct Grouping Algorithm
@@ -470,10 +468,8 @@ foreach ($possible_extensions as $ext) {
                 $is_package = (strpos($paid_month, 'Package') !== false);
                 $is_other_fee = (!$is_admission && !$is_prev_year && !$is_package && !preg_match('/^[A-Za-z]{3}-[0-9]{4}$/', $paid_month));
                 
-                // ARREARS / PARTIAL PAYMENT CHECK:
                 $is_arrear = (!$is_admission && !$is_prev_year && !$is_package && !$is_other_fee && $expected_monthly > 0 && $amt < $expected_monthly);
 
-                // When arrears_only filter is active, skip non-arrear fee records
                 if ($arrears_only === 1 && !$is_arrear) {
                     continue;
                 }
@@ -487,7 +483,7 @@ foreach ($possible_extensions as $ext) {
                 } elseif ($is_package) {
                     $group_key = 'package_' . $rec['id'];
                 } elseif ($is_other_fee) {
-                    $group_key = 'other_fee_' . $rec['id']; // Custom fees (Exam Fee, Party Fee, etc.)
+                    $group_key = 'other_fee_' . $rec['id'];
                 } elseif ($is_arrear) {
                     $group_key = 'arrear_' . $rec['id'];
                 } else {
@@ -520,12 +516,10 @@ foreach ($possible_extensions as $ext) {
                 $grouped_challan[$group_key]['total_amount'] += $amt;
             }
 
-            // If no records to show for this student with active filter, skip card
             if (empty($grouped_challan)) {
                 continue;
             }
 
-            // Build Title for grouped regular full months
             if (isset($grouped_challan['regular_months']) && !empty($grouped_challan['regular_months']['months'])) {
                 $grouped_challan['regular_months']['title'] = 'Fee for Months: ' . implode(', ', $grouped_challan['regular_months']['months']);
             }
@@ -544,7 +538,12 @@ foreach ($possible_extensions as $ext) {
                     </div>
                 </div>
 
+                <!-- ADDED STUDENT ID HERE IN THE GRID -->
                 <div class="student-details-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">Student ID</span>
+                        <span class="detail-value"><?php echo htmlspecialchars($student['id']); ?></span>
+                    </div>
                     <div class="detail-item">
                         <span class="detail-label">Student Name</span>
                         <span class="detail-value"><?php echo htmlspecialchars($student['name']); ?></span>

@@ -23,7 +23,8 @@ $search_classes = isset($_GET['search_classes']) && is_array($_GET['search_class
 $search_sections = isset($_GET['search_sections']) && is_array($_GET['search_sections']) ? $_GET['search_sections'] : [];
 $search_reasons = isset($_GET['search_reasons']) && is_array($_GET['search_reasons']) ? $_GET['search_reasons'] : [];
 
-$CONCESSION_REASONS = ['Sibling', 'Hafiz', 'Orphan', 'S.C', 'EMP', 'T.Son'];
+// Added 'Full Concession' option
+$CONCESSION_REASONS = ['Full Concession', 'Sibling', 'Hafiz', 'Orphan', 'S.C', 'EMP', 'T.Son'];
 
 // Check if user has applied any filter
 $is_filtered = (!empty($search_id) || !empty($search_name) || !empty($search_father_name) || !empty($search_b_form) || !empty($search_classes) || !empty($search_sections) || !empty($search_reasons));
@@ -76,24 +77,50 @@ if (!empty($search_sections)) {
     }
 }
 if (!empty($search_reasons)) {
-    $placeholders = implode(',', array_fill(0, count($search_reasons), '?'));
-    $where_clauses[] = "concession_reason IN ($placeholders)";
+    $reason_conditions = [];
+    $standard_reasons = [];
+
     foreach ($search_reasons as $r) {
-        $params[] = sanitize_input($r);
-        $param_types .= 's';
+        $sanitized_r = sanitize_input($r);
+        if ($sanitized_r === 'Full Concession') {
+            // Check Net Monthly Fee / Net Package Amount <= 0 OR concession equals fixed fee
+            $reason_conditions[] = "((fixed_monthly_fee > 0 AND (fixed_monthly_fee - concession_amount) <= 0) OR (package_amount > 0 AND (package_amount - concession_amount) <= 0) OR concession_reason = 'Full Concession')";
+        } else {
+            $standard_reasons[] = $sanitized_r;
+        }
+    }
+
+    if (!empty($standard_reasons)) {
+        $placeholders = implode(',', array_fill(0, count($standard_reasons), '?'));
+        $reason_conditions[] = "concession_reason IN ($placeholders)";
+        foreach ($standard_reasons as $sr) {
+            $params[] = $sr;
+            $param_types .= 's';
+        }
+    }
+
+    if (!empty($reason_conditions)) {
+        $where_clauses[] = "(" . implode(" OR ", $reason_conditions) . ")";
     }
 }
 
 $where_sql = implode(" AND ", $where_clauses);
 
-// 1. Get Total Count
-$count_query = "SELECT COUNT(*) as total FROM students WHERE $where_sql";
-$stmt_count = $conn->prepare($count_query);
+// 1. Get Total, Active, and Drop Counts (Fixed Case Insensitive & Dual Drop Status Check)
+$stats_query = "SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN LOWER(status) = 'active' THEN 1 ELSE 0 END) as active_count,
+                    SUM(CASE WHEN LOWER(status) IN ('drop', 'dropped') THEN 1 ELSE 0 END) as drop_count
+                FROM students WHERE $where_sql";
+$stmt_count = $conn->prepare($stats_query);
 if (!empty($params)) {
     $stmt_count->bind_param($param_types, ...$params);
 }
 $stmt_count->execute();
-$total_students = $stmt_count->get_result()->fetch_assoc()['total'];
+$stats_res = $stmt_count->get_result()->fetch_assoc();
+$total_students = $stats_res['total'] ?? 0;
+$active_students = $stats_res['active_count'] ?? 0;
+$drop_students = $stats_res['drop_count'] ?? 0;
 $stmt_count->close();
 
 $total_pages = ceil($total_students / $limit);
@@ -247,7 +274,11 @@ $filter_query_str = http_build_query($query_params);
 
                 <div class="table-section">
                     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                        <h4>Total Students: <?php echo $total_students; ?> </h4>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <h4 class="mb-0">Total Students: <?php echo $total_students; ?></h4>
+                            <span class="badge bg-success fs-6"><i class="fas fa-check-circle me-1"></i> Active: <?php echo $active_students; ?></span>
+                            <span class="badge bg-danger fs-6"><i class="fas fa-user-minus me-1"></i> Drop: <?php echo $drop_students; ?></span>
+                        </div>
                         <div class="d-flex gap-2">
                             <!-- PRINT STUDENT CARDS BUTTON -->
                             <a href="../master/print_student_cards.php?<?php echo $filter_query_str; ?>" target="_blank" class="btn btn-primary">
@@ -319,7 +350,7 @@ $filter_query_str = http_build_query($query_params);
                                                 <?php echo !empty($s['contact_number']) ? '<i class="fas fa-phone"></i> ' . htmlspecialchars($s['contact_number']) . '<br>' : ''; ?>
                                                 <?php echo !empty($s['contact_number2']) ? '<i class="fas fa-phone"></i> ' . htmlspecialchars($s['contact_number2']) . '<br>' : ''; ?>
                                                 <?php echo !empty($s['whatsapp_number']) ? '<i class="fab fa-whatsapp text-success"></i> ' . htmlspecialchars($s['whatsapp_number']) : ''; ?>
-                                                <span class="badge <?php echo $s['status'] == 'active' ? 'bg-success' : 'bg-danger'; ?>" style="margin-top: 5px; display: block;">
+                                                <span class="badge <?php echo strtolower($s['status']) == 'active' ? 'bg-success' : 'bg-danger'; ?>" style="margin-top: 5px; display: block;">
                                                     Status: <?php echo ucfirst(htmlspecialchars($s['status'])); ?>
                                                 </span>
                                             </td>
@@ -420,7 +451,7 @@ $filter_query_str = http_build_query($query_params);
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="cols[concession_reason]" value="1" checked id="col_concession_reason">
-                                    <label class="form-check-label fw-bold text-success" for="col_concession_reason">Concession Reason</label>
+                                    <label class="form-check-label" for="col_concession_reason">Concession Reason</label>
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="cols[contact]" value="1" checked id="col_contact">

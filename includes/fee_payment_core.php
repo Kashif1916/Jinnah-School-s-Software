@@ -398,6 +398,10 @@ if (isset($_GET['id'])) {
                         <div class="batch-summary mb-5 p-4 border rounded shadow-sm bg-white">
                             <h4 class="text-success mb-3"><i class="fas fa-receipt"></i> Batch List for Receipt</h4>
                             <form method="POST" class="w-100" action="<?php echo $self_url; ?>" id="batchCartForm">
+                                <input type="hidden" name="action" id="batch_form_action" value="process_batch">
+                                <input type="hidden" name="payment_mode" id="selected_payment_mode" value="cash">
+                                <input type="hidden" name="remove_record_id" id="remove_record_id" value="">
+
                                 <table class="table table-bordered align-middle">
                                     <thead class="table-light">
                                         <tr>
@@ -420,16 +424,14 @@ if (isset($_GET['id'])) {
                                                 <td><?php echo $item['month']; ?></td>
                                                 <td><?php echo format_currency($item['amount']); ?></td>
                                                 <td class="text-center">
-                                                    <button type="submit" name="action" value="remove_item" 
-                                                            onclick="document.getElementById('remove_record_id').value='<?php echo $item['record_id']; ?>'; return confirm('Remove <?php echo htmlspecialchars($item['name']); ?> (<?php echo $item['month']; ?>)? Note: Removing an earlier month will also remove subsequent months.');" 
+                                                    <button type="button" 
+                                                            onclick="removeCartItem('<?php echo $item['record_id']; ?>', '<?php echo htmlspecialchars($item['name'], ENT_QUOTES); ?>', '<?php echo $item['month']; ?>')" 
                                                             class="btn btn-sm btn-outline-danger py-1 px-2" title="Remove Item">
                                                         <i class="fas fa-times"></i>
                                                     </button>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
-                                        
-                                        <input type="hidden" name="remove_record_id" id="remove_record_id" value="">
                                         
                                         <tr class="table-warning">
                                             <td><strong class="text-danger"><i class="fas fa-exclamation-circle me-1"></i> Fine </strong></td>
@@ -458,22 +460,43 @@ if (isset($_GET['id'])) {
                                         <i class="fas fa-user-plus me-1"></i> Search & Add Another
                                     </a>
 
-                                    <button type="submit" name="action" value="process_batch" class="btn btn-success px-4 d-flex align-items-center">
+                                    <button type="button" id="openPaymentModalBtn" class="btn btn-success px-4 d-flex align-items-center">
                                         <i class="fas fa-print me-1"></i> Print Receipt
                                     </button>
-                                    
-                                    <div class="form-group mb-0" style="min-width: 220px;">
-                                        <select id="payment_mode" name="payment_mode" class="form-select bg-white" required>
-                                            <option value="cash" selected>💵 Cash Payment</option>
-                                            <option value="bank_transfer">🏦 Bank / Account Transfer</option>
-                                        </select>
-                                    </div>
 
-                                    <button type="submit" name="action" value="clear_cart" class="btn btn-outline-danger d-flex align-items-center" onclick="return confirm('Clear batch list?')">
+                                    <button type="button" onclick="clearCartConfirm()" class="btn btn-outline-danger d-flex align-items-center">
                                         <i class="fas fa-trash me-1"></i> Clear Batch
                                     </button>
                                 </div>
                             </form>
+                        </div>
+
+                        <!-- Payment Mode Confirmation Modal -->
+                        <div class="modal fade" id="paymentModeModal" tabindex="-1" aria-labelledby="paymentModeModalLabel" aria-hidden="true">
+                          <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                              <div class="modal-header bg-success text-white">
+                                <h5 class="modal-title" id="paymentModeModalLabel"><i class="fas fa-check-circle me-2"></i>Select Payment Method</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                              </div>
+                              <div class="modal-body py-4">
+                                <p class="text-center fw-bold text-secondary mb-4" style="font-size: 1.1rem;">
+                                    Confirm the payment receiving mode before printing receipt:
+                                </p>
+                                <div class="d-grid gap-3">
+                                  <button type="button" class="btn btn-outline-success btn-lg py-3 fw-bold d-flex align-items-center justify-content-center" onclick="confirmPaymentMode('cash')">
+                                    <i class="fas fa-money-bill-wave fa-lg me-2"></i> 💵 Cash Payment
+                                  </button>
+                                  <button type="button" class="btn btn-outline-primary btn-lg py-3 fw-bold d-flex align-items-center justify-content-center" onclick="confirmPaymentMode('bank_transfer')">
+                                    <i class="fas fa-university fa-lg me-2"></i> 🏦 Bank / Account Transfer
+                                  </button>
+                                </div>
+                              </div>
+                              <div class="modal-footer justify-content-center bg-light">
+                                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                     <?php endif; ?>
                     
@@ -486,7 +509,6 @@ if (isset($_GET['id'])) {
                             <form method="POST" class="search-form" action="<?php echo $self_url; ?>">
                                 <input type="hidden" name="action" value="search">
                                 <div class="row g-3 align-items-end">
-                                    <!-- Added Student ID (Roll No.) Search Field -->
                                     <div class="col-md-2">
                                         <label for="search_id" class="form-label font-weight-bold">Student ID</label>
                                         <input type="number" id="search_id" name="search_id" class="form-control" 
@@ -742,12 +764,48 @@ if (isset($_GET['id'])) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/script.js"></script>
     <script>
+        function confirmPaymentMode(mode) {
+            document.getElementById('selected_payment_mode').value = mode;
+            document.getElementById('batch_form_action').value = 'process_batch';
+            const modalEl = document.getElementById('paymentModeModal');
+            if (modalEl) {
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+            }
+            document.getElementById('batchCartForm').submit();
+        }
+
+        function removeCartItem(recId, name, month) {
+            if (confirm(`Remove ${name} (${month})? Note: Removing an earlier month will also remove subsequent months.`)) {
+                document.getElementById('remove_record_id').value = recId;
+                document.getElementById('batch_form_action').value = 'remove_item';
+                document.getElementById('batchCartForm').submit();
+            }
+        }
+
+        function clearCartConfirm() {
+            if (confirm('Clear batch list?')) {
+                document.getElementById('batch_form_action').value = 'clear_cart';
+                document.getElementById('batchCartForm').submit();
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             <?php if (isset($_SESSION['print_receipt_url'])): ?>
                 const receiptUrl = '<?php echo $_SESSION['print_receipt_url']; ?>';
                 window.open(receiptUrl, '_blank');
                 <?php unset($_SESSION['print_receipt_url']); ?>
             <?php endif; ?>
+
+            const openModalBtn = document.getElementById('openPaymentModalBtn');
+            if (openModalBtn) {
+                openModalBtn.addEventListener('click', function() {
+                    const paymentModal = new bootstrap.Modal(document.getElementById('paymentModeModal'));
+                    paymentModal.show();
+                });
+            }
 
             const allCheckboxes = document.querySelectorAll('.fee-checkbox');
             const regularCheckboxes = document.querySelectorAll('.regular-fee-checkbox');

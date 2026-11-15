@@ -67,11 +67,29 @@ if (!empty($search_sections)) {
     }
 }
 if (!empty($search_reasons)) {
-    $placeholders = implode(',', array_fill(0, count($search_reasons), '?'));
-    $where_clauses[] = "concession_reason IN ($placeholders)";
+    $reason_conditions = [];
+    $standard_reasons = [];
+
     foreach ($search_reasons as $r) {
-        $params[] = sanitize_input($r);
-        $param_types .= 's';
+        $sanitized_r = sanitize_input($r);
+        if ($sanitized_r === 'Full Concession') {
+            $reason_conditions[] = "((fixed_monthly_fee > 0 AND (fixed_monthly_fee - concession_amount) <= 0) OR (package_amount > 0 AND (package_amount - concession_amount) <= 0) OR concession_reason = 'Full Concession')";
+        } else {
+            $standard_reasons[] = $sanitized_r;
+        }
+    }
+
+    if (!empty($standard_reasons)) {
+        $placeholders = implode(',', array_fill(0, count($standard_reasons), '?'));
+        $reason_conditions[] = "concession_reason IN ($placeholders)";
+        foreach ($standard_reasons as $sr) {
+            $params[] = $sr;
+            $param_types .= 's';
+        }
+    }
+
+    if (!empty($reason_conditions)) {
+        $where_clauses[] = "(" . implode(" OR ", $reason_conditions) . ")";
     }
 }
 

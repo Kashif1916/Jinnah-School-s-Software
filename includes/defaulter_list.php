@@ -184,8 +184,9 @@ if (!$is_filtered) {
                                 <div class="months-checkbox-container">
                                    
                                     <?php
-                                     $start_date = new DateTime('first day of this month');
-                                     for ($i = 0; $i < 12; $i++) {
+                                     // Start from next month (+1 month) and include past 12 months
+                                     $start_date = new DateTime('first day of next month');
+                                     for ($i = 0; $i < 13; $i++) {
                                          $date = clone $start_date;
                                          $date->modify("-$i month");
                                          
