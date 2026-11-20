@@ -95,15 +95,22 @@ if ($current_role === 'master') {
             border: 1px solid rgba(0,0,0,0.05);
         }
         .avatar-circle {
-            width: 100px;
-            height: 100px;
+            width: 50px;
+            height: 50px;
             background: rgba(255,255,255,0.1);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 40px;
-            border: 3px solid rgba(255,255,255,0.2);
+            border: 3px solid rgba(255,255,255,0.3);
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .avatar-circle img {
+            width: 10%;
+            height: 10%;
+            object-fit: cover;
+            object-position: top;
         }
     </style>
 </head>
@@ -136,8 +143,8 @@ if ($current_role === 'master') {
                     <div class="dev-card p-5 mb-4">
                         <div class="row align-items-center g-4">
                             <div class="col-md-3 text-center d-flex justify-content-center">
-                                <div class="avatar-circle">
-                                    <i class="fas fa-code"></i>
+                                <div >
+                                    <img src="assets/developer.png"  style="width: 200px; height: 200px; border-radius: 50% ;" alt="Kashif Javed - Software Developer">
                                 </div>
                             </div>
                             <div class="col-md-9">

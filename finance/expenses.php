@@ -65,6 +65,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Action denied! You can only edit expenses recorded TODAY.';
             }
         }
+    } elseif (isset($_POST['action']) && $_POST['action'] === 'cancel_expense') {
+        $expense_id = intval($_POST['expense_id'] ?? 0);
+        $my_user_id = get_user_id();
+
+        if ($expense_id <= 0) {
+            $error = 'Invalid expense selected for cancellation.';
+        } else {
+            // Strict Security Check: Sirf wahi expense cancel/delete hoga jo LOGGED-IN USER ka ho AUR AJ (CURDATE) ki date ka ho!
+            $check_stmt = $conn->prepare("SELECT id FROM expenses WHERE id = ? AND user_id = ? AND DATE(created_at) = CURDATE()");
+            $check_stmt->bind_param("ii", $expense_id, $my_user_id);
+            $check_stmt->execute();
+            $check_res = $check_stmt->get_result();
+
+            if ($check_res && $check_res->num_rows > 0) {
+                $check_stmt->close();
+                $del_stmt = $conn->prepare("DELETE FROM expenses WHERE id = ?");
+                $del_stmt->bind_param("i", $expense_id);
+                if ($del_stmt->execute()) {
+                    $success = 'Today\'s expense cancelled and removed successfully!';
+                } else {
+                    $error = 'Failed to cancel expense: ' . $conn->error;
+                }
+                $del_stmt->close();
+            } else {
+                $check_stmt->close();
+                $error = 'Action denied! You can only cancel expenses recorded TODAY.';
+            }
+        }
     }
 }
 
@@ -312,16 +340,26 @@ $today_date = date('Y-m-d');
                                                     </td>
                                                     <td class="text-center">
                                                         <?php if ($is_today): ?>
-                                                            <button type="button" 
-                                                                    class="btn btn-sm btn-outline-warning edit-expense-btn" 
-                                                                    data-id="<?php echo $expense['id']; ?>"
-                                                                    data-amount="<?php echo $expense['amount']; ?>"
-                                                                    data-reason="<?php echo htmlspecialchars($expense['reason']); ?>"
-                                                                    title="Edit Today's Expense">
-                                                                <i class="fas fa-edit"></i> Edit
-                                                            </button>
+                                                            <div class="d-inline-flex gap-1">
+                                                                <button type="button" 
+                                                                        class="btn btn-sm btn-outline-warning edit-expense-btn" 
+                                                                        data-id="<?php echo $expense['id']; ?>"
+                                                                        data-amount="<?php echo $expense['amount']; ?>"
+                                                                        data-reason="<?php echo htmlspecialchars($expense['reason']); ?>"
+                                                                        title="Edit Today's Expense">
+                                                                    <i class="fas fa-edit"></i> Edit
+                                                                </button>
+                                                                <button type="button" 
+                                                                        class="btn btn-sm btn-outline-danger cancel-expense-btn" 
+                                                                        data-id="<?php echo $expense['id']; ?>"
+                                                                        data-amount="<?php echo format_currency($expense['amount']); ?>"
+                                                                        data-reason="<?php echo htmlspecialchars($expense['reason']); ?>"
+                                                                        title="Cancel Today's Expense">
+                                                                    <i class="fas fa-times"></i> Cancel
+                                                                </button>
+                                                            </div>
                                                         <?php else: ?>
-                                                            <span class="text-muted small" title="Cannot edit past dates"><i class="fas fa-lock"></i> Locked</span>
+                                                            <span class="text-muted small" title="Cannot edit or cancel past dates"><i class="fas fa-lock"></i> Locked</span>
                                                         <?php endif; ?>
                                                     </td>
                                                 </tr>
@@ -372,8 +410,36 @@ $today_date = date('Y-m-d');
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Update Expense</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cancel Expense Modal -->
+    <div class="modal fade" id="cancelExpenseModal" tabindex="-1" aria-labelledby="cancelExpenseModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST">
+                    <input type="hidden" name="action" value="cancel_expense">
+                    <input type="hidden" name="expense_id" id="cancel_expense_id">
+                    
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="cancelExpenseModalLabel"><i class="fas fa-exclamation-triangle text-danger me-2"></i> Cancel Today's Expense</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">Are you sure you want to cancel and remove this expense?</p>
+                        <div class="alert alert-light border mb-0">
+                            <div><strong>Amount:</strong> <span id="cancel_amount_display" class="text-danger fw-bold"></span></div>
+                            <div class="mt-1"><strong>Reason:</strong> <span id="cancel_reason_display"></span></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No, Keep It</button>
+                        <button type="submit" class="btn btn-danger"><i class="fas fa-trash-alt"></i> Yes, Cancel Expense</button>
                     </div>
                 </form>
             </div>
@@ -396,6 +462,21 @@ $today_date = date('Y-m-d');
                     document.getElementById('edit_reason').value = reason;
 
                     editModal.show();
+                });
+            });
+
+            const cancelModal = new bootstrap.Modal(document.getElementById('cancelExpenseModal'));
+            document.querySelectorAll('.cancel-expense-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const id = this.getAttribute('data-id');
+                    const amount = this.getAttribute('data-amount');
+                    const reason = this.getAttribute('data-reason');
+
+                    document.getElementById('cancel_expense_id').value = id;
+                    document.getElementById('cancel_amount_display').textContent = amount;
+                    document.getElementById('cancel_reason_display').textContent = reason;
+
+                    cancelModal.show();
                 });
             });
         });

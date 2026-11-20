@@ -174,13 +174,42 @@ if (!isset($redirect_to_setup) && $conn && !$conn->connect_error) {
         }
     }
 
-    // Dynamically ensure 'teacher' role exists in the role enum
+    // Dynamically ensure 'developer' and 'teacher' roles exist in the role enum
     $colCheckRole = $conn->query("SHOW COLUMNS FROM `users` LIKE 'role'");
     if ($colCheckRole && $colCheckRole->num_rows > 0) {
         $row = $colCheckRole->fetch_assoc();
-        if (isset($row['Type']) && strpos($row['Type'], 'teacher') === false) {
-            $conn->query("ALTER TABLE `users` MODIFY COLUMN `role` ENUM('master', 'finance', 'admission', 'teacher') NOT NULL");
+        if (isset($row['Type']) && strpos($row['Type'], 'developer') === false) {
+            $conn->query("ALTER TABLE `users` MODIFY COLUMN `role` ENUM('master', 'finance', 'admission', 'teacher', 'developer') NOT NULL");
         }
+    }
+
+    
+
+    // Dynamically ensure developer_notifications table exists
+    $tableCheckDevNotifs = $conn->query("SHOW TABLES LIKE 'developer_notifications'");
+    if ($tableCheckDevNotifs && $tableCheckDevNotifs->num_rows == 0) {
+        $conn->query("CREATE TABLE `developer_notifications` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `title` VARCHAR(255) NOT NULL,
+            `message` TEXT NOT NULL,
+            `type` VARCHAR(20) DEFAULT 'info',
+            `created_by` VARCHAR(50) NOT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
+
+    // Dynamically ensure notification_dismissals table exists
+    $tableCheckDismissals = $conn->query("SHOW TABLES LIKE 'notification_dismissals'");
+    if ($tableCheckDismissals && $tableCheckDismissals->num_rows == 0) {
+        $conn->query("CREATE TABLE `notification_dismissals` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `notification_id` INT NOT NULL,
+            `user_id` INT NOT NULL,
+            `dismissed_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY `unique_user_notification` (`notification_id`, `user_id`),
+            INDEX `idx_user_id` (`user_id`),
+            FOREIGN KEY (`notification_id`) REFERENCES `developer_notifications`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     }
     // Dynamically ensure calculator_audit_logs table exists
     $tableCheckAuditLogs = $conn->query("SHOW TABLES LIKE 'calculator_audit_logs'");

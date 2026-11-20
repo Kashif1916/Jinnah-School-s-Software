@@ -71,6 +71,35 @@ if (isset($_GET['ajax_action']) && $_GET['ajax_action'] === 'get_paid_students')
 }
 
 // ---------------------------------------------------------------------
+// 2b. AJAX FILTER FOR BANK PAYMENTS COLLECTION
+// ---------------------------------------------------------------------
+if (isset($_GET['ajax_action']) && $_GET['ajax_action'] === 'get_bank_collection') {
+    header('Content-Type: application/json');
+    $selected_month = sanitize_input($_GET['month'] ?? date('M-Y'));
+
+    $time = strtotime("01-" . $selected_month);
+    if (!$time) $time = time();
+    $start_date = date('Y-m-01 00:00:00', $time);
+    $end_date   = date('Y-m-t 23:59:59', $time);
+
+    $stmt = $conn->prepare("SELECT SUM(amount) as total FROM payments 
+                            WHERE (LOWER(payment_mode) != 'cash' AND payment_mode IS NOT NULL AND payment_mode != '') 
+                              AND payment_date >= ? AND payment_date <= ?");
+    $stmt->bind_param('ss', $start_date, $end_date);
+    $stmt->execute();
+    $total = round(floatval($stmt->get_result()->fetch_assoc()['total'] ?? 0));
+    $stmt->close();
+
+    echo json_encode([
+        'success' => true,
+        'amount' => $total,
+        'formatted' => 'Rs. ' . number_format($total, 0),
+        'month_label' => date('M Y', $time)
+    ]);
+    exit();
+}
+
+// ---------------------------------------------------------------------
 // 3. GRAPH 1: SCHOOL MONTHLY BREAKDOWN (UPDATED LOGIC)
 // ---------------------------------------------------------------------
 
@@ -204,6 +233,15 @@ if ($other_fee_res) {
     $this_month_other_fee = round(floatval($other_fee_res->fetch_assoc()['total'] ?? 0));
 }
 
+// Bank Transfer Collection
+$this_month_bank = 0;
+$bank_coll_res = $conn->query("SELECT SUM(amount) as total FROM payments 
+                               WHERE (LOWER(payment_mode) != 'cash' AND payment_mode IS NOT NULL AND payment_mode != '') 
+                                 AND payment_date >= '$start_of_month' AND payment_date <= '$end_of_month'");
+if ($bank_coll_res) {
+    $this_month_bank = round(floatval($bank_coll_res->fetch_assoc()['total'] ?? 0));
+}
+
 // Dynamic Month List
 $month_options = [];
 $first_day_of_month = strtotime(date('Y-m-01'));
@@ -292,7 +330,7 @@ for ($i = 0; $i < 12; $i++) {
                 <div class="topbar-right">
                     <span class="user-info">
                         <i class="fas fa-user-circle"></i> <?php echo get_username(); ?> 
-                        <small>(Principal)</small>
+                        <small>(<?php echo is_developer() ? 'Developer' : 'Principal'; ?>)</small>
                     </span>
                     <a href="../logout.php" class="btn-secondary">
                         <i class="fas fa-sign-out-alt"></i> Logout
@@ -358,6 +396,11 @@ for ($i = 0; $i < 12; $i++) {
                         <a href="receipt_note.php" class="module-nav-btn">
                             <i class="fas fa-sticky-note"></i> Custom Note
                         </a>
+                        <?php if (is_developer()): ?>
+                            <a href="notifications.php" class="module-nav-btn" style="color: #f59e0b; border-color: #f59e0b;">
+                                <i class="fas fa-bell"></i> Post Notification
+                            </a>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -548,6 +591,36 @@ for ($i = 0; $i < 12; $i++) {
                             </div>
                         </div>
 
+                        <!-- ROW 2: CARD 7 -> Bank Transfer / Deposit (Monthly Filter Dropdown) -->
+                        <div class="stat-card stat-card--dropdown" style="width: 100%; min-width: 0;">
+                            <div class="stat-card__content-wrapper">
+                                <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
+                                    <i class="fas fa-university"></i>
+                                </div>
+                                <div class="stat-content" style="min-width: 0;">
+                                    <h3 style="white-space: nowrap;">
+                                        <span id="bank_collection_amount">Rs. <?php echo number_format($this_month_bank, 0); ?></span>
+                                    </h3>
+                                    <p id="bank_collection_label" class="mb-0" style="white-space: nowrap;">Bank Deposit (<?php echo date('M Y'); ?>)</p>
+                                </div>
+                            </div>
+
+                            <div class="dropdown">
+                                <button class="btn dropdown-toggle stat-card__dropdown-btn" type="button" id="bankMonthDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Filter by Month">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="bankMonthDropdown">
+                                    <?php foreach ($month_options as $m_val => $m_text): ?>
+                                        <li>
+                                            <a class="dropdown-item bank-month-select-item" href="#" data-month="<?php echo $m_val; ?>" data-label="<?php echo date('M Y', strtotime("01-$m_val")); ?>">
+                                                <?php echo $m_text; ?>
+                                            </a>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        </div>
+
                         <!-- ROW 3: CARD 9 -> Today's Collection -->
                         <div class="stat-card" style="width: 100%; min-width: 0;">
                             <div class="stat-icon" style="background: #e3f1ea; color: #1f5f46;">
@@ -710,6 +783,24 @@ for ($i = 0; $i < 12; $i++) {
                         }
                     })
                     .catch(err => console.error("Error fetching paid students:", err));
+            });
+        });
+
+        // Bank Deposit Dynamic AJAX Dropdown Listener
+        document.querySelectorAll('.bank-month-select-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                const selectedMonth = this.getAttribute('data-month');
+
+                fetch(`dashboard.php?ajax_action=get_bank_collection&month=${encodeURIComponent(selectedMonth)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            document.getElementById('bank_collection_amount').innerText = data.formatted;
+                            document.getElementById('bank_collection_label').innerText = `Bank Deposit (${data.month_label})`;
+                        }
+                    })
+                    .catch(err => console.error("Error fetching bank collection:", err));
             });
         });
     </script>

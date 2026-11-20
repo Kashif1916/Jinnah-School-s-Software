@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupFormValidation();
     setupDeleteConfirmation();
     setupFormLoaders();
+    checkDeveloperNotifications();
 });
 
 /**
@@ -335,6 +336,157 @@ function setupAutoSaveDraft(formId, storageKey) {
     form.addEventListener('submit', function() {
         localStorage.removeItem(storageKey);
     });
+}
+
+/**
+ * Developer Notifications System
+ * Shows notifications posted by developer until user clicks "Got It"
+ */
+let devNotificationQueue = [];
+
+function getAppBasePath() {
+    const path = window.location.pathname.toLowerCase();
+    if (path.includes('/master/') || path.includes('/finance/') || path.includes('/admission/') || path.includes('/teacher/') || path.includes('/developer/')) {
+        return '../';
+    }
+    return '';
+}
+
+function formatNotificationText(text) {
+    if (!text) return '';
+    // Decode any pre-escaped HTML entities from older DB records first, then safely escape HTML
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = text.toString();
+    const decoded = textarea.value;
+
+    return escapeHtml(decoded)
+        .replace(/\\r\\n|\\n|\\r/g, '<br>')
+        .replace(/\r\n|\n|\r/g, '<br>');
+}
+
+function checkDeveloperNotifications() {
+    // Only check if logged in (avoid running on public login page if not needed)
+    if (document.body.classList.contains('login-body')) return;
+
+    const basePath = getAppBasePath();
+    fetch(`${basePath}get_notifications.php`)
+        .then(res => {
+            if (!res.ok) return [];
+            return res.json();
+        })
+        .then(notifications => {
+            if (Array.isArray(notifications) && notifications.length > 0) {
+                devNotificationQueue = notifications;
+                showNextDeveloperNotification();
+            }
+        })
+        .catch(err => {
+            // Silently ignore network/auth errors
+            console.log('Notification check skipped:', err);
+        });
+}
+
+function showNextDeveloperNotification() {
+    if (devNotificationQueue.length === 0) {
+        const existingModal = document.getElementById('devNotificationModal');
+        if (existingModal) {
+            const modalInstance = bootstrap.Modal.getInstance(existingModal);
+            if (modalInstance) modalInstance.hide();
+        }
+        return;
+    }
+
+    const currentNotif = devNotificationQueue[0];
+    let modalEl = document.getElementById('devNotificationModal');
+    
+    const typeIcons = {
+        'info': 'fa-info-circle text-info',
+        'warning': 'fa-exclamation-triangle text-warning',
+        'success': 'fa-check-circle text-success',
+        'danger': 'fa-radiation text-danger'
+    };
+    const iconClass = typeIcons[currentNotif.type] || 'fa-bell text-warning';
+
+    const modalHtml = `
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0" style="border-radius: 14px; overflow: hidden;">
+                <div class="modal-header bg-dark text-white py-3 px-4">
+                    <h5 class="modal-title d-flex align-items-center gap-2 mb-0" style="font-size: 1.1rem; font-weight: 600;">
+                        <i class="fas ${iconClass}"></i>
+                        <span>${formatNotificationText(currentNotif.title)}</span>
+                    </h5>
+                </div>
+                <div class="modal-body p-4" style="font-size: 1rem; color: #2d3748; line-height: 1.6; background: #fafbfc;">
+                    <div class="p-3 bg-white rounded border mb-3">
+                        ${formatNotificationText(currentNotif.message)}
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center text-muted small">
+                        <span><i class="fas fa-code me-1"></i> Developer Notice</span>
+                        <span><i class="far fa-clock me-1"></i> ${escapeHtml(currentNotif.created_at || '')}</span>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-center bg-light py-3 border-top-0">
+                    <button type="button" class="btn btn-primary px-5 py-2 fw-bold" style="border-radius: 8px; font-size: 1rem;" onclick="dismissDevNotification(${currentNotif.id}, this)">
+                        <i class="fas fa-check me-2"></i> Got It
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    if (!modalEl) {
+        modalEl = document.createElement('div');
+        modalEl.id = 'devNotificationModal';
+        modalEl.className = 'modal fade';
+        modalEl.setAttribute('tabindex', '-1');
+        modalEl.setAttribute('data-bs-backdrop', 'static');
+        modalEl.setAttribute('data-bs-keyboard', 'false');
+        modalEl.innerHTML = modalHtml;
+        document.body.appendChild(modalEl);
+    } else {
+        modalEl.innerHTML = modalHtml;
+    }
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+}
+
+function dismissDevNotification(notifId, btn) {
+    const basePath = getAppBasePath();
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Please wait...';
+    }
+
+    fetch(`${basePath}dismiss_notification.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `notif_id=${encodeURIComponent(notifId)}`
+    })
+    .then(res => res.json())
+    .then(data => {
+        // Remove dismissed notification from queue
+        devNotificationQueue = devNotificationQueue.filter(n => n.id != notifId);
+        showNextDeveloperNotification();
+    })
+    .catch(err => {
+        console.error('Error dismissing notification:', err);
+        // Fallback: still advance queue
+        devNotificationQueue = devNotificationQueue.filter(n => n.id != notifId);
+        showNextDeveloperNotification();
+    });
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.toString().replace(/[&<>"']/g, m => map[m]);
 }
 
 console.log('School Finance Management System - JavaScript loaded successfully');

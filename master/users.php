@@ -31,15 +31,19 @@ if (isset($_GET['delete'])) {
         if ($res->num_rows > 0) {
             $user_to_delete = $res->fetch_assoc();
             
-            // Delete user
-            $del_stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
-            $del_stmt->bind_param("i", $delete_id);
-            if ($del_stmt->execute()) {
-                $success = "User '" . htmlspecialchars($user_to_delete['username']) . "' has been deleted successfully!";
+            if ($user_to_delete['role'] === 'developer' && !is_developer()) {
+                $error = "User not found!";
             } else {
-                $error = "Error deleting user: " . $conn->error;
+                // Delete user
+                $del_stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
+                $del_stmt->bind_param("i", $delete_id);
+                if ($del_stmt->execute()) {
+                    $success = "User '" . htmlspecialchars($user_to_delete['username']) . "' has been deleted successfully!";
+                } else {
+                    $error = "Error deleting user: " . $conn->error;
+                }
+                $del_stmt->close();
             }
-            $del_stmt->close();
         } else {
             $error = "User not found!";
         }
@@ -56,9 +60,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $password = $_POST['password'] ?? '';
         $role = sanitize_input($_POST['role'] ?? '');
         
+        $allowed_roles = ['master', 'finance', 'admission', 'teacher'];
+        if (is_developer()) {
+            $allowed_roles[] = 'developer';
+        }
+        
         if (empty($username) || empty($password) || empty($role)) {
             $error = "Username, Password, and Role are required!";
-        } elseif (!in_array($role, ['master', 'finance', 'admission', 'teacher'])) {
+        } elseif (!in_array($role, $allowed_roles)) {
             $error = "Invalid role selected!";
         } else {
             // Check if username exists
@@ -89,9 +98,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $role = sanitize_input($_POST['role'] ?? '');
         $current_user_id = get_user_id();
         
+        $allowed_roles = ['master', 'finance', 'admission', 'teacher'];
+        if (is_developer()) {
+            $allowed_roles[] = 'developer';
+        }
+
         if (empty($username) || empty($role)) {
             $error = "Username and Role are required!";
-        } elseif (!in_array($role, ['master', 'finance', 'admission', 'teacher'])) {
+        } elseif (!in_array($role, $allowed_roles)) {
             $error = "Invalid role selected!";
         } else {
             // Check if username exists on another user
@@ -151,41 +165,46 @@ if (isset($_GET['toggle_freeze'])) {
         
         if ($res->num_rows > 0) {
             $user_row = $res->fetch_assoc();
-            $new_frozen_status = intval($user_row['is_frozen']) === 1 ? 0 : 1;
-            // When master freezes from users.php, it stays frozen indefinitely until master unfreezes
-            $new_frozen_until = null;
-            $update_stmt = $conn->prepare("UPDATE users SET is_frozen = ?, frozen_until = ? WHERE id = ?");
-            $update_stmt->bind_param("isi", $new_frozen_status, $new_frozen_until, $toggle_id);
-            if ($update_stmt->execute()) {
-                if ($new_frozen_status === 1) {
-                    $master_user = get_username();
-                    $u_role = $user_row['role'] ?? 'finance';
-                    $l_stmt = $conn->prepare("INSERT INTO account_close_logs (user_id, username, role, closed_by, closed_at, frozen_until, status) VALUES (?, ?, ?, ?, NOW(), NULL, 'frozen_by_master')");
-                    if ($l_stmt) {
-                        $l_stmt->bind_param("isss", $toggle_id, $user_row['username'], $u_role, $master_user);
-                        $l_stmt->execute();
-                        $l_stmt->close();
-                    }
-                } else {
-                    // Update latest log status to unfrozen_by_master
-                    $conn->query("UPDATE account_close_logs SET status = 'unfrozen_by_master' WHERE user_id = " . intval($toggle_id) . " ORDER BY id DESC LIMIT 1");
-                    // Insert unfreeze audit entry
-                    $master_user = get_username();
-                    $u_role = $user_row['role'] ?? 'finance';
-                    $ip_addr = $_SERVER['REMOTE_ADDR'] ?? '';
-                    $l_stmt = $conn->prepare("INSERT INTO account_close_logs (user_id, username, role, closed_by, closed_at, frozen_until, ip_address, status) VALUES (?, ?, ?, ?, NOW(), NULL, ?, 'unfrozen_by_master')");
-                    if ($l_stmt) {
-                        $l_stmt->bind_param("issss", $toggle_id, $user_row['username'], $u_role, $master_user, $ip_addr);
-                        $l_stmt->execute();
-                        $l_stmt->close();
-                    }
-                }
-                $status_txt = $new_frozen_status === 1 ? 'frozen' : 'unfrozen';
-                $success = "User '" . htmlspecialchars($user_row['username']) . "' has been " . $status_txt . " successfully!";
+            
+            if ($user_row['role'] === 'developer' && !is_developer()) {
+                $error = "User not found!";
             } else {
-                $error = "Error updating user freeze status: " . $conn->error;
+                $new_frozen_status = intval($user_row['is_frozen']) === 1 ? 0 : 1;
+                // When master freezes from users.php, it stays frozen indefinitely until master unfreezes
+                $new_frozen_until = null;
+                $update_stmt = $conn->prepare("UPDATE users SET is_frozen = ?, frozen_until = ? WHERE id = ?");
+                $update_stmt->bind_param("isi", $new_frozen_status, $new_frozen_until, $toggle_id);
+                if ($update_stmt->execute()) {
+                    if ($new_frozen_status === 1) {
+                        $master_user = get_username();
+                        $u_role = $user_row['role'] ?? 'finance';
+                        $l_stmt = $conn->prepare("INSERT INTO account_close_logs (user_id, username, role, closed_by, closed_at, frozen_until, status) VALUES (?, ?, ?, ?, NOW(), NULL, 'frozen_by_master')");
+                        if ($l_stmt) {
+                            $l_stmt->bind_param("isss", $toggle_id, $user_row['username'], $u_role, $master_user);
+                            $l_stmt->execute();
+                            $l_stmt->close();
+                        }
+                    } else {
+                        // Update latest log status to unfrozen_by_master
+                        $conn->query("UPDATE account_close_logs SET status = 'unfrozen_by_master' WHERE user_id = " . intval($toggle_id) . " ORDER BY id DESC LIMIT 1");
+                        // Insert unfreeze audit entry
+                        $master_user = get_username();
+                        $u_role = $user_row['role'] ?? 'finance';
+                        $ip_addr = $_SERVER['REMOTE_ADDR'] ?? '';
+                        $l_stmt = $conn->prepare("INSERT INTO account_close_logs (user_id, username, role, closed_by, closed_at, frozen_until, ip_address, status) VALUES (?, ?, ?, ?, NOW(), NULL, ?, 'unfrozen_by_master')");
+                        if ($l_stmt) {
+                            $l_stmt->bind_param("issss", $toggle_id, $user_row['username'], $u_role, $master_user, $ip_addr);
+                            $l_stmt->execute();
+                            $l_stmt->close();
+                        }
+                    }
+                    $status_txt = $new_frozen_status === 1 ? 'frozen' : 'unfrozen';
+                    $success = "User '" . htmlspecialchars($user_row['username']) . "' has been " . $status_txt . " successfully!";
+                } else {
+                    $error = "Error updating user freeze status: " . $conn->error;
+                }
+                $update_stmt->close();
             }
-            $update_stmt->close();
         } else {
             $error = "User not found!";
         }
@@ -236,13 +255,26 @@ if (isset($_GET['edit'])) {
     $stmt->execute();
     $res = $stmt->get_result();
     if ($res->num_rows > 0) {
-        $edit_user = $res->fetch_assoc();
+        $u_candidate = $res->fetch_assoc();
+        // Hide developer from non-developer master
+        if ($u_candidate['role'] === 'developer' && !is_developer()) {
+            $error = "User not found!";
+            $edit_user = null;
+        } else {
+            $edit_user = $u_candidate;
+        }
     }
     $stmt->close();
 }
 
-// Fetch all users for listing
-$users_result = $conn->query("SELECT id, username, password, role, is_frozen, frozen_until, edit_access, created_at FROM users ORDER BY id ASC");
+// Fetch users for listing - DEVELOPER USER IS COMPLETELY HIDDEN FROM MASTER!
+$user_sql = "SELECT id, username, password, role, is_frozen, frozen_until, edit_access, created_at FROM users ";
+if (!is_developer()) {
+    $user_sql .= "WHERE role != 'developer' ";
+}
+$user_sql .= "ORDER BY id ASC";
+
+$users_result = $conn->query($user_sql);
 $users = [];
 if ($users_result) {
     while ($row = $users_result->fetch_assoc()) {
@@ -338,6 +370,11 @@ if ($users_result) {
                         <a href="receipt_note.php" class="module-nav-btn">
                             <i class="fas fa-sticky-note"></i> Custom Note
                         </a>
+                        <?php if (is_developer()): ?>
+                            <a href="notifications.php" class="module-nav-btn" style="color: #f59e0b; border-color: #f59e0b;">
+                                <i class="fas fa-bell"></i> Post Notification
+                            </a>
+                        <?php endif; ?>
                         <a href="../help.php" class="module-nav-btn">
                             <i class="fas fa-question-circle text-success"></i> Help & About
                         </a>
@@ -390,7 +427,9 @@ if ($users_result) {
                                                         <?php endif; ?>
                                                     </td>
                                                     <td>
-                                                        <?php if ($u['role'] === 'master'): ?>
+                                                        <?php if ($u['role'] === 'developer'): ?>
+                                                            <span class="badge bg-dark" style="font-size: 0.8rem;"><i class="fas fa-code"></i> Developer</span>
+                                                        <?php elseif ($u['role'] === 'master'): ?>
                                                             <span class="badge bg-danger" style="font-size: 0.8rem;"><i class="fas fa-shield-alt"></i> Master</span>
                                                         <?php elseif ($u['role'] === 'finance'): ?>
                                                             <span class="badge bg-primary" style="font-size: 0.8rem;"><i class="fas fa-calculator"></i> Finance</span>
@@ -418,7 +457,7 @@ if ($users_result) {
                                                             <span class="badge bg-success" style="font-size: 0.8rem;"><i class="fas fa-check-circle"></i> Active</span>
                                                         <?php endif; ?>
                                                         
-                                                        <?php if ($u['role'] !== 'master'): ?>
+                                                        <?php if ($u['role'] !== 'master' && $u['role'] !== 'developer'): ?>
                                                             <br>
                                                             <?php if (intval($u['edit_access'] ?? 0) === 1): ?>
                                                                 <span class="badge bg-info text-dark" style="font-size: 0.75rem; margin-top: 4px;"><i class="fas fa-user-edit"></i> Edit Allowed</span>
@@ -431,7 +470,7 @@ if ($users_result) {
                                                         <?php echo date('d-M-Y h:i A', strtotime($u['created_at'])); ?>
                                                     </td>
                                                     <td class="text-end">
-                                                        <?php if ($u['id'] != get_user_id() && $u['role'] !== 'master'): ?>
+                                                        <?php if ($u['id'] != get_user_id() && $u['role'] !== 'master' && $u['role'] !== 'developer'): ?>
                                                             <?php if (intval($u['edit_access'] ?? 0) === 1): ?>
                                                                 <a href="users.php?toggle_edit_access=<?php echo $u['id']; ?>" class="btn btn-sm btn-outline-secondary me-1" style="padding: 4px 10px; font-size: 0.85rem;" title="Revoke Edit Access">
                                                                     <i class="fas fa-user-slash"></i> Revoke Edit
@@ -498,6 +537,9 @@ if ($users_result) {
                                             <option value="finance" <?php echo $edit_user['role'] === 'finance' ? 'selected' : ''; ?>>Finance User</option>
                                             <option value="teacher" <?php echo $edit_user['role'] === 'teacher' ? 'selected' : ''; ?>>Teacher</option>
                                             <option value="master" <?php echo $edit_user['role'] === 'master' ? 'selected' : ''; ?>>Master Admin</option>
+                                            <?php if (is_developer()): ?>
+                                                <option value="developer" <?php echo $edit_user['role'] === 'developer' ? 'selected' : ''; ?>>Developer</option>
+                                            <?php endif; ?>
                                         </select>
                                     </div>
                                     

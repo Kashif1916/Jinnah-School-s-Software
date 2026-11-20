@@ -18,10 +18,10 @@ function is_logged_in() {
 }
 
 /**
- * Check if user is Master
+ * Check if user is Master (or Developer who inherits all Master roles)
  */
 function is_master() {
-    return is_logged_in() && $_SESSION['role'] === 'master';
+    return is_logged_in() && ($_SESSION['role'] === 'master' || $_SESSION['role'] === 'developer');
 }
 
 /**
@@ -43,6 +43,13 @@ function is_admission() {
  */
 function is_teacher() {
     return is_logged_in() && $_SESSION['role'] === 'teacher';
+}
+
+/**
+ * Check if user is Developer
+ */
+function is_developer() {
+    return is_logged_in() && $_SESSION['role'] === 'developer';
 }
 
 /**
@@ -204,6 +211,17 @@ function require_admission() {
 function require_teacher() {
     require_login();
     if (!is_teacher()) {
+        header('Location: ' . BASE_URL . 'index.php');
+        exit();
+    }
+}
+
+/**
+ * Require developer role
+ */
+function require_developer() {
+    require_login();
+    if (!is_developer()) {
         header('Location: ' . BASE_URL . 'index.php');
         exit();
     }

