@@ -278,12 +278,22 @@ function get_total_paid_fees($student_id) {
 function get_defaulters($class = '', $section = '', $months = [], $name = '', $father_name = '', $student_id = '') {
     global $conn;
     
-    // Default months list: next month + past 12 months
+    // Check if 2+, 3+, or Arrears checkbox is active in request when months is empty
+    $exclude_next_month = (
+        (!empty($_REQUEST['min_2_months']) && $_REQUEST['min_2_months'] == 1) ||
+        (!empty($_REQUEST['min_3_months']) && $_REQUEST['min_3_months'] == 1) ||
+        (!empty($_REQUEST['arrears_only']) && $_REQUEST['arrears_only'] == 1)
+    );
+
+    // Default months list
     if (empty($months)) {
         $months = [];
         $start_date = strtotime(date('Y-m-01'));
-        $months[] = date('M-Y', strtotime("+1 month", $start_date));
-        for ($i = 0; $i < 12; $i++) {
+        if (!$exclude_next_month) {
+            $months[] = date('M-Y', strtotime("+1 month", $start_date));
+        }
+        $lookback = (!empty($_REQUEST['prev_plus_next_1']) && $_REQUEST['prev_plus_next_1'] == 1) ? 24 : 12;
+        for ($i = 0; $i < $lookback; $i++) {
             $months[] = date('M-Y', strtotime("-$i months", $start_date));
         }
         $months[] = 'Admission';
@@ -393,7 +403,7 @@ function get_defaulters($class = '', $section = '', $months = [], $name = '', $f
 }
 
 /**
- * Filter defaulters list by 2+ months, 3+ months, or arrears only
+ * Filter defaulters list by 2+ months, 3+ months, or arrears only (excludes next month automatically)
  */
 function filter_defaulters_by_criteria($all_defaulter_list, $min_2_months = 0, $min_3_months = 0, $arrears_only = 0, $months_filter = []) {
     global $conn;
@@ -405,6 +415,21 @@ function filter_defaulters_by_criteria($all_defaulter_list, $min_2_months = 0, $
     $min_2_months = !empty($min_2_months) ? 1 : 0;
     $min_3_months = !empty($min_3_months) ? 1 : 0;
     $arrears_only = !empty($arrears_only) ? 1 : 0;
+    $next_month_str = date('M-Y', strtotime('+1 month', strtotime(date('Y-m-01'))));
+
+    // When 2+, 3+, or Arrears Only is checked, ensure next month is excluded from pending_months & pending_count
+    if ($min_2_months === 1 || $min_3_months === 1 || $arrears_only === 1) {
+        foreach ($all_defaulter_list as $k => $d) {
+            if (!empty($d['pending_months'])) {
+                $m_arr = array_map('trim', explode(',', $d['pending_months']));
+                $m_arr = array_values(array_filter($m_arr, function($m) use ($next_month_str) {
+                    return $m !== '' && $m !== $next_month_str;
+                }));
+                $all_defaulter_list[$k]['pending_months'] = implode(',', $m_arr);
+                $all_defaulter_list[$k]['pending_count'] = count($m_arr);
+            }
+        }
+    }
 
     if ($arrears_only === 1) {
         foreach ($all_defaulter_list as $k => $d) {
@@ -425,6 +450,10 @@ function filter_defaulters_by_criteria($all_defaulter_list, $min_2_months = 0, $
                 if ($arr_res) {
                     while ($r_row = $arr_res->fetch_assoc()) {
                         $m_trimmed = trim($r_row['month']);
+                        // Always exclude next month for Arrears Only
+                        if ($m_trimmed === $next_month_str) {
+                            continue;
+                        }
                         if (!empty($months_filter) && !in_array($m_trimmed, (array)$months_filter)) {
                             continue;
                         }

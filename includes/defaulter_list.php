@@ -31,12 +31,13 @@ $student_id_filter = sanitize_input($_REQUEST['student_id'] ?? '');
 $name_filter = sanitize_input($_REQUEST['name'] ?? '');
 $father_name_filter = sanitize_input($_REQUEST['father_name'] ?? '');
 $months_filter = $_REQUEST['months'] ?? [];
-$min_2_months = isset($_REQUEST['min_2_months']) ? 1 : 0; // 2+ Months Checkbox value
-$min_3_months = isset($_REQUEST['min_3_months']) ? 1 : 0; // 3+ Months Checkbox value
-$arrears_only = isset($_REQUEST['arrears_only']) ? 1 : 0; // Arrears (Partial Payment) Checkbox value
+$min_2_months = isset($_REQUEST['min_2_months']) && $_REQUEST['min_2_months'] == 1 ? 1 : 0; // 2+ Months Checkbox value
+$min_3_months = isset($_REQUEST['min_3_months']) && $_REQUEST['min_3_months'] == 1 ? 1 : 0; // 3+ Months Checkbox value
+$arrears_only = isset($_REQUEST['arrears_only']) && $_REQUEST['arrears_only'] == 1 ? 1 : 0; // Arrears (Partial Payment) Checkbox value
+$prev_plus_next_1 = isset($_REQUEST['prev_plus_next_1']) && $_REQUEST['prev_plus_next_1'] == 1 ? 1 : 0; // Previous Pending + Next 1 Month Checkbox value
 
 // Check if user has applied any filter
-$is_filtered = (!empty($student_id_filter) || !empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($father_name_filter) || !empty($months_filter) || $min_2_months === 1 || $min_3_months === 1 || $arrears_only === 1);
+$is_filtered = (!empty($student_id_filter) || !empty($class_filter) || !empty($section_filter) || !empty($name_filter) || !empty($father_name_filter) || !empty($months_filter) || $min_2_months === 1 || $min_3_months === 1 || $arrears_only === 1 || $prev_plus_next_1 === 1);
 
 // Pagination Configuration (Only applies when NO filter is used)
 $limit = 20; // Default items per page
@@ -44,15 +45,49 @@ $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] :
 if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
 
+// Determine effective months filter:
+// - If 2+, 3+, or Arrears is checked (and no manual months selected), exclude next month (+1 month)
+// - If Previous Pending + Next 1 Month is checked (and no manual months selected), include past + current + next 1 month
+$effective_months_filter = $months_filter;
+if (empty($effective_months_filter)) {
+    $start_date = strtotime(date('Y-m-01'));
+    if ($min_2_months === 1 || $min_3_months === 1 || $arrears_only === 1) {
+        // Past 12 months + Current month ONLY (Exclude next month)
+        $effective_months_filter = [];
+        for ($i = 0; $i < 12; $i++) {
+            $effective_months_filter[] = date('M-Y', strtotime("-$i months", $start_date));
+        }
+        $effective_months_filter[] = 'Admission';
+        $effective_months_filter[] = 'Pre_Year';
+        $effective_months_filter[] = 'Prev-Year';
+        $effective_months_filter[] = 'Pre-Year';
+        $effective_months_filter[] = 'Yearly Package';
+        $effective_months_filter[] = 'Package';
+    } elseif ($prev_plus_next_1 === 1) {
+        // Previous pending (up to 24 months) + Current month + Next 1 month
+        $effective_months_filter = [];
+        $effective_months_filter[] = date('M-Y', strtotime("+1 month", $start_date));
+        for ($i = 0; $i < 24; $i++) {
+            $effective_months_filter[] = date('M-Y', strtotime("-$i months", $start_date));
+        }
+        $effective_months_filter[] = 'Admission';
+        $effective_months_filter[] = 'Pre_Year';
+        $effective_months_filter[] = 'Prev-Year';
+        $effective_months_filter[] = 'Pre-Year';
+        $effective_months_filter[] = 'Yearly Package';
+        $effective_months_filter[] = 'Package';
+    }
+}
+
 // Get defaulters (updated to accept Student ID, multi-select class & section arrays)
-$defaulters = get_defaulters($class_filter, $section_filter, $months_filter, $name_filter, $father_name_filter, $student_id_filter);
+$defaulters = get_defaulters($class_filter, $section_filter, $effective_months_filter, $name_filter, $father_name_filter, $student_id_filter);
 $all_defaulter_list = [];
 if ($defaulters) {
     $all_defaulter_list = $defaulters->fetch_all(MYSQLI_ASSOC);
 }
 
 // Apply 2+ months, 3+ months, or arrears filter
-$all_defaulter_list = filter_defaulters_by_criteria($all_defaulter_list, $min_2_months, $min_3_months, $arrears_only, $months_filter);
+$all_defaulter_list = filter_defaulters_by_criteria($all_defaulter_list, $min_2_months, $min_3_months, $arrears_only, $effective_months_filter);
 
 $total_defaulters = count($all_defaulter_list);
 $total_pages = ceil($total_defaulters / $limit);
@@ -120,6 +155,9 @@ if (!$is_filtered) {
         }
         .checkbox-card.card-info {
             color: #0dcaf0;
+        }
+        .checkbox-card.card-success {
+            color: #198754;
         }
     </style>
 </head>
@@ -225,22 +263,28 @@ if (!$is_filtered) {
                             <div class="form-group">
                                 <label>Pending Filter</label>
                                 <div class="d-flex flex-column gap-2">
-                                    <!-- 2+ Months Pending Checkbox -->
+                                    <!-- 2+ Months Pending Checkbox (Excludes Next Month) -->
                                     <label class="checkbox-card card-warning">
                                         <input type="checkbox" name="min_2_months" id="min_2_months" value="1" style="width: 18px; height: 18px;" <?php echo ($min_2_months === 1) ? 'checked' : ''; ?>>
                                         <span><i class="fas fa-exclamation-triangle me-1"></i> 2+ Months Pending Only</span>
                                     </label>
 
-                                    <!-- 3+ Months Pending Checkbox -->
+                                    <!-- 3+ Months Pending Checkbox (Excludes Next Month) -->
                                     <label class="checkbox-card card-danger">
                                         <input type="checkbox" name="min_3_months" id="min_3_months" value="1" style="width: 18px; height: 18px;" <?php echo ($min_3_months === 1) ? 'checked' : ''; ?>>
                                         <span><i class="fas fa-exclamation-circle me-1"></i> 3+ Months Pending Only</span>
                                     </label>
 
-                                    <!-- Arrears Only Checkbox -->
+                                    <!-- Arrears Only Checkbox (Excludes Next Month) -->
                                     <label class="checkbox-card card-info">
                                         <input type="checkbox" name="arrears_only" id="arrears_only" value="1" style="width: 18px; height: 18px;" <?php echo ($arrears_only === 1) ? 'checked' : ''; ?>>
                                         <span class="text-dark"><i class="fas fa-coins text-info me-1"></i> Arrears Only (Partial Payments)</span>
+                                    </label>
+
+                                    <!-- Previous Pending + Next 1 Month Checkbox -->
+                                    <label class="checkbox-card card-success">
+                                        <input type="checkbox" name="prev_plus_next_1" id="prev_plus_next_1" value="1" style="width: 18px; height: 18px;" <?php echo ($prev_plus_next_1 === 1) ? 'checked' : ''; ?>>
+                                        <span><i class="fas fa-calendar-plus me-1"></i> Previous Pending + Next 1 Month</span>
                                     </label>
                                 </div>
                             </div>
@@ -274,7 +318,10 @@ if (!$is_filtered) {
                         <?php if ($arrears_only === 1): ?>
                             <input type="hidden" name="arrears_only" value="1">
                         <?php endif; ?>
-                        <?php foreach ((array)$months_filter as $m_f): ?>
+                        <?php if ($prev_plus_next_1 === 1): ?>
+                            <input type="hidden" name="prev_plus_next_1" value="1">
+                        <?php endif; ?>
+                        <?php foreach ((array)$effective_months_filter as $m_f): ?>
                             <input type="hidden" name="months[]" value="<?php echo htmlspecialchars($m_f); ?>">
                         <?php endforeach; ?>
 
@@ -291,10 +338,11 @@ if (!$is_filtered) {
                                         'section' => $section_filter, 
                                         'name' => $name_filter, 
                                         'father_name' => $father_name_filter,
-                                        'months' => $months_filter,
+                                        'months' => $effective_months_filter,
                                         'min_2_months' => $min_2_months,
                                         'min_3_months' => $min_3_months,
-                                        'arrears_only' => $arrears_only
+                                        'arrears_only' => $arrears_only,
+                                        'prev_plus_next_1' => $prev_plus_next_1
                                     ];
                                     $report_url = "../master/defaulter_report.php?" . http_build_query($query_data);
                                 ?>
@@ -329,10 +377,11 @@ if (!$is_filtered) {
                                             'section' => $section_filter, 
                                             'name' => $name_filter, 
                                             'father_name' => $father_name_filter,
-                                            'months' => $months_filter,
+                                            'months' => $effective_months_filter,
                                             'min_2_months' => $min_2_months,
                                             'min_3_months' => $min_3_months,
-                                            'arrears_only' => $arrears_only
+                                            'arrears_only' => $arrears_only,
+                                            'prev_plus_next_1' => $prev_plus_next_1
                                         ]);
                                         ?>
                                         <tr>
@@ -431,31 +480,25 @@ if (!$is_filtered) {
 
         updateExportButtonText();
 
-        // Mutual exclusion between 2+, 3+, and Arrears checkboxes
-        var min2Cb = document.getElementById('min_2_months');
-        var min3Cb = document.getElementById('min_3_months');
-        var arrCb  = document.getElementById('arrears_only');
+        // Mutual exclusion between 2+, 3+, Arrears, and Previous+Next 1 Month checkboxes
+        var filterCbs = [
+            document.getElementById('min_2_months'),
+            document.getElementById('min_3_months'),
+            document.getElementById('arrears_only'),
+            document.getElementById('prev_plus_next_1')
+        ].filter(Boolean);
 
-        if (min2Cb && min3Cb && arrCb) {
-            min2Cb.addEventListener('change', function() {
+        filterCbs.forEach(function(cb) {
+            cb.addEventListener('change', function() {
                 if (this.checked) {
-                    min3Cb.checked = false;
-                    arrCb.checked = false;
+                    filterCbs.forEach(function(otherCb) {
+                        if (otherCb !== cb) {
+                            otherCb.checked = false;
+                        }
+                    });
                 }
             });
-            min3Cb.addEventListener('change', function() {
-                if (this.checked) {
-                    min2Cb.checked = false;
-                    arrCb.checked = false;
-                }
-            });
-            arrCb.addEventListener('change', function() {
-                if (this.checked) {
-                    min2Cb.checked = false;
-                    min3Cb.checked = false;
-                }
-            });
-        }
+        });
     });
     </script>
 </body>
